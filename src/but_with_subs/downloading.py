@@ -126,7 +126,7 @@ def download(url: str) -> c.Generator[DownloadProgress, None, File]:
         },
     }
 
-    logger.info("Starting download from URL: %s", url)
+    logger.info("Starting download from %s", url)
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
