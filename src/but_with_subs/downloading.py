@@ -108,11 +108,8 @@ def download(url: str) -> c.Generator[DownloadProgress, None, File]:
     progress_queue: queue.Queue[DownloadProgress] = queue.Queue()
 
     ydl_opts: dict = {
-        "outtmpl": {
-            "video": "./data/%(title)s.%(ext)s",
-            "audio": "./data/%(title)s.%(ext)s",
-        },
-        "format": "bestvideo+bestaudio/best",
+        "paths": dict(home="./data"),
+        "format": "bestvideo*+bestaudio*",
         "noplaylist": True,
         "hooks": {
             "progress_hooks": [
@@ -128,7 +125,7 @@ def download(url: str) -> c.Generator[DownloadProgress, None, File]:
 
     logger.info("Starting download from %s", url)
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[no-untyped-call]
         ydl.download([url])
 
     logger.info("Download completed, scanning for files in ./data/")
