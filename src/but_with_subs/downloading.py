@@ -6,12 +6,11 @@ that uses yt-dlp to fetch media from URLs.
 """
 
 import collections.abc as c
-import logging
-import pathlib
+import queue
 from pathlib import Path
 
-from pydantic import BaseModel
 import yt_dlp
+from pydantic import BaseModel
 
 from .logging_config import logger
 
@@ -50,12 +49,16 @@ class DownloadProgress(BaseModel):
     current_file: str | None = None
 
 
-def _parse_progress_info(info: dict) -> DownloadProgress:
+def _parse_progress_info(
+    info: dict, progress_queue: queue.Queue[DownloadProgress] | None = None
+) -> DownloadProgress:
     """Parse yt-dlp progress info into a DownloadProgress model.
 
     Args:
         info:
             Progress dictionary from yt-dlp hook.
+        progress_queue:
+            Optional queue to put the progress update into.
 
     Returns:
         A DownloadProgress instance with extracted values.
@@ -76,9 +79,14 @@ def _parse_progress_info(info: dict) -> DownloadProgress:
     if info.get("_filename") is not None:
         current_file = str(info["_filename"])
 
-    return DownloadProgress(
+    progress = DownloadProgress(
         percentage=percentage, status=status, current_file=current_file
     )
+
+    if progress_queue is not None:
+        progress_queue.put(progress)
+
+    return progress
 
 
 def download(url: str) -> c.Generator[DownloadProgress, None, File]:
@@ -97,6 +105,8 @@ def download(url: str) -> c.Generator[DownloadProgress, None, File]:
     data_dir = Path("./data")
     data_dir.mkdir(parents=True, exist_ok=True)
 
+    progress_queue: queue.Queue[DownloadProgress] = queue.Queue()
+
     ydl_opts: dict = {
         "outtmpl": {
             "video": "./data/%(title)s.%(ext)s",
@@ -107,8 +117,10 @@ def download(url: str) -> c.Generator[DownloadProgress, None, File]:
         "hooks": {
             "progress_hooks": [
                 lambda info: (
-                    logger.info("Progress: %s", _parse_progress_info(info))
-                    or _parse_progress_info(info)
+                    logger.info(
+                        "Progress: %s", _parse_progress_info(info, progress_queue)
+                    )
+                    or _parse_progress_info(info, progress_queue)
                 )
             ]
         },
@@ -140,5 +152,8 @@ def download(url: str) -> c.Generator[DownloadProgress, None, File]:
                 audio_path = item
 
     logger.info("Download results - video: %s, audio: %s", video_path, audio_path)
+
+    while not progress_queue.empty():
+        yield progress_queue.get()
 
     return File(url=url, video_path=video_path, audio_path=audio_path)

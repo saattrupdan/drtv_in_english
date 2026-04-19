@@ -163,7 +163,7 @@ URL and does the following:
    contains a `VideoWithSubs` model with the following fields:
 
    - `video_path (str)`: The absolute path to the downloaded video file, with audio
-	 merged
+  merged
    - `subtitles_path (str)`: The absolute path to the generated subtitles file
 
 ### Phase 7: Integrate UI with API

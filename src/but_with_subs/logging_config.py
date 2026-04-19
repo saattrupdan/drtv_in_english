@@ -6,10 +6,8 @@ your application startup to ensure all loggers share the same
 handlers and formatting.
 """
 
-import collections.abc as c
 import logging
 import sys
-
 
 logger = logging.getLogger(__package__)
 

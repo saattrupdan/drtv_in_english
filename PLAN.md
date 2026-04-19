@@ -132,7 +132,7 @@ The function will:
 - [x] Update `src/but_with_subs/__init__.py` to import and call `configure_logging()`
 - [x] Create `src/but_with_subs/downloading.py` with `File`, `DownloadProgress`, and `download`
 - [x] Create `src/scripts/download_video.py` test script
-- [ ] Create `tests/test_downloading.py` with comprehensive tests
+- [x] Create `tests/test_downloading.py` with comprehensive tests
 - [ ] Add `data/*` to `.gitignore` (preserving `.gitkeep`)
 - [ ] Run `make check` (formatters, linters, type checkers)
 - [ ] Run `make test` (pytest)
