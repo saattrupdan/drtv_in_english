@@ -20,7 +20,10 @@ def main(url: str) -> None:
     logger.info(f"Downloading from {url}...")
     gen = download(url=url)
     while True:
-        progress = next(gen)
+        try:
+            progress = next(gen)
+        except StopIteration:
+            break
         logger.info(progress)
 
 
