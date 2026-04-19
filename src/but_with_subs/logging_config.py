@@ -17,9 +17,6 @@ def configure_logging() -> None:
 
     Sets up a StreamHandler with a formatter that includes the
     logger name, level, and message. The default level is DEBUG.
-
-    Returns:
-        None
     """
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
