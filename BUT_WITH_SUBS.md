@@ -130,4 +130,80 @@ Note that in this phase, there's no calling the API yet, we just want to make su
 the UI works. The progress bar should just slowly move up to 100%, imitating the
 download and transcription process. The video player should just play an empty video.
 
+There should also be a button in the UI to go back to home, to process another video.
+
 ### Phase 6: API
+
+The API should be a FastAPI app that exposes the POST endpoint `/process` that takes a
+URL and does the following:
+
+1. Downloads the video and audio using the `download` function from Phase 1. The yielded
+   progress updates should be captured in a generator, which will be the
+   `StreamingResponse` to the endpoint.
+2. When the video and audio finish downloading we get the output `File` model from the
+   function, and these should be stored in the database. The database should have a
+   `files` table with the following columns:
+
+   - `url (str)`: The URL of the video (primary key)
+   - `video_path (str)`: The absolute path to the downloaded video file, if any
+   - `audio_path (str)`: The absolute path to the downloaded audio file, if any
+   - `subtitles_path (str)`: The absolute path to the generated subtitles file, if any
+   - `created_at (datetime)`: The timestamp when the file was created
+
+   Note that we don't set the `subtitles_path` yet, since we haven't generated the
+   subtitles yet.
+3. Next, we chunk the audio using the `chunk_audio` function from Phase 2. The yielded
+   chunks are passed through to the `transcribe` function from Phase 3, and we capture
+   the progress updates in the generator. When the transcription finishes, we get a list
+   of `Transcription` models.
+4. We next call the `generate_subtitles` function from Phase 4, and capture the progress
+   updates in the generator. When the subtitles are generated, we get a `Path` object
+   pointing to the generated `vtt` file, and we store this in the database.
+5. Finally, we add a final 'completed' progress update to the generator, which also
+   contains a `VideoWithSubs` model with the following fields:
+
+   - `video_path (str)`: The absolute path to the downloaded video file, with audio
+	 merged
+   - `subtitles_path (str)`: The absolute path to the generated subtitles file
+
+### Phase 7: Integrate UI with API
+
+When the submission is triggered, the frontend should make a POST request to the API
+endpoint `/process` with the URL as the request body. The frontend should then display
+a progress bar with the progress updates from the API, in the same progress bar as was
+created in Phase 5.
+
+When the progress is finished, the frontend receives the `VideoWithSubs` model defined
+in Phase 6, and the values of these are then displayed in the HTML5 video element,
+defined in Phase 5.
+
+### Phase 8: Set up Docker
+
+Docker Compose is already set up, but you should add a postgres service (use
+`18.3-trixie` as the version) to the `docker-compose.yaml` file. You have to ensure that
+the backend installs `ffmpeg`, as that's required for the downloading to work. Also
+ensure that the NGINX config in `docker-compose.nginx.conf` is set up properly to handle
+the streaming of the API responses, and also in terms of timeouts, as the processing can
+take a long time (maybe have the timeout be 1 hour).
+
+### Phase 9: Documentation
+
+Update the readme with the following sections:
+
+- "Quick Start", which uses the `docker compose up --build --remove-orphans` command to
+  start the app
+- "Local Development", which shows how to install the repo (`make install`) and to run
+  the app in development mode (`npm run dev` and `uv run fastapi dev
+  src/but_with_subs/api.py`)
+- "Workflow", describing the workflow from the user sends a request, with diagrams
+- "Stack", describing the stack used in the project
+- "Contribute", on how to contribute to the project. Refer to the `CONTRIBUTING.md` file
+
+The readme should also feature the logo in `./public/but-with-subs-logo.jpg` at the top.
+
+### Phase 10: Backend tests
+
+Create tests for all the backend modules, and ensure they all pass with `make test`.
+Include both simple unit tests as well as full integration tests that test the entire
+flow from downloading the video to generating the subtitles (including the API). We
+should use a short dummy clip for this, so ask me for it.
