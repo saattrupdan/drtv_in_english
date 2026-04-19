@@ -1,24 +1,22 @@
 <!-- This disables the "First line in file should be a top level heading" rule -->
 <!-- markdownlint-disable MD041 -->
-<a href="https://github.com/alexandrainst/but_with_subs">
 <img
- src="https://filedn.com/lRBwPhPxgV74tO0rDoe8SpH/alexandra/alexandra-logo.jpeg"
+ src="/but-with-subs-logo.jpg"
  width="239"
  height="175"
  align="right"
- alt="Alexandra Institute Logo"
+ alt="But with subs logo"
 />
-</a>
 
 # But With Subs
 
 Watch anything online... but with subs.
 
 ______________________________________________________________________
-[![Code Coverage](https://img.shields.io/badge/Coverage-0%25-red.svg)](https://github.com/alexandrainst/but_with_subs/tree/main/tests)
-[![License](https://img.shields.io/github/license/alexandrainst/but_with_subs)](https://github.com/alexandrainst/but_with_subs/blob/main/LICENSE)
-[![LastCommit](https://img.shields.io/github/last-commit/alexandrainst/but_with_subs)](https://github.com/alexandrainst/but_with_subs/commits/main)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](https://github.com/alexandrainst/but_with_subs/blob/main/CODE_OF_CONDUCT.md)
+[![Code Coverage](https://img.shields.io/badge/Coverage-0%25-red.svg)](https://github.com/saattrupdan/but_with_subs/tree/main/tests)
+[![License](https://img.shields.io/github/license/saattrupdan/but_with_subs)](https://github.com/saattrupdan/but_with_subs/blob/main/LICENSE)
+[![LastCommit](https://img.shields.io/github/last-commit/saattrupdan/but_with_subs)](https://github.com/saattrupdan/but_with_subs/commits/main)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](https://github.com/saattrupdan/but_with_subs/blob/main/CODE_OF_CONDUCT.md)
 
 Developer:
 
@@ -125,6 +123,6 @@ for the repository (can be enabled on Github in the repository settings).
 Code Spaces is a new feature on Github, that allows you to develop on a project
 completely in the cloud, without having to do any local setup at all. This repo comes
 included with a configuration file for running code spaces on Github. When hosted on
-`alexandrainst/but_with_subs` then simply press the `<> Code` button
+`saattrupdan/but_with_subs` then simply press the `<> Code` button
 and add a code space to get started, which will open a VSCode window directly in your
 browser.

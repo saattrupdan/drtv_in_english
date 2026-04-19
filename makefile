@@ -32,7 +32,6 @@ install: ## Install dependencies
 	@$(MAKE) --quiet install-dependencies
 	@$(MAKE) --quiet setup-environment-variables
 	@$(MAKE) --quiet setup-git
-	@$(MAKE) --quiet add-repo-to-git
 	@echo "Installed the 'but_with_subs' project! You can now activate your virtual environment with 'source .venv/bin/activate'."
 	@echo "Note that this is a 'uv' project. Use 'uv add <package>' to install new dependencies and 'uv remove <package>' to remove them."
 
@@ -41,7 +40,6 @@ install-non-interactive:
 	@$(MAKE) --quiet install-dependencies
 	@$(MAKE) --quiet setup-environment-variables-non-interactive
 	@$(MAKE) --quiet setup-git
-	@$(MAKE) --quiet add-repo-to-git
 
 install-uv:
 	@if [ "$(shell which uv)" = "" ]; then \
@@ -76,15 +74,6 @@ setup-git:
 	@git init
 	@git config --local user.name "${GIT_NAME}"
 	@git config --local user.email "${GIT_EMAIL}"
-
-add-repo-to-git:
-	@if [ ! "$(shell git status --short)" = "" ] && [ "$(shell git --no-pager log --all | sed 's/`//g')" = "" ]; then \
-		git add .; \
-		git commit --quiet -m "Initial commit"; \
-	fi
-	@if [ "$(shell git remote)" = "" ]; then \
-		git remote add origin git@github.com:alexandrainst/but_with_subs.git; \
-	fi
 
 test:  ## Run tests
 	@uv run pytest && uv run readme-cov
