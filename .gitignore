@@ -114,5 +114,9 @@ site/
 # Node modules
 node_modules/
 
+# Data directory (top-level contents)
+data/*
+!data/.gitkeep
+
 # Implementation plan
 PLAN.md

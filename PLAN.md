@@ -133,7 +133,7 @@ The function will:
 - [x] Create `src/but_with_subs/downloading.py` with `File`, `DownloadProgress`, and `download`
 - [x] Create `src/scripts/download_video.py` test script
 - [x] Create `tests/test_downloading.py` with comprehensive tests
-- [ ] Add `data/*` to `.gitignore` (preserving `.gitkeep`)
+- [x] Add `data/*` to `.gitignore` (preserving `.gitkeep`)
 - [ ] Run `make check` (formatters, linters, type checkers)
 - [ ] Run `make test` (pytest)
 - [ ] Update documentation if necessary
