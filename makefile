@@ -76,7 +76,10 @@ setup-git:
 	@git config --local user.email "${GIT_EMAIL}"
 
 test:  ## Run tests
-	@uv run pytest && uv run readme-cov
+	@uv run pytest && \
+		uv run readme-cov && \
+		git add README.md && \
+		git commit -m "docs: Update coverage badge"
 
 docker:  ## Build Docker image and run container
 	@make install
