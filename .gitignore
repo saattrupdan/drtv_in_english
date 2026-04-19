@@ -113,3 +113,6 @@ site/
 
 # Node modules
 node_modules/
+
+# Implementation plan
+PLAN.md
