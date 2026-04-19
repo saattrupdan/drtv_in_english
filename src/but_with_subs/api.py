@@ -1,0 +1,47 @@
+"""FastAPI application and endpoints."""
+
+import typing as t
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> t.AsyncGenerator[None, None]:
+    """Manage application lifespan.
+
+    Args:
+        app:
+            The FastAPI application.
+
+    Yields:
+        Nothing, really. Yielding is just used to separate setup and teardown.
+    """
+    # Set up global state using `app.state.<new-attribute>` here
+
+    yield
+
+    # Clean up the global state here, if relevant
+
+
+app = FastAPI(title="But With Subs", version="0.0.0", lifespan=lifespan)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
+
+@app.get("/health")
+def health_check() -> dict[str, str]:
+    """Health check endpoint.
+
+    Returns:
+        Dictionary with status "OK" if the service is healthy.
+    """
+    return {"status": "OK"}
