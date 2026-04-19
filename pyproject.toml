@@ -10,7 +10,10 @@ maintainers = [
   {name = "Dan Saattrup Smart", email = "dan.smart@alexandra.dk"},
 ]
 requires-python = ">=3.12,<4.0"
-dependencies = ["fastapi[standard]>=0.135.3",]
+dependencies = [
+    "fastapi[standard]>=0.135.3",
+    "yt-dlp>=2026.3.17",
+]
 
 [project.urls]
 Repository = "https://github.com/saattrupdan/but_with_subs"
