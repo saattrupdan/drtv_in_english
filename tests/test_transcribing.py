@@ -9,7 +9,6 @@ import typing as t
 import unittest.mock as um
 
 import numpy as np
-import pytest
 
 from but_with_subs.transcribing import Transcription, transcribe
 
@@ -26,9 +25,7 @@ def test_transcription_model_creation_with_all_fields() -> None:
     correctly.
     """
     transcription: Transcription = Transcription(
-        start_time=0.0,
-        end_time=1.5,
-        text="Hello world",
+        start_time=0.0, end_time=1.5, text="Hello world"
     )
 
     assert transcription.start_time == 0.0
@@ -44,9 +41,7 @@ def test_transcription_model_with_nonzero_start() -> None:
     start.
     """
     transcription = Transcription(
-        start_time=2.5,
-        end_time=5.0,
-        text="This is a later segment",
+        start_time=2.5, end_time=5.0, text="This is a later segment"
     )
 
     assert transcription.start_time == 2.5
@@ -61,9 +56,7 @@ def test_transcription_duration_matches() -> None:
     end_time=3.0, the duration (end_time - start_time) equals 3.0.
     """
     transcription = Transcription(
-        start_time=0.0,
-        end_time=3.0,
-        text="Three second segment",
+        start_time=0.0, end_time=3.0, text="Three second segment"
     )
 
     assert transcription.end_time - transcription.start_time == 3.0
@@ -76,9 +69,7 @@ def test_transcription_duration_with_offset() -> None:
     start_time is greater than zero.
     """
     transcription = Transcription(
-        start_time=1.5,
-        end_time=4.5,
-        text="Three second segment with offset",
+        start_time=1.5, end_time=4.5, text="Three second segment with offset"
     )
 
     assert transcription.end_time - transcription.start_time == 3.0
@@ -89,9 +80,7 @@ def test_transcription_duration_with_offset() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_pipeline(
-    return_value: list[dict[str, t.Any]],
-) -> um.MagicMock:
+def _make_mock_pipeline(return_value: list[dict[str, t.Any]]) -> um.MagicMock:
     """Create a mock AutomaticSpeechRecognitionPipeline.
 
     Args:
@@ -124,9 +113,7 @@ def test_transcribe_yields_transcription_models() -> None:
     )
 
     results = transcribe(
-        audio_data=mock_audio,
-        pipeline=mock_pipeline,
-        chunk_offset=0.0,
+        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
     )
 
     assert len(results) == 2
@@ -152,9 +139,7 @@ def test_transcribe_correct_time_offsets() -> None:
     )
 
     results = transcribe(
-        audio_data=mock_audio,
-        pipeline=mock_pipeline,
-        chunk_offset=5.0,
+        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=5.0
     )
 
     assert results[0].start_time == 5.0
@@ -182,9 +167,7 @@ def test_transcribe_preserves_text() -> None:
     )
 
     results = transcribe(
-        audio_data=mock_audio,
-        pipeline=mock_pipeline,
-        chunk_offset=0.0,
+        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
     )
 
     assert results[0].text == "First segment"
@@ -198,18 +181,10 @@ def test_transcribe_empty_audio_empty_result() -> None:
     that an empty list is returned.
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(
-        return_value=[
-            {
-                "chunks": [],
-            }
-        ]
-    )
+    mock_pipeline = _make_mock_pipeline(return_value=[{"chunks": []}])
 
     results = transcribe(
-        audio_data=mock_audio,
-        pipeline=mock_pipeline,
-        chunk_offset=0.0,
+        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
     )
 
     assert results == []
@@ -235,9 +210,7 @@ def test_transcribe_multiple_chunks_from_pipeline() -> None:
     )
 
     results = transcribe(
-        audio_data=mock_audio,
-        pipeline=mock_pipeline,
-        chunk_offset=0.0,
+        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
     )
 
     assert len(results) == 3
@@ -255,19 +228,11 @@ def test_transcribe_duration_matches_timestamps() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     mock_pipeline = _make_mock_pipeline(
-        return_value=[
-            {
-                "chunks": [
-                    {"text": "Segment", "timestamp": (1.0, 3.5)},
-                ]
-            }
-        ]
+        return_value=[{"chunks": [{"text": "Segment", "timestamp": (1.0, 3.5)}]}]
     )
 
     results = transcribe(
-        audio_data=mock_audio,
-        pipeline=mock_pipeline,
-        chunk_offset=0.0,
+        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
     )
 
     assert len(results) == 1
@@ -282,19 +247,11 @@ def test_transcribe_with_nonzero_offset_preserves_duration() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     mock_pipeline = _make_mock_pipeline(
-        return_value=[
-            {
-                "chunks": [
-                    {"text": "Segment", "timestamp": (0.5, 2.0)},
-                ]
-            }
-        ]
+        return_value=[{"chunks": [{"text": "Segment", "timestamp": (0.5, 2.0)}]}]
     )
 
     results = transcribe(
-        audio_data=mock_audio,
-        pipeline=mock_pipeline,
-        chunk_offset=10.0,
+        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=10.0
     )
 
     assert len(results) == 1

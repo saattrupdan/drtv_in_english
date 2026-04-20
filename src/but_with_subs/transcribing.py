@@ -74,9 +74,7 @@ def transcribe(
             end_time = float(timestamp[1]) + chunk_offset
             segments.append(
                 Transcription(
-                    start_time=start_time,
-                    end_time=end_time,
-                    text=chunk["text"],
+                    start_time=start_time, end_time=end_time, text=chunk["text"]
                 )
             )
 

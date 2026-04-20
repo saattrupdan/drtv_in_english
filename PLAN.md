@@ -18,4 +18,4 @@ Phase 3 adds speech-to-text transcription to the pipeline. We create a `transcri
 - [x] Create `src/but_with_subs/transcribing.py` with `Transcription` model and `transcribe` function
 - [x] Create `tests/test_transcribing.py` with unit tests for the Transcription model and transcribe function
 - [x] Run tests and verify they pass with `make test`
-- [ ] Run linting and formatting checks with `make check`
+- [x] Run linting and formatting checks with `make check`
