@@ -15,7 +15,7 @@ Phase 3 adds speech-to-text transcription to the pipeline. We create a `transcri
 ## Implementation Steps
 
 - [x] Add `transformers` and `torch` dependencies to `pyproject.toml`
-- [ ] Create `src/but_with_subs/transcribing.py` with `Transcription` model and `transcribe` function
+- [x] Create `src/but_with_subs/transcribing.py` with `Transcription` model and `transcribe` function
 - [ ] Create `tests/test_transcribing.py` with unit tests for the Transcription model and transcribe function
 - [ ] Run tests and verify they pass with `make test`
 - [ ] Run linting and formatting checks with `make check`
