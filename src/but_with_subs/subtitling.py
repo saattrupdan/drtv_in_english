@@ -137,6 +137,69 @@ def _format_vtt_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
 
 
+def _merge_transcriptions_into_sentences(
+    transcriptions: list[Transcription],
+) -> list[Transcription]:
+    """Merge word-level transcriptions into sentence-level transcriptions.
+
+    Concatenates all transcription texts with single spaces, tokenises the
+    combined text into sentences using the Danish ``punkt`` tokenizer, maps
+    each sentence back to the word-level chunks it spans, and returns new
+    ``Transcription`` objects whose start/end times cover the full sentence.
+
+    Args:
+        transcriptions:
+            A list of word-level ``Transcription`` objects.
+
+    Returns:
+        A list of ``Transcription`` objects, one per sentence, with merged
+        start/end times and the full sentence text.
+    """
+    if not transcriptions:
+        return []
+
+    # Build the full text and a character-to-chunk index map.
+    words = [t.text for t in transcriptions]
+    full_text = " ".join(words)
+
+    char_to_chunk: list[int] = []
+    for word_idx, word in enumerate(words):
+        # Each word contributes ``len(word)`` characters plus one space.
+        char_to_chunk.extend([word_idx] * len(word))
+        char_to_chunk.append(word_idx)  # the space after the word
+
+    # Tokenise into sentences.
+    sentences = nltk.sent_tokenize(full_text, language="danish")
+
+    merged: list[Transcription] = []
+
+    for sentence in sentences:
+        # Find the character span of this sentence in the full text.
+        start_pos = full_text.find(sentence)
+        if start_pos == -1:
+            # Fallback: skip sentences that can't be located.
+            continue
+
+        end_pos = start_pos + len(sentence)
+
+        # Map character positions back to word-chunk indices.
+        chunk_indices = set(char_to_chunk[start_pos:end_pos])
+
+        # Collect the min start_time and max end_time across those chunks.
+        min_start = min(transcriptions[i].start_time for i in chunk_indices)
+        max_end = max(transcriptions[i].end_time for i in chunk_indices)
+
+        merged.append(
+            Transcription(
+                start_time=min_start,
+                end_time=max_end,
+                text=sentence,
+            )
+        )
+
+    return merged
+
+
 def _escape_vtt_text(text: str) -> str:
     """Escape special characters for WebVTT cue text.
 
