@@ -9,22 +9,15 @@ handlers and formatting.
 import logging
 import sys
 
-logger = logging.getLogger(__package__)
-
 
 def configure_logging() -> None:
-    """Configure logging for the but_with_subs package.
-
-    Sets up a StreamHandler with a formatter that includes the
-    logger name, level, and message. The default level is DEBUG.
-    """
+    """Configure logging for the but_with_subs package."""
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-
+    root_logger.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        fmt="%(asctime)s • %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     handler = logging.StreamHandler(stream=sys.stdout)
-    handler.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter(fmt="%(name)s - %(levelname)s - %(message)s")
-    handler.setFormatter(formatter)
-
-    root_logger.addHandler(handler)
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(fmt=formatter)
+    root_logger.addHandler(hdlr=handler)
