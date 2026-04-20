@@ -83,8 +83,15 @@ def _load_audio(path: pl.Path) -> tuple[int, np.ndarray]:
     """
     sample_rate, audio_data = scipy.io.wavfile.read(filename=path)
     if audio_data.size == 0:
-        msg = f"Audio file {path} contains no data"
-        raise ValueError(msg)
+        raise ValueError(f"Audio file {path} contains no data")
+
+    # Ensure that the audio array is a numpy array of floats
+    audio_data = np.array(audio_data, dtype=np.float32) / np.iinfo(audio_data.dtype).max
+
+    # Ensure that the audio is mono
+    if audio_data.ndim > 1:
+        audio_data = np.mean(a=audio_data, axis=1)
+
     logger.info("Loaded audio from %s at %d Hz", path, sample_rate)
     return sample_rate, audio_data
 
@@ -99,7 +106,7 @@ def _resample_to_16k_mono(
 
     Args:
         audio:
-            Audio data array. Can be mono (1D) or stereo (2D).
+            Mono audio float data array, of shape (audio_len,).
         original_sr:
             The original sample rate of the audio.
 
@@ -107,16 +114,11 @@ def _resample_to_16k_mono(
         Tuple of (new_sample_rate, mono_resampled_audio).
 
     """
-    if audio.ndim > 1:
-        mono_audio = np.mean(a=audio, axis=0)
-    else:
-        mono_audio = audio
-
     target_sr = 16000
     if target_sr != original_sr:
-        n_samples = int(mono_audio.size * target_sr / original_sr)
-        mono_audio = scipy.signal.resample(x=mono_audio, num=n_samples)
-
+        logger.info("Resampling audio from %d Hz to 16 kHz", original_sr)
+        n_samples = int(audio.size * target_sr / original_sr)
+        mono_audio = scipy.signal.resample(x=audio, num=n_samples)
     logger.info("Resampled audio from %d Hz to %d Hz", original_sr, target_sr)
     return target_sr, mono_audio
 

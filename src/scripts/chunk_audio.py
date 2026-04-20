@@ -38,14 +38,12 @@ def main(audio_path: str) -> None:
 
     for i, chunk in enumerate(chunks, start=1):
         duration = chunk.end_time - chunk.start_time
-        n_samples = chunk.audio.size
         logger.info(
-            "Chunk %d: start=%.3f s, end=%.3f s, duration=%.3f s, samples=%d",
+            "Chunk %d: start=%.3f s, end=%.3f s, duration=%.3f s",
             i,
             chunk.start_time,
             chunk.end_time,
             duration,
-            n_samples,
         )
 
 
