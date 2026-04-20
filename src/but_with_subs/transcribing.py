@@ -63,11 +63,11 @@ def transcribe(
         audio_data.size,
     )
 
-    result = pipeline(audio_data, return_timestamps=True)
+    result = pipeline(audio_data, return_timestamps="char")
 
     segments: list[Transcription] = []
-    for chunk_info in result:
-        chunks = chunk_info.get("chunks", [])
+    chunks = result.get("chunks", [])
+    for chunk_info in chunks:
         for chunk in chunks:
             timestamp = chunk["timestamp"]
             start_time = float(timestamp[0]) + chunk_offset

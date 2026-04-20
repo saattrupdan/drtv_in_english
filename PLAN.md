@@ -25,6 +25,6 @@ The user wants a `transcribe_audio.py` script that:
 ## Implementation Steps
 
 - [x] Create `src/scripts/transcribe_audio.py` with click CLI, Wav2Vec2 pipeline setup, chunking loop, and transcription output logging
-- [ ] Run the script against a sample audio file to verify it works end-to-end
+- [x] Run the script against a sample audio file to verify it works end-to-end
 - [ ] Run `make check` to ensure linting and formatting pass
 - [ ] Run `make test` to ensure existing tests still pass
