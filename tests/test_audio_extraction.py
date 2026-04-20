@@ -58,7 +58,8 @@ def test_extract_audio_calls_ffmpeg_with_correct_command() -> None:
         extract_audio(video_path=video_path)
 
     mock_run.assert_called_once_with(
-        args=["ffmpeg", "-i", str(video_path), "-vn", "video.wav"], check=True
+        args=["ffmpeg", "-i", str(video_path), "-n", "-v", "error", str(video_path.with_suffix(".wav"))],
+        check=True,
     )
 
 
@@ -177,10 +178,10 @@ def test_extract_audio_with_no_extension() -> None:
 
 
 def test_extract_audio_ffmpeg_command_uses_correct_flags() -> None:
-    """Test that the ffmpeg command includes the -vn flag.
+    """Test that the ffmpeg command includes the -n and -v flags.
 
-    Verifies that the -vn flag (disable video) is present in the
-    command to ensure only audio is extracted.
+    Verifies that the -n (never overwrite) and -v error flags are
+    present in the command arguments.
     """
     video_path = _make_video_path("video", ".mp4")
 
@@ -188,7 +189,9 @@ def test_extract_audio_ffmpeg_command_uses_correct_flags() -> None:
         extract_audio(video_path=video_path)
 
     call_kwargs = mock_run.call_args.kwargs
-    assert "-vn" in call_kwargs["args"]
+    args = call_kwargs["args"]
+    assert "-n" in args
+    assert "-v" in args
 
 
 def test_extract_audio_ffmpeg_input_flag() -> None:
