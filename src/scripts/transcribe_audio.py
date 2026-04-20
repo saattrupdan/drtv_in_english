@@ -1,7 +1,10 @@
-"""Test script to demonstrate audio transcription with Wav2Vec2.
+"""Transcribe an audio file using Wav2Vec2 and generate subtitle files.
 
 Usage:
-    uv run src/scripts/transcribe_audio.py -a [audio_path]
+    uv run src/scripts/transcribe_audio.py [audio_path]
+
+The script transcribes the audio, splits it into chunks based on silence,
+and outputs a `.vtt` subtitle file alongside the original audio file.
 """
 
 import logging
