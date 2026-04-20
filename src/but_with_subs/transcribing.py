@@ -5,6 +5,7 @@ using a pretrained ASR pipeline from the Hugging Face transformers library.
 """
 
 import logging
+from typing import cast
 
 import numpy as np
 from pydantic import BaseModel
@@ -66,7 +67,7 @@ def transcribe(
     result = pipeline(audio_data, return_timestamps="char")
 
     segments: list[Transcription] = []
-    chunks = result.get("chunks", [])
+    chunks: list[dict] = cast(dict, result).get("chunks", [])
     for chunk_info in chunks:
         for chunk in chunks:
             timestamp = chunk["timestamp"]
