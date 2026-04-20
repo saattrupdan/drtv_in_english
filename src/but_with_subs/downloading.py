@@ -63,21 +63,15 @@ def _parse_progress_info(
     Returns:
         A DownloadProgress instance with extracted values.
     """
-    percentage: float = 0.0
-    if info.get("_percent_str") is not None:
-        str_val = info["_percent_str"].strip().rstrip("%")
-        try:
-            percentage = float(str_val)
-        except ValueError:
-            percentage = 0.0
-    elif info.get("_percent") is not None:
-        percentage = float(info["_percent"])
+    fragment_index = info.get("fragment_index")
+    fragment_count = info.get("fragment_count")
+    if fragment_index is not None and fragment_count is not None:
+        percentage = fragment_index / fragment_count
+    else:
+        percentage = 0.0
 
-    status = info.get("_status", "unknown")
-
-    current_file: str | None = None
-    if info.get("_filename") is not None:
-        current_file = str(info["_filename"])
+    status = info.get("status", "unknown")
+    current_file = info.get("filename")
 
     progress = DownloadProgress(
         percentage=percentage, status=status, current_file=current_file
@@ -102,7 +96,7 @@ def download(url: str) -> c.Generator[DownloadProgress, None, File]:
     Returns:
         A File model with the URLs and paths of the downloaded files.
     """
-    data_dir = Path("./data")
+    data_dir = Path("data")
     data_dir.mkdir(parents=True, exist_ok=True)
 
     progress_queue: queue.Queue[DownloadProgress] = queue.Queue()
@@ -111,16 +105,14 @@ def download(url: str) -> c.Generator[DownloadProgress, None, File]:
         "paths": dict(home="./data"),
         "format": "bestvideo*+bestaudio*",
         "noplaylist": True,
-        "hooks": {
-            "progress_hooks": [
-                lambda info: (
-                    logger.info(
-                        "Progress: %s", _parse_progress_info(info, progress_queue)
-                    )
-                    or _parse_progress_info(info, progress_queue)
+        "progress_hooks": [
+            lambda info: (
+                logger.info(
+                    "Progress: %s",
+                    _parse_progress_info(info=info, progress_queue=progress_queue),
                 )
-            ]
-        },
+            )
+        ],
     }
 
     logger.info("Starting download from %s", url)
