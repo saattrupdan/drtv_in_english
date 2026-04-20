@@ -12,6 +12,7 @@ import tempfile as tf
 from but_with_subs.subtitling import (
     _escape_vtt_text,
     _format_vtt_timestamp,
+    _merge_transcriptions_into_sentences,
     generate_subtitles,
 )
 from but_with_subs.transcribing import Transcription
@@ -334,3 +335,83 @@ def test_generate_subtitles_overwrites_existing_file() -> None:
     content_2 = result_path.read_text(encoding="utf-8")
     assert "New content" in content_2
     assert "Old content" not in content_2
+
+
+# ---------------------------------------------------------------------------
+# _merge_transcriptions_into_sentences tests
+# ---------------------------------------------------------------------------
+
+
+def test_merge_transcriptions_empty_list_returns_empty() -> None:
+    """Test _merge_transcriptions_into_sentences returns an empty list for empty input.
+
+    Verifies that passing an empty list produces an empty list as output.
+    """
+    result = _merge_transcriptions_into_sentences(transcriptions=[])
+
+    assert result == []
+
+
+def test_merge_transcriptions_single_word() -> None:
+    """Test _merge_transcriptions_into_sentences handles a single word transcription.
+
+    Creates a single word-level transcription and verifies that the result
+    contains exactly one sentence-level transcription with matching text
+    and the same start/end times.
+    """
+    transcriptions = [
+        _make_transcription(start_time=0.5, end_time=1.2, text="Hello")
+    ]
+
+    result = _merge_transcriptions_into_sentences(transcriptions=transcriptions)
+
+    assert len(result) == 1
+    assert result[0].text == "Hello"
+    assert result[0].start_time == 0.5
+    assert result[0].end_time == 1.2
+
+
+def test_merge_transcriptions_basic_sentence_merging() -> None:
+    """Test _merge_transcriptions_into_sentences merges word-level transcriptions into sentences.
+
+    Creates a list of word-level transcriptions forming a single sentence
+    and verifies that they are merged into one transcription with the
+    earliest start time and the latest end time.
+    """
+    transcriptions = [
+        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
+        _make_transcription(start_time=0.3, end_time=0.5, text="world"),
+    ]
+
+    result = _merge_transcriptions_into_sentences(transcriptions=transcriptions)
+
+    assert len(result) == 1
+    assert result[0].text == "Hello world"
+    assert result[0].start_time == 0.0
+    assert result[0].end_time == 0.5
+
+
+def test_merge_transcriptions_multiple_sentences() -> None:
+    """Test _merge_transcriptions_into_sentences merges multiple sentences correctly.
+
+    Creates word-level transcriptions that form two sentences separated by
+    a period and verifies that the output contains two sentence-level
+    transcriptions with proper start/end time merging.
+    """
+    transcriptions = [
+        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
+        _make_transcription(start_time=0.3, end_time=0.5, text="world."),
+        _make_transcription(start_time=0.6, end_time=0.7, text="How"),
+        _make_transcription(start_time=0.8, end_time=1.0, text="are"),
+        _make_transcription(start_time=1.1, end_time=1.3, text="you"),
+    ]
+
+    result = _merge_transcriptions_into_sentences(transcriptions=transcriptions)
+
+    assert len(result) == 2
+    assert result[0].text == "Hello world."
+    assert result[0].start_time == 0.0
+    assert result[0].end_time == 0.5
+    assert result[1].text == "How are you"
+    assert result[1].start_time == 0.6
+    assert result[1].end_time == 1.3
