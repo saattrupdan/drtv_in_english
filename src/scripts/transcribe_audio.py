@@ -9,11 +9,12 @@ import sys
 from pathlib import Path
 
 import click
-import librosa
+from tqdm.auto import tqdm
 from transformers import pipeline
 
 from but_with_subs.chunking import chunk_audio
 from but_with_subs.device import get_device
+from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.transcribing import transcribe
 
 logger = logging.getLogger(__package__)
@@ -35,33 +36,30 @@ def main(audio_path: str) -> None:
     path = Path(audio_path)
 
     if not path.is_file():
-        logger.error("File not found: %s", audio_path)
+        logger.error("File not found: {audio_path}")
         sys.exit(1)
 
-    logger.info("Loading audio from %s...", audio_path)
-    librosa.load(path=audio_path, sr=None)[0]
+    print(f"Loading audio from {audio_path}...")
 
-    logger.info("Creating Wav2Vec2 ASR pipeline...")
-    asr_pipeline = pipeline(
-        task="automatic-speech-recognition",
-        model="CoRal-project/roest-v3-wav2vec2-315m",
-        device=get_device(),
-    )
+    with tqdm(total=1, desc="Creating ASR pipeline", unit="step") as pbar:
+        asr_pipeline = pipeline(
+            task="automatic-speech-recognition",
+            model="CoRal-project/roest-v3-wav2vec2-315m",
+            device=get_device(),
+        )
+        pbar.update(1)
 
     logger.info("Chunking audio...")
     for chunk in chunk_audio(audio_path=path):
         logger.info(
-            "Transcribing chunk: %.2fs - %.2fs", chunk.start_time, chunk.end_time
+            "Transcribing chunk: {chunk.start_time:.2f}s - {chunk.end_time:.2f}s",
         )
         segments = transcribe(
             audio_data=chunk.audio, pipeline=asr_pipeline, chunk_offset=chunk.start_time
         )
         for segment in segments:
             logger.info(
-                "  %.2fs - %.2fs: %s",
-                segment.start_time,
-                segment.end_time,
-                segment.text,
+                "  {segment.start_time:.2f}s - {segment.end_time:.2f}s: {segment.text}",
             )
 
     logger.info("Transcription complete.")
