@@ -59,6 +59,21 @@ def main(audio_path: str) -> None:
 
     print(f"Transcription complete. {len(all_transcriptions)} segments found.")
 
+    if not all_transcriptions:
+        logger.warning("No transcription segments found. Skipping subtitle generation.")
+        return
+
+    output_path = Path(audio_path).with_suffix(".vtt")
+    with tqdm(
+        total=len(all_transcriptions), unit="segment", desc="Generating subtitles"
+    ) as pbar:
+        for current, total in generate_subtitles(
+            transcriptions=all_transcriptions, audio_path=path
+        ):
+            pbar.update(current - pbar.n)
+
+    print(f"Subtitles written to {output_path}")
+
 
 if __name__ == "__main__":
     main()
