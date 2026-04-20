@@ -52,7 +52,7 @@ def main(audio_path: str) -> None:
         )
         pbar.update(1)
 
-    chunks = list(tqdm(chunk_audio(audio_path=path), unit="chunk", desc="Chunking"))
+    chunks = list(chunk_audio(audio_path=path))
     all_transcriptions = []
     for chunk in tqdm(chunks, unit="chunk", desc="Transcribing"):
         segments = transcribe(
@@ -70,7 +70,7 @@ def main(audio_path: str) -> None:
     with tqdm(
         total=len(all_transcriptions), unit="segment", desc="Generating subtitles"
     ) as pbar:
-        for current, total in generate_subtitles(
+        for current, _ in generate_subtitles(
             transcriptions=all_transcriptions, audio_path=path
         ):
             pbar.update(current - pbar.n)
