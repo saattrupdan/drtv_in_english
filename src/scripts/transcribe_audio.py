@@ -49,20 +49,15 @@ def main(audio_path: str) -> None:
         )
         pbar.update(1)
 
-    logger.info("Chunking audio...")
-    for chunk in chunk_audio(audio_path=path):
-        logger.info(
-            "Transcribing chunk: {chunk.start_time:.2f}s - {chunk.end_time:.2f}s",
-        )
+    chunks = list(tqdm(chunk_audio(audio_path=path), unit="chunk", desc="Chunking"))
+    all_transcriptions = []
+    for chunk in tqdm(chunks, unit="chunk", desc="Transcribing"):
         segments = transcribe(
             audio_data=chunk.audio, pipeline=asr_pipeline, chunk_offset=chunk.start_time
         )
-        for segment in segments:
-            logger.info(
-                "  {segment.start_time:.2f}s - {segment.end_time:.2f}s: {segment.text}",
-            )
+        all_transcriptions.extend(segments)
 
-    logger.info("Transcription complete.")
+    print(f"Transcription complete. {len(all_transcriptions)} segments found.")
 
 
 if __name__ == "__main__":
