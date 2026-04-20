@@ -58,7 +58,15 @@ def test_extract_audio_calls_ffmpeg_with_correct_command() -> None:
         extract_audio(video_path=video_path)
 
     mock_run.assert_called_once_with(
-        args=["ffmpeg", "-i", str(video_path), "-n", "-v", "error", str(video_path.with_suffix(".wav"))],
+        args=[
+            "ffmpeg",
+            "-i",
+            str(video_path),
+            "-n",
+            "-v",
+            "error",
+            str(video_path.with_suffix(".wav")),
+        ],
         check=True,
     )
 
