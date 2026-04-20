@@ -80,7 +80,7 @@ Check that it works on the sample URLs above.
 
 Ensure good logging along the way, with the same logger as defined in Phase 1.
 
-### Phase 4: Generating subtitle files
+### Phase 4: Generating subtitle files [x]
 
 We should have a convenience function that converts a list of `Transcription` models
 into a `vtt` file.
