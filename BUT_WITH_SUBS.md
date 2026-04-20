@@ -11,7 +11,7 @@ subtitles in whatever language you want, even if it's on a streaming service.
 
 ## Development plan
 
-### Phase 1: Downloading video and audio
+### Phase 1: Downloading video and audio ✅
 
 Implement `download` function in a separate `downloading` module that takes a URL and
 downloads the video and audio using the `yt-dlp` library - docs for that library is
@@ -44,7 +44,7 @@ Ensure good logging along the way (use `logger = logging.getLogger(__package__)`
 make sure that logging is configured somewhere central (not just in the module where it
 is used).
 
-### Phase 2: Chunking audio
+### Phase 2: Chunking audio ✅
 
 The audio file should be split into chunks. We should chunk based on natural breaks in
 the audio (silence below a certain threshold, or other such heuristics). This should
@@ -62,7 +62,7 @@ Check that it works on the sample URLs above.
 
 Ensure good logging along the way, with the same logger as defined in Phase 1.
 
-### Phase 3: Transcribing audio
+### Phase 3: Transcribing audio ✅
 
 We should use `pipeline` function from the `transformer` library with Wav2Vec2 models to
 transcribe the audio chunks. This should result in a `transcribe` function in a separate
@@ -80,7 +80,7 @@ Check that it works on the sample URLs above.
 
 Ensure good logging along the way, with the same logger as defined in Phase 1.
 
-### Phase 4: Generating subtitle files [x]
+### Phase 4: Generating subtitle files ✅
 
 We should have a convenience function that converts a list of `Transcription` models
 into a `vtt` file.
