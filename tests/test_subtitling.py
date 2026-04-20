@@ -8,7 +8,6 @@ yielding, and error handling.
 
 import pathlib as pl
 import tempfile as tf
-import typing as t
 
 from but_with_subs.subtitling import (
     _escape_vtt_text,
@@ -23,9 +22,7 @@ from but_with_subs.transcribing import Transcription
 
 
 def _make_transcription(
-    start_time: float = 0.0,
-    end_time: float = 1.0,
-    text: str = "Hello world",
+    start_time: float = 0.0, end_time: float = 1.0, text: str = "Hello world"
 ) -> Transcription:
     """Create a Transcription model with the given parameters.
 
@@ -40,10 +37,7 @@ def _make_transcription(
     return Transcription(start_time=start_time, end_time=end_time, text=text)
 
 
-def _make_audio_file(
-    suffix: str = ".wav",
-    content: bytes | None = None,
-) -> pl.Path:
+def _make_audio_file(suffix: str = ".wav", content: bytes | None = None) -> pl.Path:
     """Create a temporary audio file and return its path.
 
     Args:
@@ -174,7 +168,9 @@ def test_generate_subtitles_creates_vtt_file() -> None:
     cue number, timestamps, and text.
     """
     audio_path = _make_audio_file()
-    transcriptions = [_make_transcription(start_time=0.0, end_time=1.5, text="Hello world")]
+    transcriptions = [
+        _make_transcription(start_time=0.0, end_time=1.5, text="Hello world")
+    ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
     list(generator)
@@ -234,7 +230,9 @@ def test_generate_subtitles_yields_progress() -> None:
         _make_transcription(start_time=2.0, end_time=3.0, text="Three"),
     ]
 
-    progress = list(generate_subtitles(transcriptions=transcriptions, audio_path=audio_path))
+    progress = list(
+        generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
+    )
 
     assert len(progress) == 3
     assert progress[0] == (1, 3)
@@ -267,7 +265,7 @@ def test_generate_subtitles_timestamp_format() -> None:
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=1.2346, text="Timestamp test"),
+        _make_transcription(start_time=0.0, end_time=1.2346, text="Timestamp test")
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -286,7 +284,7 @@ def test_generate_subtitles_special_characters_in_text() -> None:
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=1.0, text="A & B < C > D"),
+        _make_transcription(start_time=0.0, end_time=1.0, text="A & B < C > D")
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -313,7 +311,7 @@ def test_generate_subtitles_overwrites_existing_file() -> None:
 
     # First run: write initial content
     transcriptions_1 = [
-        _make_transcription(start_time=0.0, end_time=1.0, text="Old content"),
+        _make_transcription(start_time=0.0, end_time=1.0, text="Old content")
     ]
     generator_1 = generate_subtitles(
         transcriptions=transcriptions_1, audio_path=audio_path
@@ -326,7 +324,7 @@ def test_generate_subtitles_overwrites_existing_file() -> None:
 
     # Second run: overwrite with new content
     transcriptions_2 = [
-        _make_transcription(start_time=0.0, end_time=1.0, text="New content"),
+        _make_transcription(start_time=0.0, end_time=1.0, text="New content")
     ]
     generator_2 = generate_subtitles(
         transcriptions=transcriptions_2, audio_path=audio_path
