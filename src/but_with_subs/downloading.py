@@ -82,7 +82,7 @@ def _parse_progress_info(
 
 def download(
     url: str, progress_hook: c.Callable[[DownloadProgress], None] = lambda _: None
-) -> c.Generator[DownloadProgress, None, File]:
+) -> File:
     """Download video and audio from a URL using yt-dlp.
 
     Args:
@@ -106,11 +106,9 @@ def download(
         "noprogress": True,
         "no_warnings": True,
         "progress_hooks": [
-            lambda info: (
-                log_once(
-                    _parse_progress_info(info=info, progress_hook=progress_hook),
-                    level=logging.INFO,
-                )
+            lambda info: log_once(
+                _parse_progress_info(info=info, progress_hook=progress_hook),
+                level=logging.INFO,
             )
         ],
     }

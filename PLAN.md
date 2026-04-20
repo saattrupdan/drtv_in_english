@@ -44,6 +44,7 @@ These will be added via `uv add numpy scipy`.
 ### 1. Chunk Model (Pydantic)
 
 A new `Chunk` Pydantic model will be created in the `chunking` module. It will have:
+
 - `start_time: float` - Start time in seconds from beginning of audio
 - `end_time: float` - End time in seconds from beginning of audio
 - `audio: numpy.ndarray` - Mono audio data at 16kHz
@@ -53,6 +54,7 @@ A new `Chunk` Pydantic model will be created in the `chunking` module. It will h
 The module will contain:
 
 **`chunk_audio` function:**
+
 - Takes `audio_path: Path` argument
 - Yields `Chunk` models
 - Uses silence detection to find natural breaks
@@ -60,6 +62,7 @@ The module will contain:
 - Returns numpy arrays of shape `(audio_length,)`
 
 **Helper functions (low-level, ordered after high-level):**
+
 - `_detect_silence_breaks` - Finds silence thresholds and gap locations
 - `_load_and_resample_audio` - Loads WAV file and converts to 16kHz mono
 - `_split_audio_into_chunks` - Splits audio into chunks based on break points

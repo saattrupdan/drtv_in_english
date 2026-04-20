@@ -35,29 +35,16 @@ def _make_path_mock(name: str, suffix: str, is_file: bool = True) -> um.Mock:
     return mock_path
 
 
-def _iterate_gen(gen: um.Mock) -> tuple[list[DownloadProgress], File]:
-    """Consume a generator, collecting yields and extracting the return.
+def _get_download_result() -> File:
+    """Call download and return the File result.
 
-    Args:
-        gen:
-            A generator to iterate over.
+    This is a helper that wraps download() calls so we don't need to
+    iterate over a generator.
 
     Returns:
-        A tuple of (progress items, final File).
+        The File model returned by download().
     """
-    progress_items: list[DownloadProgress] = []
-    result: File | None = None
-    try:
-        while True:
-            item = next(gen)
-            if isinstance(item, DownloadProgress):
-                progress_items.append(item)
-            else:
-                result = item
-    except StopIteration as e:
-        result = e.value
-    assert result is not None, "Generator did not return a File"
-    return progress_items, result
+    return download(url="https://example.com/video")
 
 
 # ---------------------------------------------------------------------------
@@ -129,11 +116,9 @@ def test_download_creates_data_dir() -> None:
         ),
         um.patch("but_with_subs.downloading.Path.iterdir", return_value=iter([])),
     ):
-        gen = download(url="https://example.com/video")
-        _, result = _iterate_gen(gen)
+        download(url="https://example.com/video")
 
     mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-    assert result.url == "https://example.com/video"
 
 
 def test_download_returns_file_with_paths() -> None:
@@ -159,8 +144,7 @@ def test_download_returns_file_with_paths() -> None:
         ),
         um.patch("builtins.sorted", side_effect=lambda x: list(x)),
     ):
-        gen = download(url="https://example.com/video")
-        _, result = _iterate_gen(gen)
+        result = download(url="https://example.com/video")
 
     assert result.url == "https://example.com/video"
     assert result.video_path == fake_video
