@@ -118,5 +118,4 @@ node_modules/
 data/*
 !data/.gitkeep
 
-# Implementation plan
-PLAN.md
+
