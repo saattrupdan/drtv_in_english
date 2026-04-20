@@ -23,6 +23,9 @@ from but_with_subs.transcribing import transcribe
 logger = logging.getLogger(__package__)
 
 
+MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
+
+
 @click.command()
 @click.argument("audio_path", type=str)
 def main(audio_path: str) -> None:
@@ -42,15 +45,10 @@ def main(audio_path: str) -> None:
         logger.error("File not found: {audio_path}")
         sys.exit(1)
 
-    print(f"Loading audio from {audio_path}...")
-
-    with tqdm(total=1, desc="Creating ASR pipeline", unit="step") as pbar:
-        asr_pipeline = pipeline(
-            task="automatic-speech-recognition",
-            model="CoRal-project/roest-v3-wav2vec2-315m",
-            device=get_device(),
-        )
-        pbar.update(1)
+    print(f"Loading the {MODEL_ID} model...")
+    asr_pipeline = pipeline(
+        task="automatic-speech-recognition", model=MODEL_ID, device=get_device()
+    )
 
     chunks = list(chunk_audio(audio_path=path))
     all_transcriptions = []
@@ -60,22 +58,15 @@ def main(audio_path: str) -> None:
         )
         all_transcriptions.extend(segments)
 
-    print(f"Transcription complete. {len(all_transcriptions)} segments found.")
-
     if not all_transcriptions:
         logger.warning("No transcription segments found. Skipping subtitle generation.")
         return
 
-    output_path = Path(audio_path).with_suffix(".vtt")
-    with tqdm(
-        total=len(all_transcriptions), unit="segment", desc="Generating subtitles"
-    ) as pbar:
-        for current, _ in generate_subtitles(
+    with tqdm(total=100, unit="percent", desc="Generating subtitles") as pbar:
+        for current, total in generate_subtitles(
             transcriptions=all_transcriptions, audio_path=path
         ):
-            pbar.update(current - pbar.n)
-
-    print(f"Subtitles written to {output_path}")
+            pbar.update(int(100 * current / total) - pbar.n)
 
 
 if __name__ == "__main__":

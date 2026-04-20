@@ -59,7 +59,6 @@ def transcribe(
         A list of ``Transcription`` models, one per text segment.
     """
     result = pipeline(audio_data, return_timestamps="word")
-
     segments: list[Transcription] = []
     chunks: list[dict] = cast(dict, result).get("chunks", [])
     for chunk in chunks:
