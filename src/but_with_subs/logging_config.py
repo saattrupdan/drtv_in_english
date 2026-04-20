@@ -9,6 +9,8 @@ handlers and formatting.
 import logging
 import sys
 
+logger = logging.getLogger(__package__)
+
 
 def configure_logging() -> None:
     """Configure logging for the but_with_subs package."""
