@@ -6,7 +6,6 @@ natural breaks detected through silence detection.
 
 import logging
 import pathlib as pl
-import typing as t
 from collections.abc import Generator
 
 import numpy as np
