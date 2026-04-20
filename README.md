@@ -13,7 +13,7 @@
 Watch anything online... but with subs.
 
 ______________________________________________________________________
-[![Code Coverage](https://img.shields.io/badge/Coverage-92%25-green.svg)](https://github.com/saattrupdan/but_with_subs/tree/main/tests)
+[![Code Coverage](https://img.shields.io/badge/Coverage-93%25-green.svg)](https://github.com/saattrupdan/but_with_subs/tree/main/tests)
 [![License](https://img.shields.io/github/license/saattrupdan/but_with_subs)](https://github.com/saattrupdan/but_with_subs/blob/main/LICENSE)
 [![LastCommit](https://img.shields.io/github/last-commit/saattrupdan/but_with_subs)](https://github.com/saattrupdan/but_with_subs/commits/main)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](https://github.com/saattrupdan/but_with_subs/blob/main/CODE_OF_CONDUCT.md)
