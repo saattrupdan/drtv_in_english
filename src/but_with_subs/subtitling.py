@@ -65,7 +65,6 @@ def generate_subtitles(
         start_timestamp = _format_vtt_timestamp(seconds=transcription.start_time)
         end_timestamp = _format_vtt_timestamp(seconds=transcription.end_time)
         escaped_text = _escape_vtt_text(text=transcription.text)
-
         vtt_lines.extend(
             [
                 str(cue_number),
@@ -74,8 +73,6 @@ def generate_subtitles(
                 "",
             ]
         )
-
-        logger.info("Processed segment %d/%d", index, total)
         yield (index, total)
 
     vtt_content = "\n".join(vtt_lines)
