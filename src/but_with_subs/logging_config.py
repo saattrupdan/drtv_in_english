@@ -26,6 +26,9 @@ def configure_logging() -> None:
     handler.setFormatter(fmt=formatter)
     root_logger.addHandler(hdlr=handler)
 
+    # Ignore other loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 @cache
 def log_once(message: str, level: int) -> None:
