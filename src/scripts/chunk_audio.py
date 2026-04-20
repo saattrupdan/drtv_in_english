@@ -13,6 +13,8 @@ from but_with_subs.chunking import chunk_audio
 from but_with_subs.logging_config import logger
 
 
+@click.command()
+@click.argument("audio_path", required=True)
 def main(audio_path: str) -> None:
     """Run audio chunking on an audio file.
 
@@ -47,12 +49,5 @@ def main(audio_path: str) -> None:
         )
 
 
-@click.command()
-@click.argument("audio_path", required=True)
-def cli(audio_path: str) -> None:
-    """Split audio into chunks based on silence breaks."""
-    main(audio_path=audio_path)
-
-
 if __name__ == "__main__":
-    cli()
+    main()

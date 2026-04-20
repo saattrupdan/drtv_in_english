@@ -25,20 +25,15 @@ def extract_audio(video_path: Path) -> Path:
 
     """
     output_path = video_path.with_suffix(suffix=".wav")
-    logger.info("Extracting audio from %s to %s", video_path, output_path)
-    _run_ffmpeg_extract(input_path=video_path, output_path=output_path)
-    return output_path
-
-
-def _run_ffmpeg_extract(input_path: Path, output_path: Path) -> None:
-    """Run ffmpeg to extract audio from a video file.
-
-    Args:
-        input_path:
-            Path to the input video file.
-        output_path:
-            Path to the output WAV file.
-    """
-    logger.info("Extracting audio from %s to %s", input_path, output_path)
-    command: list[str] = ["ffmpeg", "-i", str(input_path), "-vn", str(output_path)]
+    logger.info("Extracting audio from '%s' to '%s'", video_path, output_path)
+    command: list[str] = [
+        "ffmpeg",
+        "-i",
+        str(video_path),
+        "-n",
+        "-v",
+        "error",
+        str(output_path),
+    ]
     subprocess.run(args=command, check=True)
+    return output_path

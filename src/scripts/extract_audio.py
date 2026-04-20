@@ -15,6 +15,8 @@ from but_with_subs.audio_extraction import extract_audio
 logger = logging.getLogger(__package__)
 
 
+@click.command()
+@click.argument("video_path", required=True)
 def main(video_path: str) -> None:
     """Run audio extraction on a video file.
 
@@ -28,17 +30,12 @@ def main(video_path: str) -> None:
         logger.error(f"File not found: {video_path}")
         sys.exit(1)
 
-    logger.info(f"Extracting audio from {video_path}...")
-    output_path = extract_audio(video_path=path)
-    logger.info(f"Audio extracted to {output_path}")
+    if path.with_suffix(".wav").exists():
+        logger.error(f"Output file already exists: {path.with_suffix('.wav')}")
+        return
 
-
-@click.command()
-@click.argument("video_path", required=True)
-def cli(video_path: str) -> None:
-    """Extract audio from a video file."""
-    main(video_path=video_path)
+    extract_audio(video_path=path)
 
 
 if __name__ == "__main__":
-    cli()
+    main()

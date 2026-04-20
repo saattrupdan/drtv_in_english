@@ -6,13 +6,12 @@ that uses yt-dlp to fetch media from URLs.
 """
 
 import collections.abc as c
-import logging
 from pathlib import Path
 
 import yt_dlp
 from pydantic import BaseModel
 
-from .logging_config import log_once, logger
+from .logging_config import logger
 
 
 class File(BaseModel):
@@ -51,7 +50,7 @@ class DownloadProgress(BaseModel):
 
 def _parse_progress_info(
     info: dict, progress_hook: c.Callable[[DownloadProgress], None]
-) -> str:
+) -> None:
     """Parse yt-dlp progress info into a DownloadProgress model.
 
     Args:
@@ -59,11 +58,7 @@ def _parse_progress_info(
             Progress dictionary from yt-dlp hook.
         progress_hook:
             A function to be called with progress updates.
-
-    Returns:
-        A DownloadProgress instance with extracted values.
     """
-    # Build the DownloadProgress object
     fragment_index = info.get("fragment_index")
     fragment_count = info.get("fragment_count")
     if fragment_index is not None and fragment_count is not None:
@@ -75,9 +70,7 @@ def _parse_progress_info(
     progress = DownloadProgress(
         status=status, current_file=current_file, percentage=percentage
     )
-
     progress_hook(progress)
-    return progress.model_dump_json()
 
 
 def download(
@@ -106,10 +99,7 @@ def download(
         "noprogress": True,
         "no_warnings": True,
         "progress_hooks": [
-            lambda info: log_once(
-                _parse_progress_info(info=info, progress_hook=progress_hook),
-                level=logging.INFO,
-            )
+            lambda info: _parse_progress_info(info=info, progress_hook=progress_hook)
         ],
     }
 
