@@ -80,7 +80,7 @@ def test_transcription_duration_with_offset() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_pipeline(return_value: list[dict[str, t.Any]]) -> um.MagicMock:
+def _make_mock_pipeline(return_value: dict[str, t.Any]) -> um.MagicMock:
     """Create a mock AutomaticSpeechRecognitionPipeline.
 
     Args:
@@ -102,14 +102,12 @@ def test_transcribe_yields_transcription_models() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     mock_pipeline = _make_mock_pipeline(
-        return_value=[
-            {
-                "chunks": [
-                    {"text": "Hello", "timestamp": (0.0, 0.5)},
-                    {"text": "world", "timestamp": (0.5, 1.0)},
-                ]
-            }
-        ]
+        return_value={
+            "chunks": [
+                {"text": "Hello", "timestamp": (0.0, 0.5)},
+                {"text": "world", "timestamp": (0.5, 1.0)},
+            ]
+        }
     )
 
     results = transcribe(
@@ -128,14 +126,12 @@ def test_transcribe_correct_time_offsets() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     mock_pipeline = _make_mock_pipeline(
-        return_value=[
-            {
-                "chunks": [
-                    {"text": "Hello", "timestamp": (0.0, 0.5)},
-                    {"text": "world", "timestamp": (0.5, 1.0)},
-                ]
-            }
-        ]
+        return_value={
+            "chunks": [
+                {"text": "Hello", "timestamp": (0.0, 0.5)},
+                {"text": "world", "timestamp": (0.5, 1.0)},
+            ]
+        }
     )
 
     results = transcribe(
@@ -156,14 +152,12 @@ def test_transcribe_preserves_text() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     mock_pipeline = _make_mock_pipeline(
-        return_value=[
-            {
-                "chunks": [
-                    {"text": "First segment", "timestamp": (0.0, 1.0)},
-                    {"text": "Second segment", "timestamp": (1.0, 2.0)},
-                ]
-            }
-        ]
+        return_value={
+            "chunks": [
+                {"text": "First segment", "timestamp": (0.0, 1.0)},
+                {"text": "Second segment", "timestamp": (1.0, 2.0)},
+            ]
+        }
     )
 
     results = transcribe(
@@ -181,7 +175,7 @@ def test_transcribe_empty_audio_empty_result() -> None:
     that an empty list is returned.
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(return_value=[{"chunks": []}])
+    mock_pipeline = _make_mock_pipeline(return_value={"chunks": []})
 
     results = transcribe(
         audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
@@ -198,15 +192,13 @@ def test_transcribe_multiple_chunks_from_pipeline() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=32000, dtype=np.float32)
     mock_pipeline = _make_mock_pipeline(
-        return_value=[
-            {
-                "chunks": [
-                    {"text": "A", "timestamp": (0.0, 0.2)},
-                    {"text": "B", "timestamp": (0.2, 0.4)},
-                    {"text": "C", "timestamp": (0.4, 0.6)},
-                ]
-            }
-        ]
+        return_value={
+            "chunks": [
+                {"text": "A", "timestamp": (0.0, 0.2)},
+                {"text": "B", "timestamp": (0.2, 0.4)},
+                {"text": "C", "timestamp": (0.4, 0.6)},
+            ]
+        }
     )
 
     results = transcribe(
@@ -228,7 +220,7 @@ def test_transcribe_duration_matches_timestamps() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     mock_pipeline = _make_mock_pipeline(
-        return_value=[{"chunks": [{"text": "Segment", "timestamp": (1.0, 3.5)}]}]
+        return_value={"chunks": [{"text": "Segment", "timestamp": (1.0, 3.5)}]}
     )
 
     results = transcribe(
@@ -247,7 +239,7 @@ def test_transcribe_with_nonzero_offset_preserves_duration() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     mock_pipeline = _make_mock_pipeline(
-        return_value=[{"chunks": [{"text": "Segment", "timestamp": (0.5, 2.0)}]}]
+        return_value={"chunks": [{"text": "Segment", "timestamp": (0.5, 2.0)}]}
     )
 
     results = transcribe(
