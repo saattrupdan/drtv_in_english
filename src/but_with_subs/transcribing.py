@@ -58,12 +58,6 @@ def transcribe(
     Returns:
         A list of ``Transcription`` models, one per text segment.
     """
-    logger.info(
-        "Transcribing audio chunk (%.2fs offset, %d samples)",
-        chunk_offset,
-        audio_data.size,
-    )
-
     result = pipeline(audio_data, return_timestamps="word")
 
     segments: list[Transcription] = []
@@ -75,6 +69,4 @@ def transcribe(
         segments.append(
             Transcription(start_time=start_time, end_time=end_time, text=chunk["text"])
         )
-
-    logger.info("Transcribed %d segments", len(segments))
     return segments
