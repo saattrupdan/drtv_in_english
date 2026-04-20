@@ -13,6 +13,7 @@ import librosa
 from transformers import pipeline
 
 from but_with_subs.chunking import chunk_audio
+from but_with_subs.device import get_device
 from but_with_subs.transcribing import transcribe
 
 logger = logging.getLogger(__package__)
@@ -44,6 +45,7 @@ def main(audio_path: str) -> None:
     asr_pipeline = pipeline(
         task="automatic-speech-recognition",
         model="CoRal-project/roest-v3-wav2vec2-315m",
+        device=get_device(),
     )
 
     logger.info("Chunking audio...")
