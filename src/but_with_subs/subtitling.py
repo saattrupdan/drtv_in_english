@@ -192,11 +192,7 @@ def _merge_transcriptions_into_sentences(
         max_end = max(transcriptions[i].end_time for i in chunk_indices)
 
         merged.append(
-            Transcription(
-                start_time=min_start,
-                end_time=max_end,
-                text=sentence,
-            )
+            Transcription(start_time=min_start, end_time=max_end, text=sentence)
         )
 
     return merged

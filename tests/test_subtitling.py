@@ -359,9 +359,7 @@ def test_merge_transcriptions_single_word() -> None:
     contains exactly one sentence-level transcription with matching text
     and the same start/end times.
     """
-    transcriptions = [
-        _make_transcription(start_time=0.5, end_time=1.2, text="Hello")
-    ]
+    transcriptions = [_make_transcription(start_time=0.5, end_time=1.2, text="Hello")]
 
     result = _merge_transcriptions_into_sentences(transcriptions=transcriptions)
 
@@ -372,7 +370,7 @@ def test_merge_transcriptions_single_word() -> None:
 
 
 def test_merge_transcriptions_basic_sentence_merging() -> None:
-    """Test _merge_transcriptions_into_sentences merges word-level transcriptions into sentences.
+    """Test merging word-level transcriptions into sentences.
 
     Creates a list of word-level transcriptions forming a single sentence
     and verifies that they are merged into one transcription with the
