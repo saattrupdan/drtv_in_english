@@ -27,7 +27,13 @@ class Chunk(BaseModel):
             End time of the chunk, in seconds from the beginning of the audio.
         audio:
             Mono audio data of the chunk, as a numpy array in 16 kHz.
+
+    Config:
+        arbitrary_types:
+            Allow numpy arrays as field types.
     """
+
+    model_config = {"arbitrary_types_allowed": True}
 
     start_time: float
     end_time: float

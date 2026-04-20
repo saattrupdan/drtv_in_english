@@ -105,12 +105,12 @@ All functions should be ordered from highest-level to lowest-level. All imports 
 
 ### Step 5: Create tests
 
-Create `tests/test_chunking.py` with tests for:
-- Chunk model creation
-- `chunk_audio` function with mocked audio data
-- Silence detection logic
-- Audio resampling logic
-- Edge cases (short audio, no silence, continuous silence)
+- [x] Create `tests/test_chunking.py` with tests for:
+  - Chunk model creation
+  - `chunk_audio` function with mocked audio data
+  - Silence detection logic
+  - Audio resampling logic
+  - Edge cases (short audio, no silence, continuous silence)
 
 ### Step 6: Run checks and tests
 
