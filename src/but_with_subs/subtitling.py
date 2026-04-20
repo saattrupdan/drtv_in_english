@@ -9,8 +9,36 @@ import collections.abc as c
 import pathlib as pl
 from pathlib import Path
 
+import nltk
+
 from .logging_config import logger
 from .transcribing import Transcription
+
+_NLTK_DATA_PACKAGES = ("punkt_tab", "punkt_tab_danish")
+
+_nltk_data_ensured = False
+
+
+def ensure_nltk_data() -> None:
+    """Ensure required NLTK data packages are downloaded.
+
+    Checks whether ``punkt_tab`` and ``punkt_tab_danish`` are already
+    present in the NLTK data path.  If either is missing, downloads it.
+    This function is idempotent — subsequent calls are a no-op.
+    """
+    global _nltk_data_ensured
+
+    if _nltk_data_ensured:
+        return
+
+    for package in _NLTK_DATA_PACKAGES:
+        try:
+            nltk.data.find(f"tokenizers/{package}")
+        except LookupError:
+            logger.info("Downloading NLTK data: %s", package)
+            nltk.download(package, quiet=True)
+
+    _nltk_data_ensured = True
 
 
 def generate_subtitles(
@@ -44,6 +72,8 @@ def generate_subtitles(
             If the audio path does not exist.
     """
     audio_path = Path(audio_path)
+
+    ensure_nltk_data()
 
     if not transcriptions:
         logger.error("Cannot generate subtitles: transcriptions list is empty")
