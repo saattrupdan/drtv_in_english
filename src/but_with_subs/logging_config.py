@@ -8,12 +8,14 @@ handlers and formatting.
 
 import logging
 import sys
+from functools import cache
 
 logger = logging.getLogger(__package__)
 
 
 def configure_logging() -> None:
     """Configure logging for the but_with_subs package."""
+    # Set up the root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     formatter = logging.Formatter(
@@ -23,3 +25,16 @@ def configure_logging() -> None:
     handler.setLevel(logging.INFO)
     handler.setFormatter(fmt=formatter)
     root_logger.addHandler(hdlr=handler)
+
+
+@cache
+def log_once(message: str, level: int) -> None:
+    """Log a message once, regardless of the number of times it is called.
+
+    Args:
+        message:
+            The message to log.
+        level:
+            The logging level to use.
+    """
+    logger.log(msg=message, level=level)
