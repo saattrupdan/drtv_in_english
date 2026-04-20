@@ -96,6 +96,9 @@ ignore = [
 "src/scripts/main.py" = [
   "I",
 ]
+"src/but_with_subs/chunking.py" = [
+  "F401",
+]
 
 [tool.ruff.lint.isort]
 split-on-trailing-comma = false
