@@ -64,20 +64,17 @@ def transcribe(
         audio_data.size,
     )
 
-    result = pipeline(audio_data, return_timestamps="char")
+    result = pipeline(audio_data, return_timestamps="word")
 
     segments: list[Transcription] = []
     chunks: list[dict] = cast(dict, result).get("chunks", [])
-    for chunk_info in chunks:
-        for chunk in chunks:
-            timestamp = chunk["timestamp"]
-            start_time = float(timestamp[0]) + chunk_offset
-            end_time = float(timestamp[1]) + chunk_offset
-            segments.append(
-                Transcription(
-                    start_time=start_time, end_time=end_time, text=chunk["text"]
-                )
-            )
+    for chunk in chunks:
+        timestamp = chunk["timestamp"]
+        start_time = float(timestamp[0]) + chunk_offset
+        end_time = float(timestamp[1]) + chunk_offset
+        segments.append(
+            Transcription(start_time=start_time, end_time=end_time, text=chunk["text"])
+        )
 
     logger.info("Transcribed %d segments", len(segments))
     return segments
