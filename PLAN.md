@@ -139,6 +139,6 @@ keyword arguments.
 
 ### Step 6: Run checks and tests
 
-- Run `make check` to ensure formatting, linting, and type checking passes
-- Run `make test` to ensure all tests pass
-- Update any relevant documentation
+- [x] Run `make check` to ensure formatting, linting, and type checking passes
+- [x] Run `make test` to ensure all tests pass
+- [x] Update any relevant documentation
