@@ -191,15 +191,15 @@ def test_generate_subtitles_creates_vtt_file() -> None:
 def test_generate_subtitles_multiple_transcriptions() -> None:
     """Test generate_subtitles writes multiple transcriptions with correct timestamps.
 
-    Creates three transcriptions with different time ranges and verifies that
-    all three appear as separate cues with correct numbering, timestamps,
-    and text content.
+    Creates three sentence-level transcriptions (each ending with a period) with
+    different time ranges and verifies that all three appear as separate cues
+    with correct numbering, timestamps, and text content.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=1.0, text="First segment"),
-        _make_transcription(start_time=1.5, end_time=3.0, text="Second segment"),
-        _make_transcription(start_time=3.5, end_time=5.0, text="Third segment"),
+        _make_transcription(start_time=0.0, end_time=1.0, text="First segment."),
+        _make_transcription(start_time=1.5, end_time=3.0, text="Second segment."),
+        _make_transcription(start_time=3.5, end_time=5.0, text="Third segment."),
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -212,23 +212,23 @@ def test_generate_subtitles_multiple_transcriptions() -> None:
     assert "1\n00:00:00.000 --> 00:00:01.000" in content
     assert "2\n00:00:01.500 --> 00:00:03.000" in content
     assert "3\n00:00:03.500 --> 00:00:05.000" in content
-    assert "First segment" in content
-    assert "Second segment" in content
-    assert "Third segment" in content
+    assert "First segment." in content
+    assert "Second segment." in content
+    assert "Third segment." in content
 
 
 def test_generate_subtitles_yields_progress() -> None:
     """Test generate_subtitles yields (current, total) progress tuples.
 
-    Creates three transcriptions and verifies that the generator yields
-    exactly three tuples with incrementing current values and the correct
-    total.
+    Creates three sentence-level transcriptions (each ending with a period)
+    and verifies that the generator yields exactly three tuples with
+    incrementing current values and the correct total.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=1.0, text="One"),
-        _make_transcription(start_time=1.0, end_time=2.0, text="Two"),
-        _make_transcription(start_time=2.0, end_time=3.0, text="Three"),
+        _make_transcription(start_time=0.0, end_time=1.0, text="One."),
+        _make_transcription(start_time=1.0, end_time=2.0, text="Two."),
+        _make_transcription(start_time=2.0, end_time=3.0, text="Three."),
     ]
 
     progress = list(
@@ -415,3 +415,182 @@ def test_merge_transcriptions_multiple_sentences() -> None:
     assert result[1].text == "How are you"
     assert result[1].start_time == 0.6
     assert result[1].end_time == 1.3
+
+
+# ---------------------------------------------------------------------------
+# Sentence-level VTT output tests
+# ---------------------------------------------------------------------------
+
+
+def test_generate_subtitles_word_level_to_sentence_cues() -> None:
+    """Test generate_subtitles merges word-level transcriptions into sentence cues.
+
+    Creates word-level transcriptions that form a sentence and verifies
+    that the VTT output contains a single sentence-level cue instead of
+    individual word cues.
+    """
+    audio_path = _make_audio_file()
+    transcriptions = [
+        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
+        _make_transcription(start_time=0.3, end_time=0.5, text="world"),
+    ]
+
+    generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
+    list(generator)
+    result_path = audio_path.with_suffix(".vtt")
+
+    content = result_path.read_text(encoding="utf-8")
+
+    # Should have exactly one cue (the merged sentence), not two word cues
+    assert content.count("\n") < 10  # header + 1 cue, not multiple word cues
+    assert "Hello world" in content
+    # Individual words should not appear as separate cues
+    # (they are part of the merged sentence text)
+
+
+def test_generate_subtitles_sentence_level_timing() -> None:
+    """Test generate_subtitles produces sentence-level timing spans.
+
+    Creates word-level transcriptions and verifies that the merged
+    sentence cue's start time is the earliest start and end time is
+    the latest end across all constituent words.
+    """
+    audio_path = _make_audio_file()
+    transcriptions = [
+        _make_transcription(start_time=0.5, end_time=0.7, text="First"),
+        _make_transcription(start_time=0.8, end_time=1.0, text="sentence"),
+        _make_transcription(start_time=1.1, end_time=1.4, text="here"),
+    ]
+
+    generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
+    list(generator)
+    result_path = audio_path.with_suffix(".vtt")
+
+    content = result_path.read_text(encoding="utf-8")
+
+    # The merged sentence should span from the earliest start (0.5) to latest end (1.4)
+    assert "00:00:00.500 --> 00:00:01.400" in content
+    assert "First sentence here" in content
+
+
+def test_generate_subtitles_sentence_level_multiple_sentences() -> None:
+    """Test generate_subtitles handles multiple sentences from word-level input.
+
+    Creates word-level transcriptions forming two sentences and verifies
+    that the VTT output contains two separate sentence-level cues with
+    correct numbering, timestamps, and text.
+    """
+    audio_path = _make_audio_file()
+    transcriptions = [
+        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
+        _make_transcription(start_time=0.3, end_time=0.5, text="world."),
+        _make_transcription(start_time=1.0, end_time=1.2, text="Good"),
+        _make_transcription(start_time=1.3, end_time=1.5, text="bye."),
+    ]
+
+    generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
+    list(generator)
+    result_path = audio_path.with_suffix(".vtt")
+
+    content = result_path.read_text(encoding="utf-8")
+
+    # Should have two sentence cues
+    assert "1\n00:00:00.000 --> 00:00:00.500" in content
+    assert "2\n00:00:01.000 --> 00:00:01.500" in content
+    assert "Hello world." in content
+    assert "Good bye." in content
+
+
+def test_generate_subtitles_vtt_header_and_cue_format() -> None:
+    """Test generate_subtitles produces a valid WebVTT file format.
+
+    Verifies the VTT file starts with the ``WEBVTT`` header, contains
+    properly formatted cue blocks with numbering, timestamps, and text,
+    and uses blank lines as separators between cues.
+    """
+    audio_path = _make_audio_file()
+    transcriptions = [
+        _make_transcription(start_time=0.0, end_time=0.5, text="First line."),
+        _make_transcription(start_time=0.6, end_time=1.0, text="Second line."),
+    ]
+
+    generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
+    list(generator)
+    result_path = audio_path.with_suffix(".vtt")
+
+    content = result_path.read_text(encoding="utf-8")
+
+    # WEBVTT header
+    assert content.startswith("WEBVTT")
+
+    # Cue blocks: number, timestamp line, text, blank line
+    lines = content.split("\n")
+
+    # First line after header should be empty (blank line after WEBVTT)
+    assert lines[0] == "WEBVTT"
+    assert lines[1] == ""
+
+    # Cue 1: number, timestamp, text, blank
+    assert lines[2] == "1"
+    assert "-->" in lines[3]
+    assert "First line." in lines[4]
+    assert lines[5] == ""
+
+    # Cue 2: number, timestamp, text, blank
+    assert lines[6] == "2"
+    assert "-->" in lines[7]
+    assert "Second line." in lines[8]
+    assert lines[9] == ""
+
+
+def test_generate_subtitles_vtt_cue_count_matches_sentences() -> None:
+    """Test generate_subtitles cue count matches the number of sentences.
+
+    Creates word-level transcriptions forming three sentences and
+    verifies that the generated VTT file contains exactly three
+    cue blocks.
+    """
+    audio_path = _make_audio_file()
+    transcriptions = [
+        _make_transcription(start_time=0.0, end_time=0.2, text="One."),
+        _make_transcription(start_time=0.5, end_time=0.7, text="Two."),
+        _make_transcription(start_time=1.0, end_time=1.2, text="Three."),
+    ]
+
+    generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
+    list(generator)
+    result_path = audio_path.with_suffix(".vtt")
+
+    content = result_path.read_text(encoding="utf-8")
+
+    # Count cue blocks by counting lines that look like cue numbers
+    # (a line containing only digits followed by a blank line or end)
+    lines = content.split("\n")
+    cue_numbers = [line for line in lines if line.strip().isdigit()]
+
+    assert len(cue_numbers) == 3
+
+
+def test_generate_subtitles_progress_yields_sentence_count() -> None:
+    """Test generate_subtitles yields progress based on sentence count.
+
+    Creates word-level transcriptions that form two sentences and
+    verifies that the generator yields exactly two progress tuples
+    (one per sentence), not one per word.
+    """
+    audio_path = _make_audio_file()
+    transcriptions = [
+        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
+        _make_transcription(start_time=0.3, end_time=0.5, text="world"),
+        _make_transcription(start_time=0.6, end_time=0.8, text="Foo."),
+        _make_transcription(start_time=0.9, end_time=1.1, text="Bar."),
+    ]
+
+    progress = list(
+        generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
+    )
+
+    # Should yield 2 progress tuples (2 sentences), not 4 (4 words)
+    assert len(progress) == 2
+    assert progress[0] == (1, 2)
+    assert progress[1] == (2, 2)
