@@ -10,7 +10,6 @@ from pathlib import Path
 
 import click
 import librosa
-import numpy as np
 from transformers import pipeline
 
 from but_with_subs.chunking import chunk_audio
@@ -20,14 +19,7 @@ logger = logging.getLogger(__package__)
 
 
 @click.command()
-@click.option(
-    "--audio",
-    "-a",
-    "audio_path",
-    required=True,
-    type=click.Path(exists=True),
-    help="Path to the WAV audio file to transcribe.",
-)
+@click.argument("audio_path", type=str)
 def main(audio_path: str) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
@@ -46,25 +38,21 @@ def main(audio_path: str) -> None:
         sys.exit(1)
 
     logger.info("Loading audio from %s...", audio_path)
-    audio_data: np.ndarray = librosa.load(path=audio_path, sr=None)[0]
+    librosa.load(path=audio_path, sr=None)[0]
 
     logger.info("Creating Wav2Vec2 ASR pipeline...")
     asr_pipeline = pipeline(
         task="automatic-speech-recognition",
-        model="facebook/wav2vec2-base-960h",
+        model="CoRal-project/roest-v3-wav2vec2-315m",
     )
 
     logger.info("Chunking audio...")
     for chunk in chunk_audio(audio_path=path):
         logger.info(
-            "Transcribing chunk: %.2fs - %.2fs",
-            chunk.start_time,
-            chunk.end_time,
+            "Transcribing chunk: %.2fs - %.2fs", chunk.start_time, chunk.end_time
         )
         segments = transcribe(
-            audio_data=chunk.audio,
-            pipeline=asr_pipeline,
-            chunk_offset=chunk.start_time,
+            audio_data=chunk.audio, pipeline=asr_pipeline, chunk_offset=chunk.start_time
         )
         for segment in segments:
             logger.info(
