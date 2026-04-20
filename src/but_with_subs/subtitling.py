@@ -84,13 +84,15 @@ def generate_subtitles(
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
     output_path = audio_path.with_suffix(suffix=".vtt")
-    total = len(transcriptions)
+
+    sentences = _merge_transcriptions_into_sentences(transcriptions)
+    total = len(sentences)
 
     logger.info("Generating subtitles for %d segments -> %s", total, output_path)
 
     vtt_lines: list[str] = ["WEBVTT", ""]
 
-    for index, transcription in enumerate(transcriptions, start=1):
+    for index, transcription in enumerate(sentences, start=1):
         cue_number = index
         start_timestamp = _format_vtt_timestamp(seconds=transcription.start_time)
         end_timestamp = _format_vtt_timestamp(seconds=transcription.end_time)
