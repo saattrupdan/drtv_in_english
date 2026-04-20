@@ -116,7 +116,7 @@ def _resample_to_16k_mono(
     """
     target_sr = 16000
     if target_sr != original_sr:
-        logger.info("Resampling audio from %d Hz to 16 kHz", original_sr)
+        logger.info("Resampling audio from %d Hz to 16,000 Hz", original_sr)
         n_samples = int(audio.size * target_sr / original_sr)
         mono_audio = scipy.signal.resample(x=audio, num=n_samples)
     logger.info("Resampled audio from %d Hz to %d Hz", original_sr, target_sr)
