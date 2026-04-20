@@ -4,26 +4,14 @@ This module contains comprehensive tests for the Chunk model, chunk_audio
 function, silence detection logic, audio resampling logic, and edge cases.
 """
 
+import contextlib as ct
 import pathlib
 import tempfile as tf
 import typing as t
 import unittest.mock as um
 
-import contextlib as ct
-
 import numpy as np
-
 import scipy.io.wavfile as wavio
-
-from but_with_subs.chunking import (
-    Chunk,
-    _detect_silence_breaks,
-    _load_audio,
-    _resample_to_16k_mono,
-    chunk_audio,
-)
-
-import numpy as np
 
 from but_with_subs.chunking import (
     Chunk,
