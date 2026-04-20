@@ -104,8 +104,14 @@ def test_chunk_audio_yields_chunk_models() -> None:
     mock_sr: int = 16000
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float64)
 
-    with um.patch(
-        "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
+    with (
+        um.patch(
+            "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
+        ),
+        um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, mock_audio),
+        ),
     ):
         audio_path = pathlib.Path("/fake/audio.wav")
         chunks = list(chunk_audio(audio_path=audio_path))
@@ -126,6 +132,10 @@ def test_chunk_audio_with_silence_breaks() -> None:
     with (
         um.patch(
             "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
+        ),
+        um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, mock_audio),
         ),
         um.patch("but_with_subs.chunking._detect_silence_breaks", return_value=[1.0]),
     ):
@@ -148,6 +158,10 @@ def test_chunk_audio_correct_times() -> None:
     with (
         um.patch(
             "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
+        ),
+        um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, mock_audio),
         ),
         um.patch("but_with_subs.chunking._detect_silence_breaks", return_value=[1.0]),
     ):
@@ -177,6 +191,10 @@ def test_chunk_audio_with_multiple_breaks() -> None:
             "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
         ),
         um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, mock_audio),
+        ),
+        um.patch(
             "but_with_subs.chunking._detect_silence_breaks", return_value=break_times
         ),
     ):
@@ -198,6 +216,10 @@ def test_chunk_audio_audio_data_matches() -> None:
     with (
         um.patch(
             "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
+        ),
+        um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, mock_audio),
         ),
         um.patch("but_with_subs.chunking._detect_silence_breaks", return_value=[1.0]),
     ):
@@ -424,8 +446,14 @@ def test_chunk_audio_edge_case_short_audio() -> None:
     mock_sr: int = 16000
     short_audio: np.ndarray = np.zeros(shape=100, dtype=np.float64)
 
-    with um.patch(
-        "but_with_subs.chunking._load_audio", return_value=(mock_sr, short_audio)
+    with (
+        um.patch(
+            "but_with_subs.chunking._load_audio", return_value=(mock_sr, short_audio)
+        ),
+        um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, short_audio),
+        ),
     ):
         audio_path = pathlib.Path("/fake/short.wav")
         chunks = list(chunk_audio(audio_path=audio_path))
@@ -446,6 +474,10 @@ def test_chunk_audio_edge_case_no_silence() -> None:
     with (
         um.patch(
             "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
+        ),
+        um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, mock_audio),
         ),
         um.patch("but_with_subs.chunking._detect_silence_breaks", return_value=[]),
     ):
@@ -471,6 +503,10 @@ def test_chunk_audio_edge_case_continuous_silence() -> None:
         um.patch(
             "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
         ),
+        um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, mock_audio),
+        ),
         um.patch("but_with_subs.chunking._detect_silence_breaks", return_value=[]),
     ):
         audio_path = pathlib.Path("/fake/continuous_silence.wav")
@@ -492,6 +528,10 @@ def test_chunk_audio_edge_case_single_break_near_end() -> None:
     with (
         um.patch(
             "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
+        ),
+        um.patch(
+            "but_with_subs.chunking._resample_to_16k_mono",
+            return_value=(mock_sr, mock_audio),
         ),
         um.patch("but_with_subs.chunking._detect_silence_breaks", return_value=[0.99]),
     ):
