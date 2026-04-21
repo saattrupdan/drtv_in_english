@@ -23,7 +23,7 @@ from but_with_subs.transcribing import transcribe
 logger = logging.getLogger(__package__)
 
 
-MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
+MODEL_ID = "CoRal-project/roest-v3-whisper-1.5b"
 
 
 @click.command()

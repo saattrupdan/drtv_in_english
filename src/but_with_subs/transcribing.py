@@ -7,6 +7,7 @@ using a pretrained ASR pipeline from the Hugging Face transformers library.
 import logging
 from typing import cast
 
+import bits_and_bobs as bnb
 import numpy as np
 from pydantic import BaseModel
 from transformers import AutomaticSpeechRecognitionPipeline
@@ -58,7 +59,9 @@ def transcribe(
     Returns:
         A list of ``Transcription`` models, one per text segment.
     """
-    result = pipeline(audio_data, return_timestamps="word")
+    with bnb.no_terminal_output():
+        result = pipeline(audio_data, return_timestamps="word")
+
     segments: list[Transcription] = []
     chunks: list[dict] = cast(dict, result).get("chunks", [])
     for chunk in chunks:

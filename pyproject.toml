@@ -11,6 +11,7 @@ maintainers = [
 ]
 requires-python = ">=3.12,<4.0"
 dependencies = [
+    "bits-and-bobs>=0.2.0",
     "fastapi[standard]>=0.135.3",
     "kenlm",
     "nltk>=3.9.1",
