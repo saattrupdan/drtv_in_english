@@ -10,7 +10,6 @@ import pathlib as pl
 from pathlib import Path
 
 import nltk
-from punctfix import PunctFixer
 
 from .logging_config import logger
 from .transcribing import Transcription
@@ -172,7 +171,6 @@ def _merge_transcriptions_into_sentences(
         char_to_chunk.append(word_idx)  # the space after the word
 
     # Tokenise into sentences
-    full_text = PunctFixer(language="da").punctuate(full_text)
     sentences = nltk.sent_tokenize(full_text, language="danish")
 
     merged: list[Transcription] = []

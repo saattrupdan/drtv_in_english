@@ -55,6 +55,7 @@ def chunk_audio(audio_path: pl.Path) -> Generator[Chunk, None, None]:
     """
     sample_rate, audio = _load_audio(path=audio_path)
     sr, mono_audio = _resample_to_16k_mono(audio=audio, original_sr=sample_rate)
+
     break_times = _detect_silence_breaks(
         audio=mono_audio, sr=sr, threshold_db=-50.0, min_gap_seconds=0.5
     )

@@ -14,7 +14,6 @@ dependencies = [
     "fastapi[standard]>=0.135.3",
     "kenlm",
     "nltk>=3.9.1",
-    "punctfix>=0.11.1",
     "pyctcdecode>=0.5.0",
     "scipy>=1.17.1",
     "torch>=2.0.0",
