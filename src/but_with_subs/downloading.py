@@ -103,7 +103,7 @@ def download(
         ],
     }
 
-    logger.info("Starting download from %s", url)
+    logger.info(f"Starting download from {url}")
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[no-untyped-call]
         ydl.download(url_list=[url])
@@ -128,6 +128,6 @@ def download(
             if audio_path is None:
                 audio_path = item
 
-    logger.info("Download results - video: %s, audio: %s", video_path, audio_path)
+    logger.info(f"Download results - video: {video_path}, audio: {audio_path}")
 
     return File(url=url, video_path=video_path, audio_path=audio_path)
