@@ -25,7 +25,7 @@ def extract_audio(video_path: Path) -> Path:
 
     """
     output_path = video_path.with_suffix(suffix=".wav")
-    logger.info("Extracting audio from '%s' to '%s'", video_path, output_path)
+    logger.info(f"Extracting audio from '{video_path}' to '{output_path}'")
     command: list[str] = [
         "ffmpeg",
         "-i",
