@@ -57,7 +57,7 @@ def chunk_audio(audio_path: pl.Path) -> Generator[Chunk, None, None]:
     sr, mono_audio = _resample_to_16k_mono(audio=audio, original_sr=sample_rate)
 
     break_times = _detect_silence_breaks(
-        audio=mono_audio, sr=sr, threshold_db=-50.0, min_gap_seconds=0.5
+        audio=mono_audio, sr=sr, threshold_db=-40.0, min_gap_seconds=1.0
     )
     for start_time, end_time, chunk_data in _split_audio_into_chunks(
         audio=mono_audio, break_times=break_times, start_time=0.0
@@ -93,7 +93,7 @@ def _load_audio(path: pl.Path) -> tuple[int, np.ndarray]:
     if audio_data.ndim > 1:
         audio_data = np.mean(a=audio_data, axis=1)
 
-    logger.info("Loaded audio from %s at %d Hz", path, sample_rate)
+    logger.info(f"Loaded audio from {path} at {sample_rate:,} Hz")
     return sample_rate, audio_data
 
 
@@ -117,10 +117,10 @@ def _resample_to_16k_mono(
     """
     target_sr = 16000
     if target_sr != original_sr:
-        logger.info("Resampling audio from %d Hz to 16,000 Hz", original_sr)
+        logger.info(f"Resampling audio from {original_sr:,} Hz to 16,000 Hz")
         n_samples = int(audio.size * target_sr / original_sr)
         mono_audio = scipy.signal.resample(x=audio, num=n_samples)
-    logger.info("Resampled audio from %d Hz to %d Hz", original_sr, target_sr)
+    logger.info(f"Resampled audio from {original_sr:,} Hz to {target_sr:,} Hz")
     return target_sr, mono_audio
 
 
@@ -179,7 +179,7 @@ def _detect_silence_breaks(
                 filtered.append(break_times[i])
         break_times = filtered
 
-    logger.info("Detected %d silence breaks", len(break_times))
+    logger.info(f"Detected {len(break_times)} silence breaks")
     return break_times
 
 
@@ -218,5 +218,5 @@ def _split_audio_into_chunks(
         if chunk_data.size > 0:
             chunks.append((chunk_start, chunk_end, chunk_data))
 
-    logger.info("Split audio into %d chunks", len(chunks))
+    logger.info(f"Split audio into {len(chunks)} chunks")
     return chunks
