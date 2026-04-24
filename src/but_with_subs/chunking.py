@@ -129,7 +129,9 @@ def _split_audio_into_chunks(audio: np.ndarray) -> list[Chunk]:
             model=load_silero_vad(),
             return_seconds=True,
             threshold=0.4,
-            progress_tracking_callback=lambda progress: pbar.update(progress - pbar.n),
+            progress_tracking_callback=lambda progress: pbar.update(
+                int(progress) - pbar.n
+            ),
         )
     chunks = []
     for speech_timestamp_dct in speech_timestamps:
