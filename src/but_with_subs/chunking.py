@@ -6,12 +6,14 @@ natural breaks detected through silence detection.
 
 import logging
 import pathlib as pl
-from collections.abc import Generator
 
 import numpy as np
 import scipy.io.wavfile
 import scipy.signal
+import torch
 from pydantic import BaseModel
+from silero_vad import get_speech_timestamps, load_silero_vad
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__package__)
 
@@ -21,15 +23,11 @@ class Chunk(BaseModel):
 
     Attributes:
         start_time:
-            Start time of the chunk, in seconds from the beginning of the audio.
+            Start time of the chunk in seconds.
         end_time:
-            End time of the chunk, in seconds from the beginning of the audio.
+            End time of the chunk in seconds.
         audio:
-            Mono audio data of the chunk, as a numpy array in 16 kHz.
-
-    Config:
-        arbitrary_types:
-            Allow numpy arrays as field types.
+            Numpy array containing the audio data for the chunk.
     """
 
     model_config = {"arbitrary_types_allowed": True}
@@ -39,7 +37,7 @@ class Chunk(BaseModel):
     audio: np.ndarray
 
 
-def chunk_audio(audio_path: pl.Path) -> Generator[Chunk, None, None]:
+def chunk_audio(audio_path: pl.Path) -> list[Chunk]:
     """Yield audio chunks split by silence breaks.
 
     Loads the audio file, resamples it to 16 kHz mono, detects silence
@@ -47,22 +45,15 @@ def chunk_audio(audio_path: pl.Path) -> Generator[Chunk, None, None]:
 
     Args:
         audio_path:
-            Path to the WAV audio file to split.
+            Path to the audio file to chunk.
 
     Yields:
         Chunk models for each audio segment between silence breaks.
 
     """
     sample_rate, audio = _load_audio(path=audio_path)
-    sr, mono_audio = _resample_to_16k_mono(audio=audio, original_sr=sample_rate)
-
-    break_times = _detect_silence_breaks(
-        audio=mono_audio, sr=sr, threshold_db=-40.0, min_gap_seconds=1.0
-    )
-    for start_time, end_time, chunk_data in _split_audio_into_chunks(
-        audio=mono_audio, break_times=break_times, start_time=0.0
-    ):
-        yield Chunk(start_time=start_time, end_time=end_time, audio=chunk_data)
+    mono_audio = _resample_to_16k_mono(audio=audio, original_sr=sample_rate)
+    return _split_audio_into_chunks(audio=mono_audio)
 
 
 def _load_audio(path: pl.Path) -> tuple[int, np.ndarray]:
@@ -97,9 +88,7 @@ def _load_audio(path: pl.Path) -> tuple[int, np.ndarray]:
     return sample_rate, audio_data
 
 
-def _resample_to_16k_mono(
-    audio: np.ndarray, original_sr: int
-) -> tuple[int, np.ndarray]:
+def _resample_to_16k_mono(audio: np.ndarray, original_sr: int) -> np.ndarray:
     """Resample audio to 16 kHz mono using scipy.signal.resample.
 
     Converts multi-channel audio to mono by averaging channels and
@@ -117,106 +106,38 @@ def _resample_to_16k_mono(
     """
     target_sr = 16000
     if target_sr != original_sr:
-        logger.info(f"Resampling audio from {original_sr:,} Hz to 16,000 Hz")
+        logger.info(f"Resampling audio from {original_sr:,} Hz to 16,000 Hz...")
         n_samples = int(audio.size * target_sr / original_sr)
         mono_audio = scipy.signal.resample(x=audio, num=n_samples)
     logger.info(f"Resampled audio from {original_sr:,} Hz to {target_sr:,} Hz")
-    return target_sr, mono_audio
+    return mono_audio
 
 
-def _detect_silence_breaks(
-    audio: np.ndarray, sr: int, threshold_db: float, min_gap_seconds: float
-) -> list[float]:
-    """Detect silence breaks in audio using energy-based threshold.
-
-    Finds gaps in the audio where the signal energy falls below the
-    specified threshold. Only gaps longer than min_gap_seconds are
-    returned as break points.
+def _split_audio_into_chunks(audio: np.ndarray) -> list[Chunk]:
+    """Split audio into chunks.
 
     Args:
         audio:
             Mono audio data array.
-        sr:
-            Sample rate of the audio.
-        threshold_db:
-            Energy threshold in dB below which a silence gap is detected.
-        min_gap_seconds:
-            Minimum duration of silence in seconds to be considered a break.
 
     Returns:
-        List of break times in seconds from the start of the audio.
-
+        List of Chunk models for each segment.
     """
-    target_sr = 16000
-    window_size = int(target_sr * 0.05)
-    hop_size = int(target_sr * 0.025)
-
-    n_windows = (len(audio) - window_size) // hop_size + 1
-    if n_windows <= 0:
-        logger.warning("Audio too short for silence detection")
-        return []
-
-    energies = np.zeros(shape=n_windows)
-    for i in range(n_windows):
-        start = i * hop_size
-        end = start + window_size
-        frame = audio[start:end]
-        energies[i] = 10.0 * np.log10(np.max(np.abs(frame) ** 2) + 1e-10)
-
-    silence_mask = energies < threshold_db
-    break_times: list[float] = []
-
-    for i in range(1, n_windows):
-        if silence_mask[i] and (not silence_mask[i - 1]):
-            break_time = float(i * hop_size) / sr
-            break_times.append(break_time)
-
-    if len(break_times) > 1:
-        filtered: list[float] = []
-        for i in range(1, len(break_times)):
-            gap = break_times[i] - break_times[i - 1]
-            if gap >= min_gap_seconds:
-                filtered.append(break_times[i])
-        break_times = filtered
-
-    logger.info(f"Detected {len(break_times)} silence breaks")
-    return break_times
-
-
-def _split_audio_into_chunks(
-    audio: np.ndarray, break_times: list[float], start_time: float
-) -> list[tuple[float, float, np.ndarray]]:
-    """Split audio into chunks based on silence break times.
-
-    Divides the audio into segments using the provided break times.
-    Each chunk is represented as a tuple of (start_time, end_time, data).
-
-    Args:
-        audio:
-            Mono audio data array.
-        break_times:
-            List of break times in seconds from the start of the audio.
-        start_time:
-            Start time offset for the current audio segment.
-
-    Returns:
-        List of tuples containing (start_time, end_time, audio_data)
-        for each chunk.
-
-    """
-    sr = 16000
-    chunks: list[tuple[float, float, np.ndarray]] = []
-
-    times = [start_time] + break_times + [float(len(audio)) / sr]
-
-    for i in range(len(times) - 1):
-        chunk_start = times[i]
-        chunk_end = times[i + 1]
-        start_sample = int(chunk_start * sr)
-        end_sample = int(chunk_end * sr)
-        chunk_data = audio[start_sample:end_sample]
-        if chunk_data.size > 0:
-            chunks.append((chunk_start, chunk_end, chunk_data))
+    with tqdm(total=100, desc="Splitting audio into chunks", unit="chunk") as pbar:
+        speech_timestamps = get_speech_timestamps(
+            audio=torch.from_numpy(audio),
+            model=load_silero_vad(),
+            return_seconds=True,
+            threshold=0.4,
+            progress_tracking_callback=lambda progress: pbar.update(progress - pbar.n),
+        )
+    chunks = []
+    for speech_timestamp_dct in speech_timestamps:
+        start_s = speech_timestamp_dct["start"]
+        end_s = speech_timestamp_dct["end"]
+        chunk_audio = audio[int(start_s * 16_000) : int(end_s * 16_000)]
+        chunk = Chunk(start_time=start_s, end_time=end_s, audio=chunk_audio)
+        chunks.append(chunk)
 
     logger.info(f"Split audio into {len(chunks)} chunks")
     return chunks

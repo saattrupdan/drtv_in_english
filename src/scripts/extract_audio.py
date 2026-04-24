@@ -25,14 +25,12 @@ def main(video_path: str) -> None:
             Path to the input video file.
     """
     path = Path(video_path)
-
     if not path.is_file():
         logger.error(f"File not found: {video_path}")
         sys.exit(1)
-
-    if path.with_suffix(".wav").exists():
+    elif path.with_suffix(".wav").exists():
         logger.error(f"Output file already exists: {path.with_suffix('.wav')}")
-        return
+        sys.exit(1)
 
     extract_audio(video_path=path)
 

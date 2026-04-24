@@ -11,6 +11,7 @@ import logging
 import sys
 from pathlib import Path
 
+import bits_and_bobs as bnb
 import click
 from tqdm.auto import tqdm
 from transformers import pipeline
@@ -23,7 +24,8 @@ from but_with_subs.transcribing import transcribe
 logger = logging.getLogger(__package__)
 
 
-MODEL_ID = "CoRal-project/roest-v3-whisper-1.5b"
+MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
+# MODEL_ID = "CoRal-project/roest-v3-whisper-1.5b"
 
 
 @click.command()
@@ -45,16 +47,18 @@ def main(audio_path: str) -> None:
         logger.error("File not found: {audio_path}")
         sys.exit(1)
 
-    print(f"Loading the {MODEL_ID} model...")
-    asr_pipeline = pipeline(
-        task="automatic-speech-recognition", model=MODEL_ID, device=get_device()
-    )
+    logger.info(f"Loading the {MODEL_ID} model...")
+    with bnb.no_terminal_output():
+        model = pipeline(
+            task="automatic-speech-recognition", model=MODEL_ID, device=get_device()
+        )
 
-    chunks = list(chunk_audio(audio_path=path))
+    chunks = chunk_audio(audio_path=path)
+
     all_transcriptions = []
     for chunk in tqdm(chunks, unit="chunk", desc="Transcribing"):
         segments = transcribe(
-            audio_data=chunk.audio, pipeline=asr_pipeline, chunk_offset=chunk.start_time
+            audio_data=chunk.audio, model=model, chunk_offset=chunk.start_time
         )
         all_transcriptions.extend(segments)
 

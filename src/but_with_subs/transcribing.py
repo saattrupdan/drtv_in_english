@@ -5,7 +5,7 @@ using a pretrained ASR pipeline from the Hugging Face transformers library.
 """
 
 import logging
-from typing import cast
+import typing as t
 
 import bits_and_bobs as bnb
 import numpy as np
@@ -36,7 +36,7 @@ class Transcription(BaseModel):
 
 def transcribe(
     audio_data: np.ndarray,
-    pipeline: AutomaticSpeechRecognitionPipeline,
+    model: AutomaticSpeechRecognitionPipeline,
     chunk_offset: float = 0.0,
 ) -> list[Transcription]:
     """Transcribe an audio chunk using an ASR pipeline.
@@ -50,21 +50,21 @@ def transcribe(
     Args:
         audio_data:
             Mono audio data as a numpy array (16 kHz float32).
-        pipeline:
-            A pretrained ``AutomaticSpeechRecognitionPipeline`` instance.
+        model:
+            The transcription model.
         chunk_offset:
             Time offset in seconds representing where this chunk sits within
             the full audio file. Added to each segment's start/end times.
 
     Returns:
-        A list of ``Transcription`` models, one per text segment.
+        A list of ``Transcription`` models, each representing a segment of the
+        audio file.
     """
     with bnb.no_terminal_output():
-        result = pipeline(audio_data, return_timestamps="word")
+        result = t.cast(dict, model(audio_data, return_timestamps="word"))
 
     segments: list[Transcription] = []
-    chunks: list[dict] = cast(dict, result).get("chunks", [])
-    for chunk in chunks:
+    for chunk in result.get("chunks", []):
         timestamp = chunk["timestamp"]
         start_time = float(timestamp[0]) + chunk_offset
         end_time = float(timestamp[1]) + chunk_offset

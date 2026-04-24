@@ -26,7 +26,6 @@ def main(audio_path: str) -> None:
             Path to the input audio file.
     """
     path = Path(audio_path)
-
     if not path.is_file():
         logger.error(f"File not found: {audio_path}")
         sys.exit(1)
@@ -39,7 +38,10 @@ def main(audio_path: str) -> None:
     for i, chunk in enumerate(chunks, start=1):
         duration = chunk.end_time - chunk.start_time
         logger.info(
-            f"Chunk {i}: start={chunk.start_time:.3f} s, end={chunk.end_time:.3f} s, duration={duration:.3f} s"
+            f"Chunk {i}: "
+            f"start={chunk.start_time:.3f} s, "
+            f"end={chunk.end_time:.3f} s, "
+            f"duration={duration:.3f} s"
         )
 
 
