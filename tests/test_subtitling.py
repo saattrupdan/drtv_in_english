@@ -12,7 +12,6 @@ import tempfile as tf
 from but_with_subs.subtitling import (
     _escape_vtt_text,
     _format_vtt_timestamp,
-    _merge_transcriptions_into_sentences,
     generate_subtitles,
 )
 from but_with_subs.transcribing import Transcription
@@ -184,22 +183,22 @@ def test_generate_subtitles_creates_vtt_file() -> None:
     content = result_path.read_text(encoding="utf-8")
     assert content.startswith("WEBVTT")
     assert "1" in content
-    assert "00:00:00.000 --> 00:00:01.500" in content
+    assert "00:00:00.000 --> 00:00:03.000" in content
     assert "Hello world" in content
 
 
 def test_generate_subtitles_multiple_transcriptions() -> None:
-    """Test generate_subtitles writes multiple transcriptions with correct timestamps.
+    """Test generate_subtitles produces rolling-window cues for multiple words.
 
-    Creates three sentence-level transcriptions (each ending with a period) with
-    different time ranges and verifies that all three appear as separate cues
-    with correct numbering, timestamps, and text content.
+    Creates three words spaced so that the first expires (word_duration=3.0)
+    before the third appears. Verifies the rolling window accumulates and
+    then sheds words correctly.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=1.0, text="First segment."),
-        _make_transcription(start_time=1.5, end_time=3.0, text="Second segment."),
-        _make_transcription(start_time=3.5, end_time=5.0, text="Third segment."),
+        _make_transcription(start_time=0.0, end_time=1.0, text="First"),
+        _make_transcription(start_time=1.5, end_time=3.0, text="Second"),
+        _make_transcription(start_time=3.5, end_time=5.0, text="Third"),
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -207,14 +206,14 @@ def test_generate_subtitles_multiple_transcriptions() -> None:
     result_path = audio_path.with_suffix(".vtt")
 
     content = result_path.read_text(encoding="utf-8")
-    assert content.count("\n") >= 12  # header + 3 cues with blank lines
+    assert "First" in content
+    assert "Second" in content
+    assert "Third" in content
 
-    assert "1\n00:00:00.000 --> 00:00:01.000" in content
-    assert "2\n00:00:01.500 --> 00:00:03.000" in content
-    assert "3\n00:00:03.500 --> 00:00:05.000" in content
-    assert "First segment." in content
-    assert "Second segment." in content
-    assert "Third segment." in content
+    # At t=1.5 both First and Second are active
+    assert "First Second" in content
+    # At t=3.5 both Second and Third are active (First expired at t=3.0)
+    assert "Second Third" in content
 
 
 def test_generate_subtitles_yields_progress() -> None:
@@ -260,13 +259,13 @@ def test_generate_subtitles_empty_list_raises() -> None:
 def test_generate_subtitles_timestamp_format() -> None:
     """Test generate_subtitles produces correctly formatted VTT timestamps.
 
-    Creates a transcription with fractional seconds (1.2346) and verifies
-    that the output VTT file contains the properly rounded millisecond
-    timestamp ``00:00:01.235``.
+    Creates a transcription with a fractional start_time (1.2346) and
+    verifies that the output VTT file contains the properly rounded
+    millisecond timestamp ``00:00:01.235``.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=1.2346, text="Timestamp test")
+        _make_transcription(start_time=1.2346, end_time=2.0, text="Timestamp test")
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -337,95 +336,11 @@ def test_generate_subtitles_overwrites_existing_file() -> None:
     assert "Old content" not in content_2
 
 
-# ---------------------------------------------------------------------------
-# _merge_transcriptions_into_sentences tests
-# ---------------------------------------------------------------------------
+def test_generate_subtitles_rolling_window_accumulation() -> None:
+    """Test that words accumulate in the rolling window.
 
-
-def test_merge_transcriptions_empty_list_returns_empty() -> None:
-    """Test _merge_transcriptions_into_sentences returns an empty list for empty input.
-
-    Verifies that passing an empty list produces an empty list as output.
-    """
-    result = _merge_transcriptions_into_sentences(transcriptions=[])
-
-    assert result == []
-
-
-def test_merge_transcriptions_single_word() -> None:
-    """Test _merge_transcriptions_into_sentences handles a single word transcription.
-
-    Creates a single word-level transcription and verifies that the result
-    contains exactly one sentence-level transcription with matching text
-    and the same start/end times.
-    """
-    transcriptions = [_make_transcription(start_time=0.5, end_time=1.2, text="Hello")]
-
-    result = _merge_transcriptions_into_sentences(transcriptions=transcriptions)
-
-    assert len(result) == 1
-    assert result[0].text == "Hello"
-    assert result[0].start_time == 0.5
-    assert result[0].end_time == 1.2
-
-
-def test_merge_transcriptions_basic_sentence_merging() -> None:
-    """Test merging word-level transcriptions into sentences.
-
-    Creates a list of word-level transcriptions forming a single sentence
-    and verifies that they are merged into one transcription with the
-    earliest start time and the latest end time.
-    """
-    transcriptions = [
-        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
-        _make_transcription(start_time=0.3, end_time=0.5, text="world"),
-    ]
-
-    result = _merge_transcriptions_into_sentences(transcriptions=transcriptions)
-
-    assert len(result) == 1
-    assert result[0].text == "Hello world"
-    assert result[0].start_time == 0.0
-    assert result[0].end_time == 0.5
-
-
-def test_merge_transcriptions_multiple_sentences() -> None:
-    """Test _merge_transcriptions_into_sentences merges multiple sentences correctly.
-
-    Creates word-level transcriptions that form two sentences separated by
-    a period and verifies that the output contains two sentence-level
-    transcriptions with proper start/end time merging.
-    """
-    transcriptions = [
-        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
-        _make_transcription(start_time=0.3, end_time=0.5, text="world."),
-        _make_transcription(start_time=0.6, end_time=0.7, text="How"),
-        _make_transcription(start_time=0.8, end_time=1.0, text="are"),
-        _make_transcription(start_time=1.1, end_time=1.3, text="you"),
-    ]
-
-    result = _merge_transcriptions_into_sentences(transcriptions=transcriptions)
-
-    assert len(result) == 2
-    assert result[0].text == "Hello world."
-    assert result[0].start_time == 0.0
-    assert result[0].end_time == 0.5
-    assert result[1].text == "How are you"
-    assert result[1].start_time == 0.6
-    assert result[1].end_time == 1.3
-
-
-# ---------------------------------------------------------------------------
-# Sentence-level VTT output tests
-# ---------------------------------------------------------------------------
-
-
-def test_generate_subtitles_word_level_to_sentence_cues() -> None:
-    """Test generate_subtitles merges word-level transcriptions into sentence cues.
-
-    Creates word-level transcriptions that form a sentence and verifies
-    that the VTT output contains a single sentence-level cue instead of
-    individual word cues.
+    Two words appearing close together should both be visible in the
+    same cue after the second word appears.
     """
     audio_path = _make_audio_file()
     transcriptions = [
@@ -439,25 +354,22 @@ def test_generate_subtitles_word_level_to_sentence_cues() -> None:
 
     content = result_path.read_text(encoding="utf-8")
 
-    # Should have exactly one cue (the merged sentence), not two word cues
-    assert content.count("\n") < 10  # header + 1 cue, not multiple word cues
+    # First cue shows only the first word
+    assert "1\n00:00:00.000 --> 00:00:00.300\nHello" in content
+    # Second cue shows both words accumulated
     assert "Hello world" in content
-    # Individual words should not appear as separate cues
-    # (they are part of the merged sentence text)
 
 
-def test_generate_subtitles_sentence_level_timing() -> None:
-    """Test generate_subtitles produces sentence-level timing spans.
+def test_generate_subtitles_word_expiry() -> None:
+    """Test that words expire after word_duration seconds.
 
-    Creates word-level transcriptions and verifies that the merged
-    sentence cue's start time is the earliest start and end time is
-    the latest end across all constituent words.
+    Two words separated by more than word_duration should never appear
+    in the same cue.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.5, end_time=0.7, text="First"),
-        _make_transcription(start_time=0.8, end_time=1.0, text="sentence"),
-        _make_transcription(start_time=1.1, end_time=1.4, text="here"),
+        _make_transcription(start_time=0.0, end_time=0.5, text="First"),
+        _make_transcription(start_time=4.0, end_time=4.5, text="Second"),
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -466,37 +378,37 @@ def test_generate_subtitles_sentence_level_timing() -> None:
 
     content = result_path.read_text(encoding="utf-8")
 
-    # The merged sentence should span from the earliest start (0.5) to latest end (1.4)
-    assert "00:00:00.500 --> 00:00:01.400" in content
-    assert "First sentence here" in content
+    # First word expires at 3.0, second appears at 4.0 → they never overlap
+    assert "First Second" not in content
+    assert "First" in content
+    assert "Second" in content
 
 
-def test_generate_subtitles_sentence_level_multiple_sentences() -> None:
-    """Test generate_subtitles handles multiple sentences from word-level input.
+def test_generate_subtitles_max_words_pushes_out_old() -> None:
+    """Test that the max_words limit pushes out the oldest words.
 
-    Creates word-level transcriptions forming two sentences and verifies
-    that the VTT output contains two separate sentence-level cues with
-    correct numbering, timestamps, and text.
+    With max_words=2, adding a third word should remove the first from
+    the display.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
-        _make_transcription(start_time=0.3, end_time=0.5, text="world."),
-        _make_transcription(start_time=1.0, end_time=1.2, text="Good"),
-        _make_transcription(start_time=1.3, end_time=1.5, text="bye."),
+        _make_transcription(start_time=0.0, end_time=0.2, text="one"),
+        _make_transcription(start_time=0.3, end_time=0.5, text="two"),
+        _make_transcription(start_time=0.6, end_time=0.8, text="three"),
     ]
 
-    generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
+    generator = generate_subtitles(
+        transcriptions=transcriptions, audio_path=audio_path, max_words=2
+    )
     list(generator)
     result_path = audio_path.with_suffix(".vtt")
 
     content = result_path.read_text(encoding="utf-8")
 
-    # Should have two sentence cues
-    assert "1\n00:00:00.000 --> 00:00:00.500" in content
-    assert "2\n00:00:01.000 --> 00:00:01.500" in content
-    assert "Hello world." in content
-    assert "Good bye." in content
+    # After "three" appears, "one" should be pushed out
+    assert "two three" in content
+    # "one two three" should never appear together
+    assert "one two three" not in content
 
 
 def test_generate_subtitles_vtt_header_and_cue_format() -> None:
@@ -541,18 +453,18 @@ def test_generate_subtitles_vtt_header_and_cue_format() -> None:
     assert lines[9] == ""
 
 
-def test_generate_subtitles_vtt_cue_count_matches_sentences() -> None:
-    """Test generate_subtitles cue count matches the number of sentences.
+def test_generate_subtitles_cue_count_reflects_state_changes() -> None:
+    """Test that cue count matches the number of rolling-window state changes.
 
-    Creates word-level transcriptions forming three sentences and
-    verifies that the generated VTT file contains exactly three
-    cue blocks.
+    Three words close together (all within word_duration) produce a cue
+    for each appear event plus cues for each expiry event, giving 5 cues
+    total (3 accumulating, 2 shedding, then empty).
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=0.2, text="One."),
-        _make_transcription(start_time=0.5, end_time=0.7, text="Two."),
-        _make_transcription(start_time=1.0, end_time=1.2, text="Three."),
+        _make_transcription(start_time=0.0, end_time=0.2, text="One"),
+        _make_transcription(start_time=0.5, end_time=0.7, text="Two"),
+        _make_transcription(start_time=1.0, end_time=1.2, text="Three"),
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -561,34 +473,32 @@ def test_generate_subtitles_vtt_cue_count_matches_sentences() -> None:
 
     content = result_path.read_text(encoding="utf-8")
 
-    # Count cue blocks by counting lines that look like cue numbers
-    # (a line containing only digits followed by a blank line or end)
     lines = content.split("\n")
     cue_numbers = [line for line in lines if line.strip().isdigit()]
 
-    assert len(cue_numbers) == 3
+    assert len(cue_numbers) == 5
 
 
-def test_generate_subtitles_progress_yields_sentence_count() -> None:
-    """Test generate_subtitles yields progress based on sentence count.
+def test_generate_subtitles_progress_yields_per_word() -> None:
+    """Test that generate_subtitles yields one progress tuple per word.
 
-    Creates word-level transcriptions that form two sentences and
-    verifies that the generator yields exactly two progress tuples
-    (one per sentence), not one per word.
+    With 4 word-level transcriptions the generator should yield 4
+    progress tuples with incrementing counts.
     """
     audio_path = _make_audio_file()
     transcriptions = [
         _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
         _make_transcription(start_time=0.3, end_time=0.5, text="world"),
-        _make_transcription(start_time=0.6, end_time=0.8, text="Foo."),
-        _make_transcription(start_time=0.9, end_time=1.1, text="Bar."),
+        _make_transcription(start_time=0.6, end_time=0.8, text="Foo"),
+        _make_transcription(start_time=0.9, end_time=1.1, text="Bar"),
     ]
 
     progress = list(
         generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
     )
 
-    # Should yield 2 progress tuples (2 sentences), not 4 (4 words)
-    assert len(progress) == 2
-    assert progress[0] == (1, 2)
-    assert progress[1] == (2, 2)
+    assert len(progress) == 4
+    assert progress[0] == (1, 4)
+    assert progress[1] == (2, 4)
+    assert progress[2] == (3, 4)
+    assert progress[3] == (4, 4)
