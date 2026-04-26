@@ -7,10 +7,8 @@ properly punctuated, properly casemapped subtitle segments.
 import logging
 
 from pydantic import BaseModel
-from tqdm.auto import tqdm
 
 from .llm import LLMConfig, query_llm
-from .transcribing import Transcription
 from .transcribing import Transcription
 
 logger = logging.getLogger(__package__)
@@ -159,27 +157,15 @@ async def format_transcriptions(
         chunk_transcriptions[i : i + 4] for i in range(0, len(chunk_transcriptions), 4)
     ]
 
-    total_batches = len(batches)
+    all_segments: list[FormattedSegment] = []
 
-    with SharedProgress(
-        total=total_batches, desc="Processing transcription batches"
-    ) as shared_progress:
-        results: list[list[FormattedSegment]] = await asyncio.gather(
-            *[
-                _process_batch_with_progress(
-                    batch, llm_config, i, total_batches, shared_progress
-                )
-                for i, batch in enumerate(batches)
-            ]
-        )
-
-    segments: list[FormattedSegment] = []
-    for result in results:
-        segments.extend(result)
+    for batch in tqdm(batches, desc="Processing transcription batches"):
+        segments = await _process_batch(batch, llm_config)
+        all_segments.extend(segments)
 
     # Map position intervals back to timestamps.
     formatted_transcriptions: list[Transcription] = []
-    for segment in segments:
+    for segment in all_segments:
         start_word = position_to_transcription.get(segment.start_position)
         end_word = position_to_transcription.get(segment.end_position)
 
@@ -202,43 +188,8 @@ async def format_transcriptions(
     return formatted_transcriptions
 
 
-async def _process_batch_with_progress(
-    batch: list[list[Transcription]],
-    llm_config: LLMConfig,
-    batch_index: int,
-    total_batches: int,
-    shared_progress: SharedProgress | None = None,
-) -> list[FormattedSegment]:
-    """Process a batch using a shared progress bar.
-
-    Args:
-        batch:
-            A list of 4 or fewer chunk transcription lists.
-        llm_config:
-            Configuration for the LLM API call.
-        batch_index:
-            Zero-based index of this batch among all batches.
-        total_batches:
-            Total number of batches.
-        shared_progress (optional):
-            A shared progress instance to update on batch completion.
-
-    Returns:
-        A list of formatted segments from the LLM response.
-    """
-    if shared_progress is not None:
-        progress_callback = SharedProgressCallback(shared_progress)
-    else:
-        progress_callback = None
-
-    return await _process_batch(batch, llm_config, progress_callback=progress_callback)
-
-
-async def _process_batch(
-    batch: list[list[Transcription]],
-    llm_config: LLMConfig,
-    *,
-    progress_callback: c.Callable[[LLMProgress], None] | None = None,
+def _process_batch(
+    batch: list[list[Transcription]], llm_config: LLMConfig
 ) -> list[FormattedSegment]:
     """Process a single batch of chunks through the LLM.
 
@@ -247,8 +198,6 @@ async def _process_batch(
             A list of 4 or fewer chunk transcription lists.
         llm_config:
             Configuration for the LLM API call.
-        progress_callback (optional):
-            A callback invoked with LLM progress updates.
 
     Returns:
         A list of formatted segments from the LLM response.
@@ -257,9 +206,7 @@ async def _process_batch(
     config = llm_config.model_copy(
         update={"response_model": TranscribedSegmentsResponse}
     )
-    response = await query_llm(
-        prompt=prompt, config=config, progress_callback=progress_callback
-    )
+    response = query_llm(prompt=prompt, config=config)
 
     if isinstance(response, str):
         logger.warning("LLM returned raw string instead of structured data")
