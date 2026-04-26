@@ -91,7 +91,7 @@ dev = [
 requires-dist = [
     { name = "bits-and-bobs", specifier = ">=0.2.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.3" },
-    { name = "kenlm", url = "https://github.com/kpu/kenlm/archive/master.zip" },
+    { name = "kenlm" },
     { name = "pyctcdecode", specifier = ">=0.5.0" },
     { name = "scipy", specifier = ">=1.17.1" },
     { name = "silero-vad", specifier = ">=6.2.1" },
@@ -717,8 +717,8 @@ wheels = [
 [[package]]
 name = "kenlm"
 version = "0.2.0"
-source = { url = "https://github.com/kpu/kenlm/archive/master.zip" }
-sdist = { hash = "sha256:f935c2ac0be6dd1bf96a5852973dad6103c48e866cf33532459fb1336bea4bfe" }
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/97/76/6a7479e3546d34ee46fc960c8d0ccf281f26ed18956d17f4ec5dcb1fa377/kenlm-0.2.0.tar.gz", hash = "sha256:c2dc1dc09d3c150e6a1777ef0fd5cac3688e1dc1cc13e41472d0284e5e88ac7f", size = 427425, upload-time = "2023-08-19T21:08:00.745Z" }
 
 [[package]]
 name = "markdown-it-py"
