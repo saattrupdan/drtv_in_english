@@ -1,22 +1,31 @@
-"""Progress event types for LLM request lifecycle."""
+"""Progress event types for LLM API calls."""
 
-from __future__ import annotations
-
-import typing as t
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 
-@dataclass(frozen=True)
-class LLMProgress:
-    """Progress event for LLM request lifecycle."""
+class LLMProgress(BaseModel):
+    """Represents a progress event from an LLM API call.
 
-    status: t.Literal["request_starting", "request_sent", "complete", "error"]
+    Attributes:
+        status:
+            The status of the progress event (e.g. "request_starting", "complete").
+        elapsed_ms:
+            Elapsed time in milliseconds since the start of the call.
+        message:
+            A human-readable description of the current state.
+        model:
+            The name of the model being queried, if available.
+        error:
+            An error message, if the call failed.
+    """
+
+    status: str
     elapsed_ms: float
     message: str
     model: str | None = None
     error: str | None = None
 
 
-def _noop_callback(_: LLMProgress) -> None:
-    """No-op progress callback used as default."""
+def _noop_callback(progress: LLMProgress) -> None:
+    """A no-op callback for use when no progress reporting is desired."""
     pass
