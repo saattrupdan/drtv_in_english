@@ -26,7 +26,7 @@ def main(video_path: str) -> None:
     """
     path = Path(video_path)
     if not path.is_file():
-        logger.error(f"File not found: {video_path}")
+        logger.error("File not found: %s", video_path)
         sys.exit(1)
     elif path.with_suffix(".wav").exists():
         logger.error(f"Output file already exists: {path.with_suffix('.wav')}")
