@@ -1,8 +1,10 @@
-"""Progress event types for LLM API calls."""
+"""Progress event types and shared progress utilities for LLM API calls."""
 
 import collections.abc as c
+import threading
 
 from pydantic import BaseModel, ConfigDict
+from tqdm.auto import tqdm
 
 
 class LLMProgress(BaseModel):
@@ -28,6 +30,76 @@ class LLMProgress(BaseModel):
     message: str
     model: str | None = None
     error: str | None = None
+
+
+class SharedProgress:
+    """A thread-safe wrapper around a single ``tqdm`` progress bar.
+
+    Designed for use across multiple parallel workers so that only one
+    progress bar is visible in the terminal.
+    """
+
+    def __init__(self, total: int, desc: str = "") -> None:
+        """Initialise the shared progress bar.
+
+        Args:
+            total:
+                The total number of units to track.
+            desc (optional):
+                A description string shown alongside the progress bar.
+                Defaults to an empty string.
+        """
+        self._lock = threading.Lock()
+        self._tqdm = tqdm(total=total, desc=desc or None)
+
+    def update(self, n: int = 1) -> None:
+        """Advance the progress bar by ``n`` units.
+
+        Args:
+            n (optional):
+                Number of units to advance. Defaults to 1.
+        """
+        with self._lock:
+            self._tqdm.update(n)
+
+    def set_description(self, desc: str) -> None:
+        """Update the description shown alongside the progress bar.
+
+        Args:
+            desc:
+                The new description string.
+        """
+        with self._lock:
+            self._tqdm.set_description(desc)
+
+    def close(self) -> None:
+        """Close and clean up the progress bar."""
+        with self._lock:
+            self._tqdm.close()
+
+
+def SharedProgressCallback(shared_progress: SharedProgress) -> c.Callable[[LLMProgress], None]:
+    """Return a callback suitable for LLM progress events.
+
+    The callback increments the shared progress bar on completion and
+    updates its description on intermediate statuses.
+
+    Args:
+        shared_progress:
+            The ``SharedProgress`` instance to update.
+
+    Returns:
+        A callback function matching the ``c.Callable[[LLMProgress], None]``
+        signature expected by ``query_llm`` and related functions.
+    """
+
+    def callback(progress: LLMProgress) -> None:
+        if progress.status == "complete":
+            shared_progress.update(1)
+        elif progress.status in ("request_starting", "request_sent", "error"):
+            shared_progress.set_description(progress.message)
+
+    return callback
 
 
 def _noop_callback(progress: LLMProgress) -> None:
