@@ -24,7 +24,7 @@ def configure_logging() -> None:
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.setLevel(logging.INFO)
     handler.setFormatter(fmt=formatter)
-    root_logger.addHandler(hdlr=handler)
+    root_logger.addHandler(handler)
 
     # Ignore other loggers
     logging.getLogger("httpx").setLevel(logging.WARNING)
