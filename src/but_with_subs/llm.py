@@ -104,6 +104,12 @@ async def query_llm[ResponseModel: BaseModel](
         logger.info("LLM API response received")
 
         content: str = response_data["choices"][0]["message"]["content"]
+
+        # Guard against null content from the LLM
+        if content is None:
+            logger.warning("LLM returned null content, returning raw response")
+            return content
+
         if config.response_model is None:
             logger.info(f"Received LLM response with {len(content):,} tokens")
             return content
