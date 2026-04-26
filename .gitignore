@@ -118,5 +118,5 @@ node_modules/
 data/*
 !data/.gitkeep
 
-# Plan
-**/PLAN.md
+# Worktrees
+.worktrees
