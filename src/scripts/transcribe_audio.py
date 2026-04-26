@@ -8,7 +8,6 @@ and outputs a `.vtt` subtitle file alongside the original audio file.
 """
 
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -66,12 +65,27 @@ def translate_transcriptions(
 @click.command()
 @click.argument("audio_path", type=str)
 @click.option(
+    "--llm-model",
+    type=str,
+    required=True,
+    default="gpt-oss-20b",
+    help="LLM model to use for translation.",
+)
+@click.option("--llm-api-base", type=str, default="", help="Base URL for the LLM API.")
+@click.option("--llm-api-key", type=str, required=True, help="API key for the LLM.")
+@click.option(
     "--language",
     type=str,
     default=None,
     help="Target language for translation (e.g. 'French', 'Spanish').",
 )
-def main(audio_path: str, language: str | None) -> None:
+def main(
+    audio_path: str,
+    language: str | None,
+    llm_model: str,
+    llm_api_base: str,
+    llm_api_key: str,
+) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
     Loads the audio file, splits it into chunks based on silence breaks,
@@ -84,6 +98,12 @@ def main(audio_path: str, language: str | None) -> None:
         language:
             Target language for translation. If not provided, no translation
             is performed.
+        llm_model:
+            Name of the LLM model to use for translation.
+        llm_api_base:
+            Base URL for the LLM API.
+        llm_api_key:
+            API key for the LLM.
     """
     path = Path(audio_path)
 
@@ -112,11 +132,11 @@ def main(audio_path: str, language: str | None) -> None:
 
     if language is not None:
         llm_config = LLMConfig(
-            model=os.environ["LLM_MODEL"],
+            model=llm_model,
             temperature=0.0,
             max_tokens=1000,
-            api_base=os.environ.get("LLM_API_BASE", ""),
-            api_key=os.environ.get("LLM_API_KEY", ""),
+            api_base=llm_api_base,
+            api_key=llm_api_key,
         )
         all_transcriptions = translate_transcriptions(
             all_transcriptions, target_language=language, llm_config=llm_config
