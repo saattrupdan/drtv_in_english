@@ -38,17 +38,17 @@ class Chunk(BaseModel):
 
 
 def chunk_audio(audio_path: pl.Path) -> list[Chunk]:
-    """Yield audio chunks split by silence breaks.
+    """Split audio into chunks based on silence breaks.
 
     Loads the audio file, resamples it to 16 kHz mono, detects silence
-    breaks, and yields Chunk models for each segment between breaks.
+    breaks, and returns Chunk models for each segment between breaks.
 
     Args:
         audio_path:
             Path to the audio file to chunk.
 
-    Yields:
-        Chunk models for each audio segment between silence breaks.
+    Returns:
+        List of Chunk models for each audio segment between silence breaks.
 
     """
     sample_rate, audio = _load_audio(path=audio_path)

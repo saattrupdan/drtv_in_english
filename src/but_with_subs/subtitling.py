@@ -17,8 +17,7 @@ _SENTENCE_ENDINGS = frozenset(".?!")
 
 
 def _group_transcriptions(
-    transcriptions: list[Transcription],
-    max_words_per_group: int,
+    transcriptions: list[Transcription], max_words_per_group: int
 ) -> list[list[Transcription]]:
     """Split word-level transcriptions into subtitle groups.
 

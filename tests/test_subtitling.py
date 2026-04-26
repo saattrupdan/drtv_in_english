@@ -396,9 +396,7 @@ def test_generate_subtitles_max_words_per_group() -> None:
     ]
 
     generator = generate_subtitles(
-        transcriptions=transcriptions,
-        audio_path=audio_path,
-        max_words_per_group=2,
+        transcriptions=transcriptions, audio_path=audio_path, max_words_per_group=2
     )
     list(generator)
     result_path = audio_path.with_suffix(".vtt")

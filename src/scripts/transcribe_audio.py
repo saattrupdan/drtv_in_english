@@ -32,9 +32,7 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
 
 
 def translate_transcriptions(
-    transcriptions: list[Transcription],
-    target_language: str,
-    llm_config: LLMConfig,
+    transcriptions: list[Transcription], target_language: str, llm_config: LLMConfig
 ) -> list[Transcription]:
     """Translate each transcription segment to the target language.
 
@@ -53,9 +51,7 @@ def translate_transcriptions(
     translated: list[Transcription] = []
     for segment in tqdm(transcriptions, unit="segment", desc="Translating"):
         translated_text = translate(
-            text=segment.text,
-            target_language=target_language,
-            llm_config=llm_config,
+            text=segment.text, target_language=target_language, llm_config=llm_config
         )
         translated.append(
             Transcription(

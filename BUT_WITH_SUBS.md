@@ -95,7 +95,20 @@ Check that it works on the sample URLs above.
 
 Ensure good logging along the way, with the same logger as defined in Phase 1.
 
-### Phase 5: Creating UI
+### Phase 5: Translating subtitles
+
+We should have a `translate` function in a separate `translation` module that takes
+transcribed text, a target language, and an LLM configuration, and returns the
+translated text. It uses the LLM module (`llm.py`) to perform the translation via an
+LLM API.
+
+A `--language` command-line parameter should be added to the workflow so the user
+can specify the desired output language. When provided, each transcription segment is
+translated into the target language before subtitle generation. The translation happens
+after transcription and before subtitling, replacing the original text in each
+`Transcription` model with its translated counterpart.
+
+### Phase 6: Creating UI
 
 The UI should look very professional and sleek, and should include the title "... But
 With Subs" and logo (found in `./public/but-with-subs-logo.jpg`) and the favicon (found
@@ -132,7 +145,7 @@ download and transcription process. The video player should just play an empty v
 
 There should also be a button in the UI to go back to home, to process another video.
 
-### Phase 6: API
+### Phase 7: API
 
 The API should be a FastAPI app that exposes the POST endpoint `/process` that takes a
 URL and does the following:
@@ -166,7 +179,7 @@ URL and does the following:
   merged
    - `subtitles_path (str)`: The absolute path to the generated subtitles file
 
-### Phase 7: Integrate UI with API
+### Phase 8: Integrate UI with API
 
 When the submission is triggered, the frontend should make a POST request to the API
 endpoint `/process` with the URL as the request body. The frontend should then display

@@ -1,5 +1,9 @@
-import click
+"""Translate a text string using an LLM."""
+
+import asyncio
 import os
+
+import click
 
 from but_with_subs.llm import LLMConfig
 from but_with_subs.translation import translate
@@ -22,7 +26,7 @@ def main(text: str, language: str, api_base: str | None) -> None:
         api_key=api_key,
     )
 
-    result = translate(text, language, config)
+    result = asyncio.run(translate(text, language, config))
     print(result)
 
 
