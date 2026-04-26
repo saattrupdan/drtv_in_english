@@ -99,6 +99,47 @@ from but_with_subs import some_function
 Note that this is also how we import functions/classes in tests, since each test Python
 file is also a Python script, rather than a module.
 
+## Usage
+
+### Configuration
+
+Translation and transcription are driven by command-line flags, not environment variables.
+The primary entry point is `src/scripts/translate_string.py`. Example:
+
+```bash
+uv run python src/scripts/translate_string.py \
+    --text "Hello, world!" \
+    --language "French" \
+    --llm-model "gpt-oss-20b" \
+    --llm-api-key "your-llm-api-key" \
+    --api-key "your-translation-api-key" \
+    --api-base "http://localhost:8080"
+```
+
+All flags are:
+
+| Flag | Description | Required | Default |
+|---|---|---|---|
+| `--text` | Text to translate | Yes | — |
+| `--language` | Target language | Yes | — |
+| `--llm-model` | The LLM model to use (e.g., `"gpt-oss-20b"`) | Yes | — |
+| `--llm-api-key` | The LLM API key | Yes | — |
+| `--llm-api-base` | The LLM API base URL | No | — |
+| `--api-key` | The translation API key | Yes | — |
+| `--api-base` | The translation API base URL | No | `"http://localhost:8080"` |
+
+### Other Scripts
+
+Additional scripts are available in `src/scripts/`:
+
+| Script | Description |
+|---|---|
+| `download_video.py` | Download a video from a URL |
+| `extract_audio.py` | Extract audio from a video file |
+| `chunk_audio.py` | Split an audio file into chunks |
+| `transcribe_audio.py` | Transcribe audio to text |
+| `translate_string.py` | Translate a text string via an LLM |
+
 ## Features
 
 ### Docker Setup
