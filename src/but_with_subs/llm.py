@@ -12,7 +12,8 @@ from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
 
 from .llm_progress import LLMProgress
-from .logging_config import loggerfrom .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
+from .logging_config import logger
+from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
 
 
 class LLMConfig(BaseModel):
