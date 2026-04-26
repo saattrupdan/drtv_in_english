@@ -22,6 +22,7 @@ from but_with_subs.device import get_device
 from but_with_subs.llm import LLMConfig
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.transcribing import Transcription, transcribe
+from but_with_subs.transcription_formatting import format_transcriptions
 from but_with_subs.translation import translate
 
 logger = logging.getLogger(__package__)
@@ -104,20 +105,24 @@ def main(
         logger.warning("No transcription segments found. Skipping subtitle generation.")
         return
 
-    # TODO: Format the transcriptions correctly (casing, punctuation, wording, etc.) and
-    # split them up into semantically meaningful segments, suitable for subtitles.
-    # Maintain timestamps on a segment-level
-    segments: list[Transcription] = list()
+    # Format the transcriptions: fix casing, punctuation, wording, and split
+    # into semantically meaningful subtitle segments with accurate timestamps.
+    llm_config = LLMConfig(
+        model=llm_model,
+        temperature=0.0,
+        max_tokens=1000,
+        api_base=llm_api_base,
+        api_key=llm_api_key,
+    )
+    formatted = asyncio.run(
+        format_transcriptions(
+            chunk_transcriptions=chunk_transcriptions, llm_config=llm_config
+        )
+    )
 
     # Translate each segment to the target language
+    segments: list[Transcription] = formatted
     if language is not None:
-        llm_config = LLMConfig(
-            model=llm_model,
-            temperature=0.0,
-            max_tokens=1000,
-            api_base=llm_api_base,
-            api_key=llm_api_key,
-        )
         segments = asyncio.run(
             translate_transcriptions(
                 transcriptions=segments, target_language=language, llm_config=llm_config
