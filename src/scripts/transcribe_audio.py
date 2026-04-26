@@ -31,51 +31,19 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
 # MODEL_ID = "CoRal-project/roest-v3-whisper-1.5b"
 
 
-async def translate_transcriptions(
-    transcriptions: list[Transcription], target_language: str, llm_config: LLMConfig
-) -> list[Transcription]:
-    """Translate each transcription segment to the target language.
-
-    Args:
-        transcriptions:
-            List of transcription segments to translate.
-        target_language:
-            The language to translate into.
-        llm_config:
-            Configuration for the LLM.
-
-    Returns:
-        A new list of ``Transcription`` objects with translated text
-        but the same start and end times as the originals.
-    """
-    translated: list[Transcription] = []
-    for segment in tqdm(transcriptions, unit="segment", desc="Translating"):
-        translated_text = await translate(
-            text=segment.text, target_language=target_language, llm_config=llm_config
-        )
-        translated.append(
-            Transcription(
-                start_time=segment.start_time,
-                end_time=segment.end_time,
-                text=translated_text,
-            )
-        )
-    return translated
-
-
 @click.command()
 @click.argument("audio_path", type=str)
 @click.option(
     "--llm-model",
     type=str,
     required=True,
-    default="qwen3.6-35B-A3B",
+    default="Qwen/Qwen3.6-35B-A3B-FP8",
     help="LLM model to use for translation.",
 )
 @click.option(
     "--llm-api-base",
     type=str,
-    default="http://127.0.0.1:8080",
+    default="http://100.102.237.34:8000/v1",
     help="Base URL for the LLM API.",
 )
 @click.option("--llm-api-key", type=str, default=None, help="API key for the LLM.")
@@ -155,6 +123,38 @@ def main(
             transcriptions=all_transcriptions, audio_path=path
         ):
             pbar.update(int(100 * current / total) - pbar.n)
+
+
+async def translate_transcriptions(
+    transcriptions: list[Transcription], target_language: str, llm_config: LLMConfig
+) -> list[Transcription]:
+    """Translate each transcription segment to the target language.
+
+    Args:
+        transcriptions:
+            List of transcription segments to translate.
+        target_language:
+            The language to translate into.
+        llm_config:
+            Configuration for the LLM.
+
+    Returns:
+        A new list of ``Transcription`` objects with translated text
+        but the same start and end times as the originals.
+    """
+    translated: list[Transcription] = []
+    for segment in tqdm(transcriptions, unit="segment", desc="Translating"):
+        translated_text = await translate(
+            text=segment.text, target_language=target_language, llm_config=llm_config
+        )
+        translated.append(
+            Transcription(
+                start_time=segment.start_time,
+                end_time=segment.end_time,
+                text=translated_text,
+            )
+        )
+    return translated
 
 
 if __name__ == "__main__":
