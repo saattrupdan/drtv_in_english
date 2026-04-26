@@ -113,6 +113,7 @@ async def query_llm[ResponseModel: BaseModel](
         response: Response = await client.post(
             url=url, json=payload, headers=headers, timeout=600
         )
+
         if response.is_error:
             elapsed_ms = (time.monotonic() - start_time) * 1000
             logger.error(f"LLM API error {response.status_code}: {response.text}")
@@ -138,6 +139,12 @@ async def query_llm[ResponseModel: BaseModel](
 
         # Guard against null content from the LLM
         if content is None:
+            _emit_progress(
+                callback=progress_callback,
+                status="error",
+                elapsed_ms=elapsed_ms,
+                message="LLM returned null content",
+            )
             logger.warning("LLM returned null content, returning raw response")
             _emit_progress(
                 callback=progress_callback,
@@ -162,6 +169,15 @@ async def query_llm[ResponseModel: BaseModel](
             parsed: ResponseModel = t.cast(
                 ResponseModel, config.response_model.model_validate_json(content)
             )
+
+            _emit_progress(
+                callback=progress_callback,
+                status="complete",
+                elapsed_ms=elapsed_ms,
+                message="Prompt formatted successfully",
+                model=config.model,
+            )
+            return parsed
         except ValidationError as exc:
             elapsed_ms = (time.monotonic() - start_time) * 1000
             logger.error(
@@ -179,15 +195,6 @@ async def query_llm[ResponseModel: BaseModel](
             raise ValueError(
                 f"Failed to parse LLM response with {config.response_model.__name__}"
             ) from exc
-
-        _emit_progress(
-            callback=progress_callback,
-            status="complete",
-            elapsed_ms=elapsed_ms,
-            message="Prompt formatted successfully",
-            model=config.model,
-        )
-        return parsed
     finally:
         if close_after:
             await client.aclose()
