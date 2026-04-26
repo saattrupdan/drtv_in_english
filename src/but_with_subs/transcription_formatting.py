@@ -192,4 +192,11 @@ async def _process_batch(
         logger.warning("LLM returned raw string instead of structured data")
         return []
 
+    if response is None:
+        logger.warning(
+            "LLM returned None for batch, skipping. "
+            "Check LLM provider and prompt context."
+        )
+        return []
+
     return response.segments
