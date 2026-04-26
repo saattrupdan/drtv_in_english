@@ -5,13 +5,11 @@ compatibility with llama.cpp servers. It supports arbitrary response models defi
 as Pydantic BaseModels.
 """
 
-
 import time
 import typing as t
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
-
 
 from .logging_config import logger
 from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
@@ -45,9 +43,7 @@ class LLMConfig(BaseModel):
 
 
 async def query_llm[ResponseModel: BaseModel](
-    prompt: str,
-    config: LLMConfig,
-    client: AsyncClient | None = None,
+    prompt: str, config: LLMConfig, client: AsyncClient | None = None
 ) -> ResponseModel | str | None:
     """Query an LLM API with a prompt and return a parsed response.
 
@@ -104,12 +100,12 @@ async def query_llm[ResponseModel: BaseModel](
         )
 
         if response.is_error:
-            elapsed_ms = (time.monotonic() - start_time) * 1000
+            (time.monotonic() - start_time) * 1000
             logger.error(f"LLM API error {response.status_code}: {response.text}")
             response.raise_for_status()
 
         response_data: ChatCompletionResponse = response.json()
-        elapsed_ms = (time.monotonic() - start_time) * 1000
+        (time.monotonic() - start_time) * 1000
 
         content: str = response_data["choices"][0]["message"]["content"]
 
@@ -128,7 +124,7 @@ async def query_llm[ResponseModel: BaseModel](
 
             return parsed
         except ValidationError as exc:
-            elapsed_ms = (time.monotonic() - start_time) * 1000
+            (time.monotonic() - start_time) * 1000
             logger.error(
                 f"Failed to parse LLM response with {config.response_model.__name__}: "
                 f"{exc}"
