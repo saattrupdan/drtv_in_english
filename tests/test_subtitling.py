@@ -12,6 +12,7 @@ import tempfile as tf
 from but_with_subs.subtitling import (
     _escape_vtt_text,
     _format_vtt_timestamp,
+    _group_transcriptions,
     generate_subtitles,
 )
 from but_with_subs.transcribing import Transcription
@@ -183,22 +184,22 @@ def test_generate_subtitles_creates_vtt_file() -> None:
     content = result_path.read_text(encoding="utf-8")
     assert content.startswith("WEBVTT")
     assert "1" in content
-    assert "00:00:00.000 --> 00:00:03.000" in content
+    assert "00:00:00.000 --> 00:00:01.500" in content
     assert "Hello world" in content
 
 
 def test_generate_subtitles_multiple_transcriptions() -> None:
-    """Test generate_subtitles produces rolling-window cues for multiple words.
+    """Test generate_subtitles writes multiple groups with correct timestamps.
 
-    Creates three words spaced so that the first expires (word_duration=3.0)
-    before the third appears. Verifies the rolling window accumulates and
-    then sheds words correctly.
+    Creates three sentence-level transcriptions (each ending with a period)
+    so that each becomes its own group. Verifies all three appear as
+    separate cues with correct numbering, timestamps, and text.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=1.0, text="First"),
-        _make_transcription(start_time=1.5, end_time=3.0, text="Second"),
-        _make_transcription(start_time=3.5, end_time=5.0, text="Third"),
+        _make_transcription(start_time=0.0, end_time=1.0, text="First."),
+        _make_transcription(start_time=1.5, end_time=3.0, text="Second."),
+        _make_transcription(start_time=3.5, end_time=5.0, text="Third."),
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -206,14 +207,13 @@ def test_generate_subtitles_multiple_transcriptions() -> None:
     result_path = audio_path.with_suffix(".vtt")
 
     content = result_path.read_text(encoding="utf-8")
-    assert "First" in content
-    assert "Second" in content
-    assert "Third" in content
 
-    # At t=1.5 both First and Second are active
-    assert "First Second" in content
-    # At t=3.5 both Second and Third are active (First expired at t=3.0)
-    assert "Second Third" in content
+    assert "1\n00:00:00.000 --> 00:00:01.000" in content
+    assert "2\n00:00:01.500 --> 00:00:03.000" in content
+    assert "3\n00:00:03.500 --> 00:00:05.000" in content
+    assert "First." in content
+    assert "Second." in content
+    assert "Third." in content
 
 
 def test_generate_subtitles_yields_progress() -> None:
@@ -336,11 +336,11 @@ def test_generate_subtitles_overwrites_existing_file() -> None:
     assert "Old content" not in content_2
 
 
-def test_generate_subtitles_rolling_window_accumulation() -> None:
-    """Test that words accumulate in the rolling window.
+def test_generate_subtitles_groups_words_without_punctuation() -> None:
+    """Test that consecutive words without sentence-ending punctuation are grouped.
 
-    Two words appearing close together should both be visible in the
-    same cue after the second word appears.
+    Two words without trailing punctuation should appear together in a
+    single cue spanning from the first word's start to the last word's end.
     """
     audio_path = _make_audio_file()
     transcriptions = [
@@ -354,22 +354,22 @@ def test_generate_subtitles_rolling_window_accumulation() -> None:
 
     content = result_path.read_text(encoding="utf-8")
 
-    # First cue shows only the first word
-    assert "1\n00:00:00.000 --> 00:00:00.300\nHello" in content
-    # Second cue shows both words accumulated
-    assert "Hello world" in content
+    assert "1\n00:00:00.000 --> 00:00:00.500\nHello world" in content
 
 
-def test_generate_subtitles_word_expiry() -> None:
-    """Test that words expire after word_duration seconds.
+def test_generate_subtitles_punctuation_splits_groups() -> None:
+    """Test that sentence-ending punctuation starts a new group.
 
-    Two words separated by more than word_duration should never appear
-    in the same cue.
+    A word ending with a period should close the current group, so the
+    following word starts a new cue.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=0.5, text="First"),
-        _make_transcription(start_time=4.0, end_time=4.5, text="Second"),
+        _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
+        _make_transcription(start_time=0.3, end_time=0.5, text="world."),
+        _make_transcription(start_time=0.6, end_time=0.8, text="How"),
+        _make_transcription(start_time=0.9, end_time=1.1, text="are"),
+        _make_transcription(start_time=1.2, end_time=1.4, text="you"),
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -378,17 +378,15 @@ def test_generate_subtitles_word_expiry() -> None:
 
     content = result_path.read_text(encoding="utf-8")
 
-    # First word expires at 3.0, second appears at 4.0 → they never overlap
-    assert "First Second" not in content
-    assert "First" in content
-    assert "Second" in content
+    assert "1\n00:00:00.000 --> 00:00:00.500\nHello world." in content
+    assert "2\n00:00:00.600 --> 00:00:01.400\nHow are you" in content
 
 
-def test_generate_subtitles_max_words_pushes_out_old() -> None:
-    """Test that the max_words limit pushes out the oldest words.
+def test_generate_subtitles_max_words_per_group() -> None:
+    """Test that max_words_per_group splits long sequences.
 
-    With max_words=2, adding a third word should remove the first from
-    the display.
+    With max_words_per_group=2, three words without punctuation produce
+    two cues: the first with 2 words and the second with 1.
     """
     audio_path = _make_audio_file()
     transcriptions = [
@@ -398,17 +396,17 @@ def test_generate_subtitles_max_words_pushes_out_old() -> None:
     ]
 
     generator = generate_subtitles(
-        transcriptions=transcriptions, audio_path=audio_path, max_words=2
+        transcriptions=transcriptions,
+        audio_path=audio_path,
+        max_words_per_group=2,
     )
     list(generator)
     result_path = audio_path.with_suffix(".vtt")
 
     content = result_path.read_text(encoding="utf-8")
 
-    # After "three" appears, "one" should be pushed out
-    assert "two three" in content
-    # "one two three" should never appear together
-    assert "one two three" not in content
+    assert "1\n00:00:00.000 --> 00:00:00.500\none two" in content
+    assert "2\n00:00:00.600 --> 00:00:00.800\nthree" in content
 
 
 def test_generate_subtitles_vtt_header_and_cue_format() -> None:
@@ -453,18 +451,17 @@ def test_generate_subtitles_vtt_header_and_cue_format() -> None:
     assert lines[9] == ""
 
 
-def test_generate_subtitles_cue_count_reflects_state_changes() -> None:
-    """Test that cue count matches the number of rolling-window state changes.
+def test_generate_subtitles_cue_count_matches_groups() -> None:
+    """Test that VTT cue count matches the number of word groups.
 
-    Three words close together (all within word_duration) produce a cue
-    for each appear event plus cues for each expiry event, giving 5 cues
-    total (3 accumulating, 2 shedding, then empty).
+    Three words each ending with a period produce three groups and
+    therefore three cues.
     """
     audio_path = _make_audio_file()
     transcriptions = [
-        _make_transcription(start_time=0.0, end_time=0.2, text="One"),
-        _make_transcription(start_time=0.5, end_time=0.7, text="Two"),
-        _make_transcription(start_time=1.0, end_time=1.2, text="Three"),
+        _make_transcription(start_time=0.0, end_time=0.2, text="One."),
+        _make_transcription(start_time=0.5, end_time=0.7, text="Two."),
+        _make_transcription(start_time=1.0, end_time=1.2, text="Three."),
     ]
 
     generator = generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
@@ -476,19 +473,19 @@ def test_generate_subtitles_cue_count_reflects_state_changes() -> None:
     lines = content.split("\n")
     cue_numbers = [line for line in lines if line.strip().isdigit()]
 
-    assert len(cue_numbers) == 5
+    assert len(cue_numbers) == 3
 
 
-def test_generate_subtitles_progress_yields_per_word() -> None:
-    """Test that generate_subtitles yields one progress tuple per word.
+def test_generate_subtitles_progress_yields_per_group() -> None:
+    """Test that generate_subtitles yields one progress tuple per group.
 
-    With 4 word-level transcriptions the generator should yield 4
-    progress tuples with incrementing counts.
+    Four words forming two sentences (two groups) should yield exactly
+    two progress tuples.
     """
     audio_path = _make_audio_file()
     transcriptions = [
         _make_transcription(start_time=0.0, end_time=0.2, text="Hello"),
-        _make_transcription(start_time=0.3, end_time=0.5, text="world"),
+        _make_transcription(start_time=0.3, end_time=0.5, text="world."),
         _make_transcription(start_time=0.6, end_time=0.8, text="Foo"),
         _make_transcription(start_time=0.9, end_time=1.1, text="Bar"),
     ]
@@ -497,8 +494,77 @@ def test_generate_subtitles_progress_yields_per_word() -> None:
         generate_subtitles(transcriptions=transcriptions, audio_path=audio_path)
     )
 
-    assert len(progress) == 4
-    assert progress[0] == (1, 4)
-    assert progress[1] == (2, 4)
-    assert progress[2] == (3, 4)
-    assert progress[3] == (4, 4)
+    assert len(progress) == 2
+    assert progress[0] == (1, 2)
+    assert progress[1] == (2, 2)
+
+
+# ---------------------------------------------------------------------------
+# _group_transcriptions tests
+# ---------------------------------------------------------------------------
+
+
+def test_group_transcriptions_single_sentence() -> None:
+    """Test that words without punctuation are grouped into one group."""
+    transcriptions = [
+        _make_transcription(text="Hello"),
+        _make_transcription(text="world"),
+    ]
+
+    groups = _group_transcriptions(transcriptions, max_words_per_group=8)
+
+    assert len(groups) == 1
+    assert [t.text for t in groups[0]] == ["Hello", "world"]
+
+
+def test_group_transcriptions_splits_on_punctuation() -> None:
+    """Test that sentence-ending punctuation starts a new group."""
+    transcriptions = [
+        _make_transcription(text="Hello"),
+        _make_transcription(text="world."),
+        _make_transcription(text="Goodbye"),
+    ]
+
+    groups = _group_transcriptions(transcriptions, max_words_per_group=8)
+
+    assert len(groups) == 2
+    assert [t.text for t in groups[0]] == ["Hello", "world."]
+    assert [t.text for t in groups[1]] == ["Goodbye"]
+
+
+def test_group_transcriptions_splits_on_max_words() -> None:
+    """Test that groups are split when max_words_per_group is reached."""
+    transcriptions = [
+        _make_transcription(text="a"),
+        _make_transcription(text="b"),
+        _make_transcription(text="c"),
+    ]
+
+    groups = _group_transcriptions(transcriptions, max_words_per_group=2)
+
+    assert len(groups) == 2
+    assert [t.text for t in groups[0]] == ["a", "b"]
+    assert [t.text for t in groups[1]] == ["c"]
+
+
+def test_group_transcriptions_empty_input() -> None:
+    """Test that an empty list returns no groups."""
+    groups = _group_transcriptions([], max_words_per_group=8)
+
+    assert groups == []
+
+
+def test_group_transcriptions_question_and_exclamation() -> None:
+    """Test that ? and ! also split groups."""
+    transcriptions = [
+        _make_transcription(text="Really?"),
+        _make_transcription(text="Yes!"),
+        _make_transcription(text="Wow"),
+    ]
+
+    groups = _group_transcriptions(transcriptions, max_words_per_group=8)
+
+    assert len(groups) == 3
+    assert [t.text for t in groups[0]] == ["Really?"]
+    assert [t.text for t in groups[1]] == ["Yes!"]
+    assert [t.text for t in groups[2]] == ["Wow"]

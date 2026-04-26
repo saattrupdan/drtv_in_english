@@ -1,9 +1,9 @@
 """Subtitle generation module for creating WebVTT files.
 
 This module provides functions to convert a list of ``Transcription`` models
-into a WebVTT (``.vtt``) subtitle file using a rolling-window display. Words
-appear as they are spoken and disappear either when pushed out by newer words
-or after a configurable duration, whichever comes first.
+into a WebVTT (``.vtt``) subtitle file. Word-level transcriptions are grouped
+into readable subtitle cues by splitting on sentence-ending punctuation or a
+maximum word count, whichever comes first.
 """
 
 import collections.abc as c
@@ -13,25 +13,60 @@ from pathlib import Path
 from .logging_config import logger
 from .transcribing import Transcription
 
-_EXPIRE = 0
-_APPEAR = 1
+_SENTENCE_ENDINGS = frozenset(".?!")
+
+
+def _group_transcriptions(
+    transcriptions: list[Transcription],
+    max_words_per_group: int,
+) -> list[list[Transcription]]:
+    """Split word-level transcriptions into subtitle groups.
+
+    A new group is started after a word whose text ends with sentence-ending
+    punctuation (``.``, ``?``, ``!``) or when the current group reaches
+    ``max_words_per_group`` words.
+
+    Args:
+        transcriptions:
+            Word-level transcriptions to group.
+        max_words_per_group:
+            Maximum number of words allowed in a single group.
+
+    Returns:
+        A list of groups, where each group is a non-empty list of
+        consecutive ``Transcription`` objects.
+    """
+    groups: list[list[Transcription]] = []
+    current: list[Transcription] = []
+
+    for t in transcriptions:
+        current.append(t)
+        if (
+            t.text.rstrip()[-1:] in _SENTENCE_ENDINGS
+            or len(current) >= max_words_per_group
+        ):
+            groups.append(current)
+            current = []
+
+    if current:
+        groups.append(current)
+
+    return groups
 
 
 def generate_subtitles(
     transcriptions: list[Transcription],
     audio_path: str | pl.Path,
-    max_words: int = 8,
-    word_duration: float = 3.0,
+    max_words_per_group: int = 8,
 ) -> c.Generator[tuple[int, int], None, Path]:
-    """Generate a WebVTT subtitle file with rolling-window word display.
+    """Generate a WebVTT subtitle file from word-level transcriptions.
 
-    Each transcription is treated as a single word. Words appear at their
-    ``start_time`` and are removed either when ``max_words`` newer words
-    have appeared (pushing old words out) or ``word_duration`` seconds
-    after they first appeared, whichever comes first.
+    Words are grouped into subtitle cues by splitting on sentence-ending
+    punctuation or when ``max_words_per_group`` is reached. Each cue spans
+    from the first word's ``start_time`` to the last word's ``end_time``.
 
-    Yields ``(current_index, total)`` progress tuples as each word is
-    processed.
+    Yields ``(current_index, total)`` progress tuples as each group is
+    written.
 
     Args:
         transcriptions:
@@ -39,18 +74,15 @@ def generate_subtitles(
         audio_path:
             Path to the source audio file. The output ``.vtt`` file will be
             written to the same directory with the same base name.
-        max_words:
-            Maximum number of words visible at the same time.
-        word_duration:
-            Seconds a word stays visible after it first appears (unless
-            pushed out sooner by newer words).
+        max_words_per_group:
+            Maximum number of words in a single subtitle cue.
 
     Returns:
         The ``Path`` to the generated ``.vtt`` file.
 
     Yields:
         A tuple of ``(current_index, total)`` progress markers for each
-        word processed, where ``current_index`` is 1-based.
+        group processed, where ``current_index`` is 1-based.
 
     Raises:
         ValueError:
@@ -69,74 +101,21 @@ def generate_subtitles(
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
     output_path = audio_path.with_suffix(suffix=".vtt")
+    logger.info(
+        f"Generating subtitles for {len(transcriptions)} segments -> {output_path}"
+    )
 
-    total = len(transcriptions)
-    logger.info(f"Generating subtitles for {total} segments -> {output_path}")
+    groups = _group_transcriptions(transcriptions, max_words_per_group)
+    total = len(groups)
 
-    # Build timeline events sorted so expires are processed before appears
-    # at the same timestamp.
-    events: list[tuple[float, int, int]] = []
-    for i, t in enumerate(transcriptions):
-        events.append((t.start_time, _APPEAR, i))
-        events.append((t.start_time + word_duration, _EXPIRE, i))
-    events.sort()
-
-    # Walk events chronologically, tracking visible words.
-    active: list[int] = []
-    states: list[tuple[float, list[int]]] = []
-    appeared_count = 0
-    prev_active: list[int] | None = None
-
-    ev_idx = 0
-    while ev_idx < len(events):
-        time = events[ev_idx][0]
-        # Process all events that share the same timestamp.
-        while ev_idx < len(events) and events[ev_idx][0] == time:
-            _, event_type, idx = events[ev_idx]
-            if event_type == _EXPIRE:
-                if idx in active:
-                    active.remove(idx)
-            else:
-                active.append(idx)
-                appeared_count += 1
-                yield (appeared_count, total)
-            ev_idx += 1
-
-        # Enforce the rolling-window limit.
-        while len(active) > max_words:
-            active.pop(0)
-
-        if active != prev_active:
-            states.append((time, list(active)))
-            prev_active = list(active)
-
-    # Convert states into VTT cues.
     vtt_lines: list[str] = ["WEBVTT", ""]
-    cue_number = 0
 
-    for j, (start_time, indices) in enumerate(states):
-        if not indices:
-            continue
-
-        if j + 1 < len(states):
-            end_time = states[j + 1][0]
-        else:
-            end_time = max(
-                transcriptions[idx].start_time + word_duration for idx in indices
-            )
-
-        if end_time <= start_time:
-            continue
-
-        cue_number += 1
-        text = " ".join(
-            _escape_vtt_text(text=transcriptions[idx].text) for idx in indices
-        )
-        start_ts = _format_vtt_timestamp(seconds=start_time)
-        end_ts = _format_vtt_timestamp(seconds=end_time)
-        vtt_lines.extend(
-            [str(cue_number), f"{start_ts} --> {end_ts}", text, ""]
-        )
+    for index, group in enumerate(groups, start=1):
+        start_ts = _format_vtt_timestamp(seconds=group[0].start_time)
+        end_ts = _format_vtt_timestamp(seconds=group[-1].end_time)
+        text = " ".join(_escape_vtt_text(text=t.text) for t in group)
+        vtt_lines.extend([str(index), f"{start_ts} --> {end_ts}", text, ""])
+        yield (index, total)
 
     vtt_content = "\n".join(vtt_lines)
 
