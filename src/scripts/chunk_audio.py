@@ -27,7 +27,7 @@ def main(audio_path: str) -> None:
     """
     path = Path(audio_path)
     if not path.is_file():
-        logger.error(f"File not found: {audio_path}")
+        logger.error("File not found: %s", audio_path)
         sys.exit(1)
 
     logger.info(f"Chunking audio from {audio_path}...")
