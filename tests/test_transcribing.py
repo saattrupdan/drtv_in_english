@@ -101,7 +101,7 @@ def test_transcribe_yields_transcription_models() -> None:
     verifies that the returned list contains Transcription instances.
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(
+    mock_model = _make_mock_pipeline(
         return_value={
             "chunks": [
                 {"text": "Hello", "timestamp": (0.0, 0.5)},
@@ -111,7 +111,7 @@ def test_transcribe_yields_transcription_models() -> None:
     )
 
     results = transcribe(
-        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
+        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
     )
 
     assert len(results) == 2
@@ -125,7 +125,7 @@ def test_transcribe_correct_time_offsets() -> None:
     and verifies that a chunk_offset of 5.0 shifts all times by 5.0.
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(
+    mock_model = _make_mock_pipeline(
         return_value={
             "chunks": [
                 {"text": "Hello", "timestamp": (0.0, 0.5)},
@@ -135,7 +135,7 @@ def test_transcribe_correct_time_offsets() -> None:
     )
 
     results = transcribe(
-        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=5.0
+        audio_data=mock_audio, model=mock_model, chunk_offset=5.0
     )
 
     assert results[0].start_time == 5.0
@@ -151,7 +151,7 @@ def test_transcribe_preserves_text() -> None:
     propagated to the Transcription model.
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(
+    mock_model = _make_mock_pipeline(
         return_value={
             "chunks": [
                 {"text": "First segment", "timestamp": (0.0, 1.0)},
@@ -161,7 +161,7 @@ def test_transcribe_preserves_text() -> None:
     )
 
     results = transcribe(
-        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
+        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
     )
 
     assert results[0].text == "First segment"
@@ -175,10 +175,10 @@ def test_transcribe_empty_audio_empty_result() -> None:
     that an empty list is returned.
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(return_value={"chunks": []})
+    mock_model = _make_mock_pipeline(return_value={"chunks": []})
 
     results = transcribe(
-        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
+        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
     )
 
     assert results == []
@@ -191,7 +191,7 @@ def test_transcribe_multiple_chunks_from_pipeline() -> None:
     each chunk is converted to a Transcription model.
     """
     mock_audio: np.ndarray = np.zeros(shape=32000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(
+    mock_model = _make_mock_pipeline(
         return_value={
             "chunks": [
                 {"text": "A", "timestamp": (0.0, 0.2)},
@@ -202,7 +202,7 @@ def test_transcribe_multiple_chunks_from_pipeline() -> None:
     )
 
     results = transcribe(
-        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
+        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
     )
 
     assert len(results) == 3
@@ -219,12 +219,12 @@ def test_transcribe_duration_matches_timestamps() -> None:
     from the pipeline.
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(
+    mock_model = _make_mock_pipeline(
         return_value={"chunks": [{"text": "Segment", "timestamp": (1.0, 3.5)}]}
     )
 
     results = transcribe(
-        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=0.0
+        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
     )
 
     assert len(results) == 1
@@ -238,12 +238,12 @@ def test_transcribe_with_nonzero_offset_preserves_duration() -> None:
     equally, preserving the duration of each segment.
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
-    mock_pipeline = _make_mock_pipeline(
+    mock_model = _make_mock_pipeline(
         return_value={"chunks": [{"text": "Segment", "timestamp": (0.5, 2.0)}]}
     )
 
     results = transcribe(
-        audio_data=mock_audio, pipeline=mock_pipeline, chunk_offset=10.0
+        audio_data=mock_audio, model=mock_model, chunk_offset=10.0
     )
 
     assert len(results) == 1
