@@ -20,6 +20,7 @@ from transformers import pipeline
 from but_with_subs.chunking import chunk_audio
 from but_with_subs.device import get_device
 from but_with_subs.llm import LLMConfig
+from but_with_subs.llm_progress import LLMProgress
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.transcribing import Transcription, transcribe
 from but_with_subs.transcription_formatting import format_transcriptions
@@ -156,8 +157,18 @@ async def translate_transcriptions(
     """
     translated: list[Transcription] = []
     for segment in tqdm(transcriptions, unit="segment", desc="Translating"):
+
+        def _seg_callback(progress: LLMProgress) -> None:
+            if progress.status in ("request_starting", "request_sent"):
+                tqdm.write(f"  → {progress.message}")
+            elif progress.status == "error" and progress.error:
+                tqdm.write(f"  → Error: {progress.error}")
+
         translated_text = await translate(
-            text=segment.text, target_language=target_language, llm_config=llm_config
+            text=segment.text,
+            target_language=target_language,
+            llm_config=llm_config,
+            progress_callback=_seg_callback,
         )
         translated.append(
             Transcription(
