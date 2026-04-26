@@ -6,7 +6,7 @@ direct string returns from ``query_llm``, and various target languages.
 """
 
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from but_with_subs import translation
 from but_with_subs.llm import LLMConfig
@@ -62,7 +62,7 @@ def test_translated_text_default_text_is_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_extracts_text_from_model(mock_query_llm: object) -> None:
     """Test that translate extracts text when query_llm returns a TranslatedText.
 
@@ -81,7 +81,7 @@ def test_translate_extracts_text_from_model(mock_query_llm: object) -> None:
     assert result == "Bonjour le monde"
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_calls_query_llm_with_correct_prompt(mock_query_llm: object) -> None:
     """Test that translate builds the correct prompt for query_llm.
 
@@ -104,7 +104,7 @@ def test_translate_calls_query_llm_with_correct_prompt(mock_query_llm: object) -
     assert "Translate the following text to Spanish" in prompt
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_passes_response_model_to_config(mock_query_llm: object) -> None:
     """Test that translate sets response_model on the config passed to query_llm.
 
@@ -130,7 +130,7 @@ def test_translate_passes_response_model_to_config(mock_query_llm: object) -> No
 # ---------------------------------------------------------------------------
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_returns_string_directly(mock_query_llm: object) -> None:
     """Test that translate returns the raw string when query_llm does not.
 
@@ -149,7 +149,7 @@ def test_translate_returns_string_directly(mock_query_llm: object) -> None:
     assert result == "Hola mundo"
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_stringifies_non_string_response(mock_query_llm: object) -> None:
     """Test that translate converts non-string responses via str().
 
@@ -178,7 +178,7 @@ def test_translate_stringifies_non_string_response(mock_query_llm: object) -> No
 # ---------------------------------------------------------------------------
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_spanish(mock_query_llm: object) -> None:
     """Test translation to Spanish."""
     config = _make_llm_config()
@@ -193,7 +193,7 @@ def test_translate_spanish(mock_query_llm: object) -> None:
     assert result == "Hola mundo"
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_french(mock_query_llm: object) -> None:
     """Test translation to French."""
     config = _make_llm_config()
@@ -208,7 +208,7 @@ def test_translate_french(mock_query_llm: object) -> None:
     assert result == "Bonjour le monde"
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_german(mock_query_llm: object) -> None:
     """Test translation to German."""
     config = _make_llm_config()
@@ -223,7 +223,7 @@ def test_translate_german(mock_query_llm: object) -> None:
     assert result == "Hallo Welt"
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_japanese(mock_query_llm: object) -> None:
     """Test translation to Japanese."""
     config = _make_llm_config()
@@ -238,7 +238,7 @@ def test_translate_japanese(mock_query_llm: object) -> None:
     assert result == "こんにちは世界"
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_mandarin(mock_query_llm: object) -> None:
     """Test translation to Mandarin."""
     config = _make_llm_config()
@@ -253,7 +253,7 @@ def test_translate_mandarin(mock_query_llm: object) -> None:
     assert result == "你好世界"
 
 
-@patch("but_with_subs.translation.query_llm")
+@patch("but_with_subs.translation.query_llm", new_callable=AsyncMock)
 def test_translate_arabic(mock_query_llm: object) -> None:
     """Test translation to Arabic."""
     config = _make_llm_config()

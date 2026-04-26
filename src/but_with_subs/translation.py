@@ -12,10 +12,10 @@ from .llm import LLMConfig, query_llm
 class TranslatedText(BaseModel):
     """A model representing translated text."""
 
-    text: str
+    text: str = ""
 
 
-def translate(
+async def translate(
     text: str,
     target_language: str,
     llm_config: LLMConfig,
@@ -43,13 +43,9 @@ def translate(
         f"\nInput: {text}"
     )
 
-    response = query_llm(
-        llm_config,
-        prompt=prompt,
-        response_model=TranslatedText,
-        llm_model=llm_model,
-        api_base=api_base,
-    )
+    config = llm_config.model_copy(update={"response_model": TranslatedText})
+
+    response = await query_llm(prompt, config)
 
     if isinstance(response, TranslatedText):
         return response.text
