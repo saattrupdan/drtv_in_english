@@ -16,43 +16,6 @@ from .transcribing import Transcription
 _SENTENCE_ENDINGS = frozenset(".?!")
 
 
-def _group_transcriptions(
-    transcriptions: list[Transcription], max_words_per_group: int
-) -> list[list[Transcription]]:
-    """Split word-level transcriptions into subtitle groups.
-
-    A new group is started after a word whose text ends with sentence-ending
-    punctuation (``.``, ``?``, ``!``) or when the current group reaches
-    ``max_words_per_group`` words.
-
-    Args:
-        transcriptions:
-            Word-level transcriptions to group.
-        max_words_per_group:
-            Maximum number of words allowed in a single group.
-
-    Returns:
-        A list of groups, where each group is a non-empty list of
-        consecutive ``Transcription`` objects.
-    """
-    groups: list[list[Transcription]] = []
-    current: list[Transcription] = []
-
-    for t in transcriptions:
-        current.append(t)
-        if (
-            t.text.rstrip()[-1:] in _SENTENCE_ENDINGS
-            or len(current) >= max_words_per_group
-        ):
-            groups.append(current)
-            current = []
-
-    if current:
-        groups.append(current)
-
-    return groups
-
-
 def generate_subtitles(
     transcriptions: list[Transcription],
     audio_path: str | pl.Path,
@@ -122,6 +85,43 @@ def generate_subtitles(
 
     logger.info(f"Subtitles written to {output_path}")
     return output_path
+
+
+def _group_transcriptions(
+    transcriptions: list[Transcription], max_words_per_group: int
+) -> list[list[Transcription]]:
+    """Split word-level transcriptions into subtitle groups.
+
+    A new group is started after a word whose text ends with sentence-ending
+    punctuation (``.``, ``?``, ``!``) or when the current group reaches
+    ``max_words_per_group`` words.
+
+    Args:
+        transcriptions:
+            Word-level transcriptions to group.
+        max_words_per_group:
+            Maximum number of words allowed in a single group.
+
+    Returns:
+        A list of groups, where each group is a non-empty list of
+        consecutive ``Transcription`` objects.
+    """
+    groups: list[list[Transcription]] = []
+    current: list[Transcription] = []
+
+    for t in transcriptions:
+        current.append(t)
+        if (
+            t.text.rstrip()[-1:] in _SENTENCE_ENDINGS
+            or len(current) >= max_words_per_group
+        ):
+            groups.append(current)
+            current = []
+
+    if current:
+        groups.append(current)
+
+    return groups
 
 
 def _format_vtt_timestamp(seconds: float) -> str:

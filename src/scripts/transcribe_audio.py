@@ -80,7 +80,6 @@ def main(
             API key for the LLM.
     """
     path = Path(audio_path)
-
     if not path.is_file():
         logger.error("File not found: %s", audio_path)
         sys.exit(1)
@@ -91,19 +90,26 @@ def main(
             task="automatic-speech-recognition", model=MODEL_ID, device=get_device()
         )
 
+    # Split the audio into chunks using VAD
     chunks = chunk_audio(audio_path=path)
 
-    all_transcriptions = []
+    # Transcribe each chunk, with word-level timestamps
+    chunk_transcriptions: list[list[Transcription]] = list()
     for chunk in tqdm(chunks, unit="chunk", desc="Transcribing"):
         segments = transcribe(
             audio_data=chunk.audio, model=model, chunk_offset=chunk.start_time
         )
-        all_transcriptions.extend(segments)
-
-    if not all_transcriptions:
+        chunk_transcriptions.append(segments)
+    if not chunk_transcriptions:
         logger.warning("No transcription segments found. Skipping subtitle generation.")
         return
 
+    # TODO: Format the transcriptions correctly (casing, punctuation, wording, etc.) and
+    # split them up into semantically meaningful segments, suitable for subtitles.
+    # Maintain timestamps on a segment-level
+    segments: list[Transcription] = list()
+
+    # Translate each segment to the target language
     if language is not None:
         llm_config = LLMConfig(
             model=llm_model,
@@ -112,15 +118,16 @@ def main(
             api_base=llm_api_base,
             api_key=llm_api_key,
         )
-        all_transcriptions = asyncio.run(
+        segments = asyncio.run(
             translate_transcriptions(
-                all_transcriptions, target_language=language, llm_config=llm_config
+                transcriptions=segments, target_language=language, llm_config=llm_config
             )
         )
 
+    # Generate subtitles
     with tqdm(total=100, unit="percent", desc="Generating subtitles") as pbar:
         for current, total in generate_subtitles(
-            transcriptions=all_transcriptions, audio_path=path
+            transcriptions=segments, audio_path=path
         ):
             pbar.update(int(100 * current / total) - pbar.n)
 
