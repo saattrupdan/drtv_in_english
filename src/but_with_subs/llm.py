@@ -5,13 +5,14 @@ compatibility with llama.cpp servers. It supports arbitrary response models defi
 as Pydantic BaseModels.
 """
 
+import collections.abc as c
 import typing as t
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
 
-from .logging_config import logger
-from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
+from .llm_progress import LLMProgress
+from .logging_config import loggerfrom .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
 
 
 class LLMConfig(BaseModel):
@@ -42,7 +43,10 @@ class LLMConfig(BaseModel):
 
 
 async def query_llm[ResponseModel: BaseModel](
-    prompt: str, config: LLMConfig, client: AsyncClient | None = None
+    prompt: str,
+    config: LLMConfig,
+    client: AsyncClient | None = None,
+    progress_callback: c.Callable[[LLMProgress], None] | None = None,
 ) -> ResponseModel | str | None:
     """Query an LLM API with a prompt and return a parsed response.
 
@@ -57,6 +61,8 @@ async def query_llm[ResponseModel: BaseModel](
         client (optional):
             An optional httpx AsyncClient to use for the request. If not provided,
             a new client will be created.
+        progress_callback (optional):
+            Optional callback for progress updates.
 
     Returns:
         The parsed response as an instance of the response model, a string,

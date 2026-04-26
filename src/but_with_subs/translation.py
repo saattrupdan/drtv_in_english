@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import collections.abc as c
+
 from pydantic import BaseModel
 
 from .llm import LLMConfig, query_llm
+from .llm_progress import LLMProgress
 
 
 class TranslatedText(BaseModel):
@@ -20,6 +23,7 @@ async def translate(
     *,
     llm_model: str | None = None,
     api_base: str | None = None,
+    progress_callback: c.Callable[[LLMProgress], None] | None = None,
 ) -> str:
     """Translate text to the target language using an LLM.
 
@@ -29,6 +33,8 @@ async def translate(
         llm_config: Configuration for the LLM.
         llm_model: Optional explicit model name override.
         api_base: Optional explicit API base URL override.
+        progress_callback (optional):
+            Optional callback for LLM progress updates.
 
     Returns:
         The translated text with casing, punctuation, and transcription
@@ -48,7 +54,7 @@ async def translate(
         update["api_base"] = api_base
     config = llm_config.model_copy(update=update)
 
-    response = await query_llm(prompt, config)
+    response = await query_llm(prompt, config, progress_callback=progress_callback)
 
     if isinstance(response, TranslatedText):
         return response.text
