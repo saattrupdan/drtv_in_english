@@ -6,6 +6,7 @@ that uses yt-dlp to fetch media from URLs.
 """
 
 import collections.abc as c
+import typing as t
 from pathlib import Path
 
 import yt_dlp
@@ -73,8 +74,12 @@ def _parse_progress_info(
     progress_hook(progress)
 
 
+def _noop_progress(_: DownloadProgress) -> None:
+    """No-op progress hook used as default when no callback is provided."""
+
+
 def download(
-    url: str, progress_hook: c.Callable[[DownloadProgress], None] = lambda _: None
+    url: str, progress_hook: c.Callable[[DownloadProgress], None] = _noop_progress
 ) -> File:
     """Download video and audio from a URL using yt-dlp.
 
@@ -90,7 +95,7 @@ def download(
     data_dir = Path("data")
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    ydl_opts: dict = {
+    ydl_opts: dict[str, t.Any] = {
         "paths": dict(home="./data"),
         "format": "bestvideo*+bestaudio*",
         "noplaylist": True,

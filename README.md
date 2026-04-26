@@ -119,7 +119,7 @@ uv run python src/scripts/translate_string.py \
 All flags are:
 
 | Flag | Description | Required | Default |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `--text` | Text to translate | Yes | — |
 | `--language` | Target language | Yes | — |
 | `--llm-model` | The LLM model to use (e.g., `"gpt-oss-20b"`) | Yes | — |
@@ -133,7 +133,7 @@ All flags are:
 Additional scripts are available in `src/scripts/`:
 
 | Script | Description |
-|---|---|
+| --- | --- |
 | `download_video.py` | Download a video from a URL |
 | `extract_audio.py` | Extract audio from a video file |
 | `chunk_audio.py` | Split an audio file into chunks |
