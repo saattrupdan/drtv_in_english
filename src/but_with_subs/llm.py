@@ -43,7 +43,7 @@ class LLMConfig(BaseModel):
 
 async def query_llm[ResponseModel: BaseModel](
     prompt: str, config: LLMConfig, client: AsyncClient | None = None
-) -> ResponseModel | str:
+) -> ResponseModel | str | None:
     """Query an LLM API with a prompt and return a parsed response.
 
     Sends the prompt to the specified LLM API endpoint and parses the response
@@ -59,7 +59,8 @@ async def query_llm[ResponseModel: BaseModel](
             a new client will be created.
 
     Returns:
-        The parsed response as an instance of the response model.
+        The parsed response as an instance of the response model, a string,
+        or None if the LLM returns null content.
 
     Raises:
         ValueError:
