@@ -68,11 +68,16 @@ def translate_transcriptions(
     "--llm-model",
     type=str,
     required=True,
-    default="gpt-oss-20b",
+    default="qwen3.6-35B-A3B",
     help="LLM model to use for translation.",
 )
-@click.option("--llm-api-base", type=str, default="", help="Base URL for the LLM API.")
-@click.option("--llm-api-key", type=str, required=True, help="API key for the LLM.")
+@click.option(
+    "--llm-api-base",
+    type=str,
+    default="http://127.0.0.1:8080",
+    help="Base URL for the LLM API.",
+)
+@click.option("--llm-api-key", type=str, default=None, help="API key for the LLM.")
 @click.option(
     "--language",
     type=str,
@@ -84,7 +89,7 @@ def main(
     language: str | None,
     llm_model: str,
     llm_api_base: str,
-    llm_api_key: str,
+    llm_api_key: str | None,
 ) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
