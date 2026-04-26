@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel
 
 from .llm import LLMConfig, query_llm
@@ -20,8 +18,8 @@ async def translate(
     target_language: str,
     llm_config: LLMConfig,
     *,
-    llm_model: Optional[str] = None,
-    api_base: Optional[str] = None,
+    llm_model: str | None = None,
+    api_base: str | None = None,
 ) -> str:
     """Translate text to the target language using an LLM.
 
@@ -43,7 +41,12 @@ async def translate(
         f"\nInput: {text}"
     )
 
-    config = llm_config.model_copy(update={"response_model": TranslatedText})
+    update: dict[str, object] = {"response_model": TranslatedText}
+    if llm_model is not None:
+        update["model"] = llm_model
+    if api_base is not None:
+        update["api_base"] = api_base
+    config = llm_config.model_copy(update=update)
 
     response = await query_llm(prompt, config)
 
