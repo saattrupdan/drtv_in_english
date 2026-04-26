@@ -6,7 +6,7 @@ response types, and progress callback support.
 """
 
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from but_with_subs.llm import LLMConfig
 from but_with_subs.transcribing import Transcription
@@ -15,6 +15,7 @@ from but_with_subs.transcription_formatting import (
     TranscribedSegmentsResponse,
     _build_prompt,
     _process_batch,
+    _process_batch_with_progress,
 )
 
 # ---------------------------------------------------------------------------
@@ -197,3 +198,106 @@ def test_process_batch_with_progress_callback(mock_query_llm: AsyncMock) -> None
     )
 
     assert mock_query_llm.call_args.kwargs["progress_callback"] == callback
+
+
+# ---------------------------------------------------------------------------
+# _process_batch_with_progress() tests
+# ---------------------------------------------------------------------------
+
+
+@patch("but_with_subs.transcription_formatting.query_llm", new_callable=AsyncMock)
+def test_process_batch_with_progress_uses_shared_progress(
+    mock_query_llm: AsyncMock,
+) -> None:
+    """Test that _process_batch_with_progress passes a callback to query_llm.
+
+    Verifies that when a SharedProgress instance is provided,
+    _process_batch_with_progress constructs a callback and forwards it.
+    """
+    llm_config = _make_llm_config()
+    mock_query_llm.return_value = TranscribedSegmentsResponse(segments=[])
+
+    batch: list[list[Transcription]] = [[_make_transcription(text="hello")]]
+    with patch(
+        "but_with_subs.transcription_formatting.SharedProgressCallback"
+    ) as mock_cb:
+        mock_cb.return_value = lambda _: None
+        asyncio.run(
+            _process_batch_with_progress(
+                batch=batch,
+                llm_config=llm_config,
+                batch_index=0,
+                total_batches=2,
+                shared_progress=MagicMock(),
+            )
+        )
+
+        mock_cb.assert_called_once()
+
+
+@patch("but_with_subs.transcription_formatting.query_llm", new_callable=AsyncMock)
+def test_process_batch_with_progress_no_shared_progress(
+    mock_query_llm: AsyncMock,
+) -> None:
+    """Test that _process_batch_with_progress works without shared_progress.
+
+    When shared_progress is None, no callback factory is invoked.
+    """
+    llm_config = _make_llm_config()
+    mock_query_llm.return_value = TranscribedSegmentsResponse(segments=[])
+
+    batch: list[list[Transcription]] = [[_make_transcription(text="hello")]]
+    with patch(
+        "but_with_subs.transcription_formatting.SharedProgressCallback"
+    ) as mock_cb:
+        asyncio.run(
+            _process_batch_with_progress(
+                batch=batch, llm_config=llm_config, batch_index=0, total_batches=2
+            )
+        )
+
+        mock_cb.assert_not_called()
+
+
+@patch("but_with_subs.transcription_formatting.query_llm", new_callable=AsyncMock)
+def test_process_batch_with_progress_updates_shared_on_complete(
+    mock_query_llm: AsyncMock,
+) -> None:
+    """Test that _process_batch_with_progress updates shared progress on completion.
+
+    Verifies that the callback produced by SharedProgressCallback correctly
+    calls update(1) when the LLM returns a complete status.
+    """
+    llm_config = _make_llm_config()
+    mock_query_llm.return_value = TranscribedSegmentsResponse(
+        segments=[
+            FormattedSegment(
+                text="Hello world",
+                start_position=1,
+                end_position=2,
+                start_time=1.0,
+                end_time=2.0,
+            )
+        ]
+    )
+
+    batch: list[list[Transcription]] = [[_make_transcription(text="hello")]]
+
+    with patch(
+        "but_with_subs.transcription_formatting.SharedProgress"
+    ) as mock_sp_class:
+        mock_sp = MagicMock()
+        mock_sp_class.return_value = mock_sp
+
+        result = asyncio.run(
+            _process_batch_with_progress(
+                batch=batch,
+                llm_config=llm_config,
+                batch_index=0,
+                total_batches=2,
+                shared_progress=mock_sp,
+            )
+        )
+
+        assert len(result) == 1
+        assert result[0].text == "Hello world"
