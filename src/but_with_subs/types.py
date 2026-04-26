@@ -32,7 +32,7 @@ class OutputMessage(t.TypedDict):
             The role of the message sender (e.g. "assistant").
     """
 
-    content: str
+    content: str | None
     role: t.Literal["assistant"]
 
 
