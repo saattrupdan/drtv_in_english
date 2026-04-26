@@ -1,6 +1,6 @@
 """Progress event types for LLM API calls."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class LLMProgress(BaseModel):
@@ -18,6 +18,8 @@ class LLMProgress(BaseModel):
         error:
             An error message, if the call failed.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     status: str
     elapsed_ms: float
