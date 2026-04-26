@@ -7,6 +7,7 @@ The script transcribes the audio, splits it into chunks based on silence,
 and outputs a `.vtt` subtitle file alongside the original audio file.
 """
 
+import asyncio
 import logging
 import sys
 from pathlib import Path
@@ -30,7 +31,7 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
 # MODEL_ID = "CoRal-project/roest-v3-whisper-1.5b"
 
 
-def translate_transcriptions(
+async def translate_transcriptions(
     transcriptions: list[Transcription], target_language: str, llm_config: LLMConfig
 ) -> list[Transcription]:
     """Translate each transcription segment to the target language.
@@ -49,7 +50,7 @@ def translate_transcriptions(
     """
     translated: list[Transcription] = []
     for segment in tqdm(transcriptions, unit="segment", desc="Translating"):
-        translated_text = translate(
+        translated_text = await translate(
             text=segment.text, target_language=target_language, llm_config=llm_config
         )
         translated.append(
@@ -143,8 +144,10 @@ def main(
             api_base=llm_api_base,
             api_key=llm_api_key,
         )
-        all_transcriptions = translate_transcriptions(
-            all_transcriptions, target_language=language, llm_config=llm_config
+        all_transcriptions = asyncio.run(
+            translate_transcriptions(
+                all_transcriptions, target_language=language, llm_config=llm_config
+            )
         )
 
     with tqdm(total=100, unit="percent", desc="Generating subtitles") as pbar:
