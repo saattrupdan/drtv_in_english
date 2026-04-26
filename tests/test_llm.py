@@ -68,9 +68,7 @@ def _make_mock_response(
 
 def test_llm_progress_frozen_immutability() -> None:
     """Test that LLMProgress is read-only and cannot be mutated."""
-    progress = LLMProgress(
-        status="complete", elapsed_ms=0.0, message="OK"
-    )
+    progress = LLMProgress(status="complete", elapsed_ms=0.0, message="OK")
 
     with pytest.raises(Exception):
         progress.status = "error"  # type: ignore[assignment]
@@ -87,12 +85,7 @@ def test_emit_progress_calls_callback_once() -> None:
 
     received: list[LLMProgress] = []
 
-    _emit_progress(
-        callback=callback,
-        status="complete",
-        elapsed_ms=0.0,
-        message="OK",
-    )
+    _emit_progress(callback=callback, status="complete", elapsed_ms=0.0, message="OK")
 
     assert len(received) == 1
     assert received[0].status == "complete"
