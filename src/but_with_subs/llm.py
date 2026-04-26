@@ -5,11 +5,14 @@ compatibility with llama.cpp servers. It supports arbitrary response models defi
 as Pydantic BaseModels.
 """
 
+import collections.abc as c
+import time
 import typing as t
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
 
+from .llm_progress import LLMProgress, _noop_callback
 from .logging_config import logger
 from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
 
@@ -42,7 +45,10 @@ class LLMConfig(BaseModel):
 
 
 async def query_llm[ResponseModel: BaseModel](
-    prompt: str, config: LLMConfig, client: AsyncClient | None = None
+    prompt: str,
+    config: LLMConfig,
+    client: AsyncClient | None = None,
+    progress_callback: c.Callable[[LLMProgress], None] | None = None,
 ) -> ResponseModel | str | None:
     """Query an LLM API with a prompt and return a parsed response.
 
@@ -57,6 +63,8 @@ async def query_llm[ResponseModel: BaseModel](
         client (optional):
             An optional httpx AsyncClient to use for the request. If not provided,
             a new client will be created.
+        progress_callback (optional):
+            An optional callback function that receives LLMProgress events.
 
     Returns:
         The parsed response as an instance of the response model, a string,
@@ -67,6 +75,8 @@ async def query_llm[ResponseModel: BaseModel](
             If the response cannot be parsed according to the response model.
     """
     message: InputMessage = {"role": "user", "content": prompt}
+    if progress_callback is None:
+        progress_callback = _noop_callback
 
     headers: dict[str, str] = {"Content-Type": "application/json"}
     if config.api_key is not None:
@@ -92,23 +102,60 @@ async def query_llm[ResponseModel: BaseModel](
         close_after = True
 
     try:
+        start_time = time.monotonic()
+        _emit_progress(
+            callback=progress_callback,
+            status="request_starting",
+            elapsed_ms=0.0,
+            message="Sending request...",
+        )
+
         response: Response = await client.post(
             url=url, json=payload, headers=headers, timeout=600
         )
         if response.is_error:
+            elapsed_ms = (time.monotonic() - start_time) * 1000
             logger.error(f"LLM API error {response.status_code}: {response.text}")
+            _emit_progress(
+                callback=progress_callback,
+                status="error",
+                elapsed_ms=elapsed_ms,
+                message="HTTP error from LLM API",
+                error=response.text,
+            )
             response.raise_for_status()
 
         response_data: ChatCompletionResponse = response.json()
+        elapsed_ms = (time.monotonic() - start_time) * 1000
+        _emit_progress(
+            callback=progress_callback,
+            status="request_sent",
+            elapsed_ms=elapsed_ms,
+            message="Response received",
+        )
 
         content: str = response_data["choices"][0]["message"]["content"]
 
         # Guard against null content from the LLM
         if content is None:
             logger.warning("LLM returned null content, returning raw response")
+            _emit_progress(
+                callback=progress_callback,
+                status="complete",
+                elapsed_ms=elapsed_ms,
+                message="Prompt formatted successfully",
+                model=config.model,
+            )
             return content
 
         if config.response_model is None:
+            _emit_progress(
+                callback=progress_callback,
+                status="complete",
+                elapsed_ms=elapsed_ms,
+                message="Prompt formatted successfully",
+                model=config.model,
+            )
             return content
 
         try:
@@ -116,15 +163,67 @@ async def query_llm[ResponseModel: BaseModel](
                 ResponseModel, config.response_model.model_validate_json(content)
             )
         except ValidationError as exc:
+            elapsed_ms = (time.monotonic() - start_time) * 1000
             logger.error(
                 f"Failed to parse LLM response with {config.response_model.__name__}: "
                 f"{exc}"
+            )
+            _emit_progress(
+                callback=progress_callback,
+                status="error",
+                elapsed_ms=elapsed_ms,
+                message=f"Failed to parse LLM response with "
+                f"{config.response_model.__name__}",
+                error=str(exc),
             )
             raise ValueError(
                 f"Failed to parse LLM response with {config.response_model.__name__}"
             ) from exc
 
+        _emit_progress(
+            callback=progress_callback,
+            status="complete",
+            elapsed_ms=elapsed_ms,
+            message="Prompt formatted successfully",
+            model=config.model,
+        )
         return parsed
     finally:
         if close_after:
             await client.aclose()
+
+
+def _emit_progress(
+    callback: c.Callable[[LLMProgress], None] | None,
+    status: str,
+    elapsed_ms: float,
+    message: str,
+    model: str | None = None,
+    error: str | None = None,
+) -> None:
+    """Emit a progress event if a callback is provided.
+
+    Args:
+        callback:
+            The callback function to invoke, or None.
+        status:
+            The status string for the progress event.
+        elapsed_ms:
+            Elapsed time in milliseconds since the call started.
+        message:
+            A human-readable description of the current state.
+        model (optional):
+            The name of the model being queried.
+        error (optional):
+            An error message, if the call failed.
+    """
+    if callback is not None:
+        callback(
+            LLMProgress(
+                status=status,
+                elapsed_ms=elapsed_ms,
+                message=message,
+                model=model,
+                error=error,
+            )
+        )
