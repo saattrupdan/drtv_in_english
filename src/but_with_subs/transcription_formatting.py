@@ -4,14 +4,13 @@ This module uses an LLM to format raw word-level transcriptions into
 properly punctuated, properly casemapped subtitle segments.
 """
 
-import asyncio
-import collections.abc as c
 import logging
 
 from pydantic import BaseModel
+from tqdm.auto import tqdm
 
 from .llm import LLMConfig, query_llm
-from .llm_progress import LLMProgress, SharedProgress, SharedProgressCallback
+from .transcribing import Transcription
 from .transcribing import Transcription
 
 logger = logging.getLogger(__package__)
