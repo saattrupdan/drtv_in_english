@@ -1,7 +1,7 @@
 """Tests for the LLM module.
 
-This module contains tests for ``query_llm``, covering successful requests
-and the raw string response path.
+This module contains tests for ``query_llm``, covering unmodified behaviour
+without a callback and the raw string response path.
 """
 
 from unittest.mock import AsyncMock
@@ -65,7 +65,7 @@ def _make_mock_response(
 
 @pytest.mark.asyncio
 async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None:
-    """Test that query_llm works without a callback parameter."""
+    """Test that omitting the callback parameter entirely works."""
     client = AsyncClient()
     client.post = AsyncMock(return_value=_make_mock_response())
 
@@ -77,11 +77,7 @@ async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None
 
 @pytest.mark.asyncio
 async def test_query_llm_string_response(llm_config: LLMConfig) -> None:
-    """Test that the raw string response path works correctly."""
-    config_no_model = LLMConfig(
-        model="gpt-4", temperature=0.0, max_tokens=64, api_base="http://localhost:8000"
-    )
-
+    """Test that the raw string response path works without a callback."""
     client = AsyncClient()
     client.post = AsyncMock(
         return_value=_make_mock_response(
@@ -90,7 +86,9 @@ async def test_query_llm_string_response(llm_config: LLMConfig) -> None:
     )
 
     result = await query_llm(
-        prompt="translate hello", config=config_no_model, client=client
+        prompt="translate hello",
+        config=llm_config,
+        client=client,
     )
 
     assert result == "raw translation"
