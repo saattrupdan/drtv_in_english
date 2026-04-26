@@ -84,7 +84,6 @@ async def query_llm[ResponseModel: BaseModel](
         }
 
     url = f"{config.api_base}/chat/completions"
-    logger.info(f"Querying LLM API at {url} with model {config.model}...")
 
     close_after = False
     if client is None:
@@ -101,8 +100,6 @@ async def query_llm[ResponseModel: BaseModel](
 
         response_data: ChatCompletionResponse = response.json()
 
-        logger.info("LLM API response received")
-
         content: str = response_data["choices"][0]["message"]["content"]
 
         # Guard against null content from the LLM
@@ -111,7 +108,6 @@ async def query_llm[ResponseModel: BaseModel](
             return content
 
         if config.response_model is None:
-            logger.info(f"Received LLM response with {len(content):,} tokens")
             return content
 
         try:
@@ -127,9 +123,6 @@ async def query_llm[ResponseModel: BaseModel](
                 f"Failed to parse LLM response with {config.response_model.__name__}"
             ) from exc
 
-        logger.info(
-            f"Successfully parsed LLM response into {config.response_model.__name__}"
-        )
         return parsed
     finally:
         if close_after:
