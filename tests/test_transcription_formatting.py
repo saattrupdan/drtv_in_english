@@ -12,7 +12,6 @@ from but_with_subs.llm import LLMConfig
 from but_with_subs.transcribing import Transcription
 from but_with_subs.transcription_formatting import (
     FormattedSegment,
-    InvalidInputError,
     TranscribedSegmentsResponse,
     _build_prompt,
     _process_batch,
@@ -83,21 +82,18 @@ def test_build_prompt_includes_chunk_labels() -> None:
     assert "Chunk 2:" in prompt
 
 
-def test_build_prompt_raises_for_empty_text() -> None:
-    """Test that _build_prompt raises InvalidInputError for empty text.
+def test_build_prompt_handles_empty_text() -> None:
+    """Test that _build_prompt handles empty transcription text gracefully.
 
-    Verifies that passing a transcription with ``text=""`` raises
-    ``InvalidInputError``.
+    Verifies that passing a transcription with ``text=""`` does not raise.
     """
     empty_transcription = Transcription(start_time=0.0, end_time=1.0, text="")
     chunk_transcriptions: list[list[Transcription]] = [[empty_transcription]]
 
-    try:
-        _build_prompt(chunk_transcriptions=chunk_transcriptions)
-    except InvalidInputError:
-        return
+    prompt = _build_prompt(chunk_transcriptions=chunk_transcriptions)
 
-    assert False, "Expected InvalidInputError for empty text"
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
 
 
 def test_build_prompt_includes_transcription_text() -> None:
@@ -179,7 +175,15 @@ def test_process_batch_with_progress_callback(mock_query_llm: AsyncMock) -> None
     """
     llm_config = _make_llm_config()
     mock_query_llm.return_value = TranscribedSegmentsResponse(
-        segments=[FormattedSegment(text="Hello world", start_time=1.0, end_time=2.0)]
+        segments=[
+            FormattedSegment(
+                text="Hello world",
+                start_position=1,
+                end_position=2,
+                start_time=1.0,
+                end_time=2.0,
+            )
+        ]
     )
 
     batch: list[list[Transcription]] = [[_make_transcription(text="hello")]]

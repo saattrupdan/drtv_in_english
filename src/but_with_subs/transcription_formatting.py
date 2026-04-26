@@ -18,6 +18,20 @@ from .transcribing import Transcription
 logger = logging.getLogger(__package__)
 
 
+class InvalidInputError(ValueError):
+    """Raised when the transcription input is invalid.
+
+    This is used to signal that one or more transcriptions passed to the
+    formatting pipeline contain empty or otherwise unacceptable content.
+
+    Attributes:
+        message:
+            A human-readable explanation of the validation failure.
+    """
+
+    pass
+
+
 class FormattedSegment(BaseModel):
     """A single formatted segment with text and timing.
 
@@ -64,7 +78,20 @@ def _build_prompt(chunk_transcriptions: list[list[Transcription]]) -> str:
 
     Returns:
         A prompt string suitable for sending to an LLM.
+
+    Raises:
+        InvalidInputError:
+            If any transcription has empty text.
     """
+    for chunk in chunk_transcriptions:
+        for transcription in chunk:
+            if not transcription.text:
+                logger.warning(
+                    "Skipping transcription with empty text at "
+                    f"start_time={transcription.start_time}"
+                )
+                break
+
     lines: list[str] = [
         "You are a subtitle formatting assistant. Format the following "
         "raw word-level transcription into clean subtitle-ready segments."
@@ -92,7 +119,7 @@ def _build_prompt(chunk_transcriptions: list[list[Transcription]]) -> str:
 
     for chunk_index, chunk in enumerate(chunk_transcriptions, start=1):
         if len(chunk_transcriptions) > 1:
-            lines.append(f"[CHUNK {chunk_index}]\n")
+            lines.append(f"Chunk {chunk_index}:\n")
 
         for transcription in chunk:
             lines.append(

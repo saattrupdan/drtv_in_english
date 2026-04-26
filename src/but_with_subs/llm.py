@@ -12,7 +12,7 @@ import typing as t
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
 
-from .llm_progress import LLMProgress, _noop_callback
+from .llm_progress import LLMProgress, _emit_progress, _noop_callback
 from .logging_config import logger
 from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
 
@@ -198,39 +198,3 @@ async def query_llm[ResponseModel: BaseModel](
     finally:
         if close_after:
             await client.aclose()
-
-
-def _emit_progress(
-    callback: c.Callable[[LLMProgress], None] | None,
-    status: str,
-    elapsed_ms: float,
-    message: str,
-    model: str | None = None,
-    error: str | None = None,
-) -> None:
-    """Emit a progress event if a callback is provided.
-
-    Args:
-        callback:
-            The callback function to invoke, or None.
-        status:
-            The status string for the progress event.
-        elapsed_ms:
-            Elapsed time in milliseconds since the call started.
-        message:
-            A human-readable description of the current state.
-        model (optional):
-            The name of the model being queried.
-        error (optional):
-            An error message, if the call failed.
-    """
-    if callback is not None:
-        callback(
-            LLMProgress(
-                status=status,
-                elapsed_ms=elapsed_ms,
-                message=message,
-                model=model,
-                error=error,
-            )
-        )

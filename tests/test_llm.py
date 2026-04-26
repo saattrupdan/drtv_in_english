@@ -9,7 +9,7 @@ and the raw string response path.
 from unittest.mock import AsyncMock
 
 import pytest
-from httpx import AsyncClient, Response, Request
+from httpx import AsyncClient, Request, Response
 from pydantic import BaseModel
 
 from but_with_subs.llm import LLMConfig, query_llm
@@ -26,6 +26,7 @@ class TranslationResponse(BaseModel):
 
     text: str
 
+
 @pytest.fixture()
 def llm_config() -> LLMConfig:
     """Create an LLMConfig for testing.
@@ -34,10 +35,7 @@ def llm_config() -> LLMConfig:
         An LLMConfig instance.
     """
     return LLMConfig(
-        model="gpt-4",
-        temperature=0.0,
-        max_tokens=64,
-        api_base="http://localhost:8000",
+        model="gpt-4", temperature=0.0, max_tokens=64, api_base="http://localhost:8000"
     )
 
 
@@ -60,9 +58,7 @@ def _make_mock_response(
         A Response instance.
     """
     if json_body is None:
-        json_body = {
-            "choices": [{"message": {"content": content}}],
-        }
+        json_body = {"choices": [{"message": {"content": content}}]}
     return Response(
         status_code=status_code,
         json=json_body,
@@ -72,7 +68,9 @@ def _make_mock_response(
 
 def test_llm_progress_frozen_immutability() -> None:
     """Test that LLMProgress is read-only and cannot be mutated."""
-    progress = LLMProgress(status="complete", message="OK")
+    progress = LLMProgress(
+        status="complete", elapsed_ms=0.0, message="OK"
+    )
 
     with pytest.raises(Exception):
         progress.status = "error"  # type: ignore[assignment]
@@ -80,21 +78,34 @@ def test_llm_progress_frozen_immutability() -> None:
     with pytest.raises(Exception):
         progress.message = "changed"  # type: ignore[assignment]
 
-    with pytest.raises(Exception):
-        progress.request = {"role": "user", "content": "test"}  # type: ignore[assignment]
-
 
 def test_emit_progress_calls_callback_once() -> None:
     """Test that _emit_progress invokes the callback with the progress."""
-    received: list[LLMProgress] = []
-    callback = lambda p: received.append(p)
 
-    progress = LLMProgress(status="complete", message="OK")
-    _emit_progress(progress=progress, callback=callback)
+    def callback(p: LLMProgress) -> None:
+        received.append(p)
+
+    received: list[LLMProgress] = []
+
+    _emit_progress(
+        callback=callback,
+        status="complete",
+        elapsed_ms=0.0,
+        message="OK",
+    )
 
     assert len(received) == 1
-    assert received[0] is progress
+    assert received[0].status == "complete"
+    assert received[0].message == "OK"
 
+
+@pytest.mark.asyncio
+async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None:
+    """Test that omitting the callback parameter entirely works."""
+    client = AsyncClient()
+    client.post = AsyncMock(return_value=_make_mock_response())
+
+    result = await query_llm(prompt="translate hello", config=llm_config, client=client)
 
     assert result is not None
     await client.aclose()
@@ -104,19 +115,20 @@ def test_emit_progress_calls_callback_once() -> None:
 async def test_query_llm_string_response_emits_progress() -> None:
     """Test that the raw string path also emits progress events."""
     config_no_model = LLMConfig(
-        model="gpt-4",
-        temperature=0.0,
-        max_tokens=64,
-        api_base="http://localhost:8000",
+        model="gpt-4", temperature=0.0, max_tokens=64, api_base="http://localhost:8000"
     )
 
     received: list[LLMProgress] = []
-    callback = lambda p: received.append(p)
+
+    def callback(p: LLMProgress) -> None:
+        received.append(p)
 
     client = AsyncClient()
-    client.post = AsyncMock(return_value=_make_mock_response(json_body={
-        "choices": [{"message": {"content": "raw translation"}}],
-    }))
+    client.post = AsyncMock(
+        return_value=_make_mock_response(
+            json_body={"choices": [{"message": {"content": "raw translation"}}]}
+        )
+    )
 
     result = await query_llm(
         prompt="translate hello",
@@ -130,53 +142,4 @@ async def test_query_llm_string_response_emits_progress() -> None:
     assert received[1].status == "request_sent"
     assert received[2].status == "complete"
     assert result == "raw translation"
-    await client.aclose()
-
-
-@pytest.mark.asyncio
-async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None:
-    """Test that omitting the callback parameter entirely works."""
-    client = AsyncClient()
-    client.post = AsyncMock(return_value=_make_mock_response())
-
-    result = await query_llm(
-        prompt='translate hello',
-        config=llm_config,
-        client=client,
-    )
-
-    assert result is not None
-    await client.aclose()
-
-
-@pytest.mark.asyncio
-async def test_query_llm_string_response_emits_progress() -> None:
-    """Test that the raw string path also emits progress events."""
-    config_no_model = LLMConfig(
-        model='gpt-4',
-        temperature=0.0,
-        max_tokens=64,
-        api_base='http://localhost:8000',
-    )
-
-    received: list[LLMProgress] = []
-    callback = lambda p: received.append(p)
-
-    client = AsyncClient()
-    client.post = AsyncMock(return_value=_make_mock_response(json_body={
-        'choices': [{'message': {'content': 'raw translation'}}],
-    }))
-
-    result = await query_llm(
-        prompt='translate hello',
-        config=config_no_model,
-        client=client,
-        progress_callback=callback,
-    )
-
-    assert len(received) == 3
-    assert received[0].status == 'request_starting'
-    assert received[1].status == 'request_sent'
-    assert received[2].status == 'complete'
-    assert result == 'raw translation'
     await client.aclose()
