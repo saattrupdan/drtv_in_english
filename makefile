@@ -79,7 +79,7 @@ test:  ## Run tests
 	@uv run pytest && \
 		uv run readme-cov && \
 		git add README.md && \
-		git commit -m "docs: Update coverage badge"
+		(git diff --staged --quiet || git commit -m "docs: Update coverage badge")
 
 docker:  ## Build Docker image and run container
 	@make install
