@@ -7,6 +7,7 @@ properly punctuated, properly casemapped subtitle segments.
 import logging
 
 from pydantic import BaseModel
+from tqdm.auto import tqdm
 
 from .llm import LLMConfig, query_llm
 from .transcribing import Transcription
@@ -188,7 +189,7 @@ async def format_transcriptions(
     return formatted_transcriptions
 
 
-def _process_batch(
+async def _process_batch(
     batch: list[list[Transcription]], llm_config: LLMConfig
 ) -> list[FormattedSegment]:
     """Process a single batch of chunks through the LLM.
@@ -206,7 +207,7 @@ def _process_batch(
     config = llm_config.model_copy(
         update={"response_model": TranscribedSegmentsResponse}
     )
-    response = query_llm(prompt=prompt, config=config)
+    response = await query_llm(prompt=prompt, config=config)
 
     if isinstance(response, str):
         logger.warning("LLM returned raw string instead of structured data")

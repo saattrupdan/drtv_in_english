@@ -11,7 +11,6 @@ from unittest.mock import AsyncMock, patch
 from but_with_subs.llm import LLMConfig
 from but_with_subs.transcribing import Transcription
 from but_with_subs.transcription_formatting import (
-    FormattedSegment,
     TranscribedSegmentsResponse,
     _build_prompt,
     _process_batch,

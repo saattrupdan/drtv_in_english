@@ -90,9 +90,7 @@ async def test_query_llm_string_response(llm_config: LLMConfig) -> None:
     )
 
     result = await query_llm(
-        prompt="translate hello",
-        config=config_no_model,
-        client=client,
+        prompt="translate hello", config=config_no_model, client=client
     )
 
     assert result == "raw translation"
