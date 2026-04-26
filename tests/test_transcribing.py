@@ -110,9 +110,7 @@ def test_transcribe_yields_transcription_models() -> None:
         }
     )
 
-    results = transcribe(
-        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
-    )
+    results = transcribe(audio_data=mock_audio, model=mock_model, chunk_offset=0.0)
 
     assert len(results) == 2
     assert all(isinstance(r, Transcription) for r in results)
@@ -134,9 +132,7 @@ def test_transcribe_correct_time_offsets() -> None:
         }
     )
 
-    results = transcribe(
-        audio_data=mock_audio, model=mock_model, chunk_offset=5.0
-    )
+    results = transcribe(audio_data=mock_audio, model=mock_model, chunk_offset=5.0)
 
     assert results[0].start_time == 5.0
     assert results[0].end_time == 5.5
@@ -160,9 +156,7 @@ def test_transcribe_preserves_text() -> None:
         }
     )
 
-    results = transcribe(
-        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
-    )
+    results = transcribe(audio_data=mock_audio, model=mock_model, chunk_offset=0.0)
 
     assert results[0].text == "First segment"
     assert results[1].text == "Second segment"
@@ -177,9 +171,7 @@ def test_transcribe_empty_audio_empty_result() -> None:
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     mock_model = _make_mock_pipeline(return_value={"chunks": []})
 
-    results = transcribe(
-        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
-    )
+    results = transcribe(audio_data=mock_audio, model=mock_model, chunk_offset=0.0)
 
     assert results == []
 
@@ -201,9 +193,7 @@ def test_transcribe_multiple_chunks_from_pipeline() -> None:
         }
     )
 
-    results = transcribe(
-        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
-    )
+    results = transcribe(audio_data=mock_audio, model=mock_model, chunk_offset=0.0)
 
     assert len(results) == 3
     assert results[0].text == "A"
@@ -223,9 +213,7 @@ def test_transcribe_duration_matches_timestamps() -> None:
         return_value={"chunks": [{"text": "Segment", "timestamp": (1.0, 3.5)}]}
     )
 
-    results = transcribe(
-        audio_data=mock_audio, model=mock_model, chunk_offset=0.0
-    )
+    results = transcribe(audio_data=mock_audio, model=mock_model, chunk_offset=0.0)
 
     assert len(results) == 1
     assert results[0].end_time - results[0].start_time == 2.5
@@ -242,9 +230,7 @@ def test_transcribe_with_nonzero_offset_preserves_duration() -> None:
         return_value={"chunks": [{"text": "Segment", "timestamp": (0.5, 2.0)}]}
     )
 
-    results = transcribe(
-        audio_data=mock_audio, model=mock_model, chunk_offset=10.0
-    )
+    results = transcribe(audio_data=mock_audio, model=mock_model, chunk_offset=10.0)
 
     assert len(results) == 1
     assert results[0].start_time == 10.5
