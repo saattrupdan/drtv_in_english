@@ -5,11 +5,14 @@ properly punctuated, properly casemapped subtitle segments.
 """
 
 import asyncio
+import collections.abc as c
 import logging
 
 from pydantic import BaseModel
+from tqdm.auto import tqdm
 
 from .llm import LLMConfig, query_llm
+from .llm_progress import LLMProgress
 from .transcribing import Transcription
 
 logger = logging.getLogger(__package__)
@@ -135,8 +138,12 @@ async def format_transcriptions(
         chunk_transcriptions[i : i + 4] for i in range(0, len(chunk_transcriptions), 4)
     ]
 
+    total_batches = len(batches)
     results: list[list[FormattedSegment]] = await asyncio.gather(
-        *[_process_batch(batch, llm_config) for batch in batches]
+        *[
+            _process_batch_with_progress(batch, llm_config, i, total_batches)
+            for i, batch in enumerate(batches)
+        ]
     )
 
     segments: list[FormattedSegment] = []
@@ -168,8 +175,44 @@ async def format_transcriptions(
     return formatted_transcriptions
 
 
+async def _process_batch_with_progress(
+    batch: list[list[Transcription]],
+    llm_config: LLMConfig,
+    batch_index: int,
+    total_batches: int,
+) -> list[FormattedSegment]:
+    """Process a batch with a per-batch tqdm progress indicator.
+
+    Args:
+        batch:
+            A list of 4 or fewer chunk transcription lists.
+        llm_config:
+            Configuration for the LLM API call.
+        batch_index:
+            Zero-based index of this batch among all batches.
+        total_batches:
+            Total number of batches.
+
+    Returns:
+        A list of formatted segments from the LLM response.
+    """
+    desc = f"[{batch_index + 1}/{total_batches}]"
+    with tqdm(total=1, desc=desc, unit="step") as pbar:
+
+        def _pbar_callback(_progress: LLMProgress) -> None:
+            if _progress.status == "complete":
+                pbar.update(1)
+            elif _progress.status in ("request_starting", "request_sent", "error"):
+                pbar.set_description(f"{desc} {_progress.status}")
+
+        return await _process_batch(batch, llm_config, progress_callback=_pbar_callback)
+
+
 async def _process_batch(
-    batch: list[list[Transcription]], llm_config: LLMConfig
+    batch: list[list[Transcription]],
+    llm_config: LLMConfig,
+    *,
+    progress_callback: c.Callable[[LLMProgress], None] | None = None,
 ) -> list[FormattedSegment]:
     """Process a single batch of chunks through the LLM.
 
@@ -178,6 +221,8 @@ async def _process_batch(
             A list of 4 or fewer chunk transcription lists.
         llm_config:
             Configuration for the LLM API call.
+        progress_callback (optional):
+            A callback invoked with LLM progress updates.
 
     Returns:
         A list of formatted segments from the LLM response.
@@ -186,7 +231,9 @@ async def _process_batch(
     config = llm_config.model_copy(
         update={"response_model": TranscribedSegmentsResponse}
     )
-    response = await query_llm(prompt=prompt, config=config)
+    response = await query_llm(
+        prompt=prompt, config=config, progress_callback=progress_callback
+    )
 
     if isinstance(response, str):
         logger.warning("LLM returned raw string instead of structured data")

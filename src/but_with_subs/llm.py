@@ -5,11 +5,13 @@ compatibility with llama.cpp servers. It supports arbitrary response models defi
 as Pydantic BaseModels.
 """
 
+import collections.abc as c
 import typing as t
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
 
+from .llm_progress import LLMProgress
 from .logging_config import logger
 from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
 
@@ -42,7 +44,10 @@ class LLMConfig(BaseModel):
 
 
 async def query_llm[ResponseModel: BaseModel](
-    prompt: str, config: LLMConfig, client: AsyncClient | None = None
+    prompt: str,
+    config: LLMConfig,
+    client: AsyncClient | None = None,
+    progress_callback: c.Callable[[LLMProgress], None] | None = None,
 ) -> ResponseModel | str | None:
     """Query an LLM API with a prompt and return a parsed response.
 
@@ -57,6 +62,8 @@ async def query_llm[ResponseModel: BaseModel](
         client (optional):
             An optional httpx AsyncClient to use for the request. If not provided,
             a new client will be created.
+        progress_callback (optional):
+            A callback invoked with LLM progress updates.
 
     Returns:
         The parsed response as an instance of the response model, a string,
@@ -92,10 +99,19 @@ async def query_llm[ResponseModel: BaseModel](
         close_after = True
 
     try:
+        if progress_callback is not None:
+            progress_callback(LLMProgress(status="request_starting"))
+
         response: Response = await client.post(
             url=url, json=payload, headers=headers, timeout=600
         )
+
+        if progress_callback is not None:
+            progress_callback(LLMProgress(status="request_sent"))
+
         if response.is_error:
+            if progress_callback is not None:
+                progress_callback(LLMProgress(status="error"))
             logger.error(f"LLM API error {response.status_code}: {response.text}")
             response.raise_for_status()
 
@@ -105,17 +121,28 @@ async def query_llm[ResponseModel: BaseModel](
 
         # Guard against null content from the LLM
         if content is None:
+            if progress_callback is not None:
+                progress_callback(LLMProgress(status="error"))
             logger.warning("LLM returned null content, returning raw response")
             return content
 
         if config.response_model is None:
+            if progress_callback is not None:
+                progress_callback(LLMProgress(status="complete"))
             return content
 
         try:
             parsed: ResponseModel = t.cast(
                 ResponseModel, config.response_model.model_validate_json(content)
             )
+
+            if progress_callback is not None:
+                progress_callback(LLMProgress(status="complete"))
+
+            return parsed
         except ValidationError as exc:
+            if progress_callback is not None:
+                progress_callback(LLMProgress(status="error"))
             logger.error(
                 f"Failed to parse LLM response with {config.response_model.__name__}: "
                 f"{exc}"
@@ -123,8 +150,6 @@ async def query_llm[ResponseModel: BaseModel](
             raise ValueError(
                 f"Failed to parse LLM response with {config.response_model.__name__}"
             ) from exc
-
-        return parsed
     finally:
         if close_after:
             await client.aclose()
