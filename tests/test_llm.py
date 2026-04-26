@@ -1,9 +1,7 @@
 """Tests for the LLM module.
 
-This module contains tests for ``LLMProgress``, ``_emit_progress``, and
-``query_llm``, covering progress callback emission for successful requests,
-HTTP errors, validation errors, unmodified behaviour without a callback,
-and the raw string response path.
+This module contains tests for ``query_llm``, covering unmodified behaviour
+without a callback and the raw string response path.
 """
 
 from unittest.mock import AsyncMock
@@ -13,7 +11,6 @@ from httpx import AsyncClient, Request, Response
 from pydantic import BaseModel
 
 from but_with_subs.llm import LLMConfig, query_llm
-from but_with_subs.llm_progress import LLMProgress, _emit_progress
 
 
 class TranslationResponse(BaseModel):
@@ -66,32 +63,6 @@ def _make_mock_response(
     )
 
 
-def test_llm_progress_frozen_immutability() -> None:
-    """Test that LLMProgress is read-only and cannot be mutated."""
-    progress = LLMProgress(status="complete", elapsed_ms=0.0, message="OK")
-
-    with pytest.raises(Exception):
-        progress.status = "error"  # type: ignore[assignment]
-
-    with pytest.raises(Exception):
-        progress.message = "changed"  # type: ignore[assignment]
-
-
-def test_emit_progress_calls_callback_once() -> None:
-    """Test that _emit_progress invokes the callback with the progress."""
-
-    def callback(p: LLMProgress) -> None:
-        received.append(p)
-
-    received: list[LLMProgress] = []
-
-    _emit_progress(callback=callback, status="complete", elapsed_ms=0.0, message="OK")
-
-    assert len(received) == 1
-    assert received[0].status == "complete"
-    assert received[0].message == "OK"
-
-
 @pytest.mark.asyncio
 async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None:
     """Test that omitting the callback parameter entirely works."""
@@ -105,17 +76,8 @@ async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None
 
 
 @pytest.mark.asyncio
-async def test_query_llm_string_response_emits_progress() -> None:
-    """Test that the raw string path also emits progress events."""
-    config_no_model = LLMConfig(
-        model="gpt-4", temperature=0.0, max_tokens=64, api_base="http://localhost:8000"
-    )
-
-    received: list[LLMProgress] = []
-
-    def callback(p: LLMProgress) -> None:
-        received.append(p)
-
+async def test_query_llm_string_response(llm_config: LLMConfig) -> None:
+    """Test that the raw string response path works without a callback."""
     client = AsyncClient()
     client.post = AsyncMock(
         return_value=_make_mock_response(
@@ -125,14 +87,9 @@ async def test_query_llm_string_response_emits_progress() -> None:
 
     result = await query_llm(
         prompt="translate hello",
-        config=config_no_model,
+        config=llm_config,
         client=client,
-        progress_callback=callback,
     )
 
-    assert len(received) == 3
-    assert received[0].status == "request_starting"
-    assert received[1].status == "request_sent"
-    assert received[2].status == "complete"
     assert result == "raw translation"
     await client.aclose()
