@@ -9,10 +9,9 @@ import collections.abc as c
 import logging
 
 from pydantic import BaseModel
-from tqdm.auto import tqdm
 
 from .llm import LLMConfig, query_llm
-from .llm_progress import LLMProgress
+from .llm_progress import LLMProgress, SharedProgress, SharedProgressCallback
 from .transcribing import Transcription
 
 logger = logging.getLogger(__package__)
@@ -78,10 +77,6 @@ def _build_prompt(chunk_transcriptions: list[list[Transcription]]) -> str:
 
     Returns:
         A prompt string suitable for sending to an LLM.
-
-    Raises:
-        InvalidInputError:
-            If any transcription has empty text.
     """
     for chunk in chunk_transcriptions:
         for transcription in chunk:
@@ -166,12 +161,18 @@ async def format_transcriptions(
     ]
 
     total_batches = len(batches)
-    results: list[list[FormattedSegment]] = await asyncio.gather(
-        *[
-            _process_batch_with_progress(batch, llm_config, i, total_batches)
-            for i, batch in enumerate(batches)
-        ]
-    )
+
+    with SharedProgress(
+        total=total_batches, desc="Processing transcription batches"
+    ) as shared_progress:
+        results: list[list[FormattedSegment]] = await asyncio.gather(
+            *[
+                _process_batch_with_progress(
+                    batch, llm_config, i, total_batches, shared_progress
+                )
+                for i, batch in enumerate(batches)
+            ]
+        )
 
     segments: list[FormattedSegment] = []
     for result in results:
@@ -207,8 +208,9 @@ async def _process_batch_with_progress(
     llm_config: LLMConfig,
     batch_index: int,
     total_batches: int,
+    shared_progress: SharedProgress | None = None,
 ) -> list[FormattedSegment]:
-    """Process a batch with a per-batch tqdm progress indicator.
+    """Process a batch using a shared progress bar.
 
     Args:
         batch:
@@ -219,20 +221,18 @@ async def _process_batch_with_progress(
             Zero-based index of this batch among all batches.
         total_batches:
             Total number of batches.
+        shared_progress (optional):
+            A shared progress instance to update on batch completion.
 
     Returns:
         A list of formatted segments from the LLM response.
     """
-    desc = f"[{batch_index + 1}/{total_batches}]"
-    with tqdm(total=1, desc=desc, unit="step") as pbar:
+    if shared_progress is not None:
+        progress_callback = SharedProgressCallback(shared_progress)
+    else:
+        progress_callback = None
 
-        def _pbar_callback(_progress: LLMProgress) -> None:
-            if _progress.status == "complete":
-                pbar.update(1)
-            elif _progress.status in ("request_starting", "request_sent", "error"):
-                pbar.set_description(f"{desc} {_progress.status}")
-
-        return await _process_batch(batch, llm_config, progress_callback=_pbar_callback)
+    return await _process_batch(batch, llm_config, progress_callback=progress_callback)
 
 
 async def _process_batch(
