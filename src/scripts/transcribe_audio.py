@@ -20,7 +20,6 @@ from transformers import pipeline
 from but_with_subs.chunking import chunk_audio
 from but_with_subs.device import get_device
 from but_with_subs.llm import LLMConfig
-from but_with_subs.llm_progress import LLMProgress
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.transcribing import Transcription, transcribe
 from but_with_subs.transcription_formatting import format_transcriptions
@@ -143,8 +142,7 @@ async def translate_transcriptions(
 ) -> list[Transcription]:
     """Translate each transcription segment to the target language.
 
-    Processes segments in batches of 8 concurrently using a semaphore
-    to limit the number of simultaneous LLM calls.
+    Processes segments sequentially using a tqdm progress bar.
 
     Args:
         transcriptions:
@@ -158,37 +156,23 @@ async def translate_transcriptions(
         A new list of ``Transcription`` objects with translated text
         but the same start and end times as the originals.
     """
-    semaphore = asyncio.Semaphore(8)
     translated: list[Transcription] = []
 
-    async def _translate_one(segment: Transcription) -> Transcription:
-        async with semaphore:
-
-            def _seg_callback(progress: LLMProgress) -> None:
-                if progress.status in ("request_starting", "request_sent"):
-                    tqdm.write(f"  → {progress.message}")
-                elif progress.status == "error" and progress.error:
-                    tqdm.write(f"  → Error: {progress.error}")
-
+    with tqdm(total=len(transcriptions), unit="segment", desc="Translating") as pbar:
+        for segment in transcriptions:
             translated_text = await translate(
                 text=segment.text,
                 target_language=target_language,
                 llm_config=llm_config,
-                progress_callback=_seg_callback,
             )
-            return Transcription(
-                start_time=segment.start_time,
-                end_time=segment.end_time,
-                text=translated_text,
+            translated.append(
+                Transcription(
+                    start_time=segment.start_time,
+                    end_time=segment.end_time,
+                    text=translated_text,
+                )
             )
-
-    with tqdm(total=len(transcriptions), unit="segment", desc="Translating") as pbar:
-        for i in range(0, len(transcriptions), 8):
-            batch = transcriptions[i : i + 8]
-            batch_tasks = [_translate_one(seg) for seg in batch]
-            batch_results = await asyncio.gather(*batch_tasks)
-            translated.extend(batch_results)
-            pbar.update(len(batch))
+            pbar.update(1)
 
     return translated
 
