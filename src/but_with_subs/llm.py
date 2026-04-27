@@ -107,7 +107,26 @@ async def query_llm[ResponseModel: BaseModel](
         response_data: ChatCompletionResponse = response.json()
         (time.monotonic() - start_time) * 1000
 
-        content: str = response_data["choices"][0]["message"]["content"]
+        # Log raw response for diagnosing null content issues
+        logger.debug("Raw LLM response: %s", response_data)
+
+        # Defensive extraction of content with full structure logging on failure
+        choices = response_data.get("choices")
+        if not choices:
+            logger.warning(
+                "LLM response has no choices. Full response: %s", response_data
+            )
+            return None
+
+        first_choice = choices[0]
+        message = first_choice.get("message")
+        if not message:
+            logger.warning(
+                "LLM response choice has no message. Full response: %s", response_data
+            )
+            return None
+
+        content: str | None = message.get("content")
 
         # Guard against null content from the LLM
         if content is None:
