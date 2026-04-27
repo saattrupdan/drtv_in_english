@@ -144,7 +144,9 @@ def test_process_batch_with_mocked_llm(mock_query_llm: AsyncMock) -> None:
     mock_query_llm.return_value = TranscribedSegmentsResponse(segments=[])
 
     batch: list[list[Transcription]] = [[_make_transcription(text="hello")]]
-    result = asyncio.run(_process_batch(batch=batch, llm_config=llm_config))
+    result = asyncio.run(
+        _process_batch(batch=batch, batch_idx=0, llm_config=llm_config)
+    )
 
     assert isinstance(result, list)
 
@@ -160,7 +162,9 @@ def test_process_batch_with_raw_string(mock_query_llm: AsyncMock) -> None:
     mock_query_llm.return_value = "raw unrecognized response"
 
     batch: list[list[Transcription]] = [[_make_transcription(text="hello")]]
-    result = asyncio.run(_process_batch(batch=batch, llm_config=llm_config))
+    result = asyncio.run(
+        _process_batch(batch=batch, batch_idx=0, llm_config=llm_config)
+    )
 
     assert result == []
 

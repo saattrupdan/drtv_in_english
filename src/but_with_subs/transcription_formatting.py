@@ -160,8 +160,10 @@ async def format_transcriptions(
 
     all_segments: list[FormattedSegment] = []
 
-    for batch in tqdm(batches, desc="Processing transcription batches"):
-        segments = await _process_batch(batch, llm_config)
+    for batch_idx, batch in tqdm(
+        enumerate(batches), desc="Processing transcription batches"
+    ):
+        segments = await _process_batch(batch, batch_idx, llm_config)
         all_segments.extend(segments)
 
     # Map position intervals back to timestamps.
@@ -190,13 +192,15 @@ async def format_transcriptions(
 
 
 async def _process_batch(
-    batch: list[list[Transcription]], llm_config: LLMConfig
+    batch: list[list[Transcription]], batch_idx: int, llm_config: LLMConfig
 ) -> list[FormattedSegment]:
     """Process a single batch of chunks through the LLM.
 
     Args:
         batch:
             A list of 4 or fewer chunk transcription lists.
+        batch_idx:
+            Zero-based index of the batch within the full set of batches.
         llm_config:
             Configuration for the LLM API call.
 
@@ -215,8 +219,12 @@ async def _process_batch(
 
     if response is None:
         logger.warning(
-            "LLM returned None for batch, skipping. "
-            "Check LLM provider and prompt context."
+            "LLM returned None for batch %d, skipping. "
+            "response_model=%s, prompt_len=%d. "
+            "Check LLM provider and prompt context.",
+            batch_idx,
+            TranscribedSegmentsResponse.__name__,
+            len(prompt),
         )
         return []
 
