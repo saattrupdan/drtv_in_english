@@ -81,8 +81,11 @@ async def query_llm[ResponseModel: BaseModel](
     }
     if config.response_model is not None:
         payload["response_format"] = {
-            "type": "json_object",
-            "schema": config.response_model.model_json_schema(),
+            "type": "json_schema",
+            "json_schema": {
+                "name": config.response_model.__name__,
+                "schema": config.response_model.model_json_schema(),
+            },
         }
 
     url = f"{config.api_base}/chat/completions"

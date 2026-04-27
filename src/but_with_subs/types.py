@@ -58,6 +58,20 @@ class ChatCompletionResponse(t.TypedDict):
     choices: list[Choice]
 
 
+class JsonSchema(t.TypedDict):
+    """A JSON schema for a response format.
+
+    Attributes:
+        name:
+            The name of the schema.
+        schema:
+            The JSON schema for the response format.
+    """
+
+    name: str
+    schema: str
+
+
 class ResponseFormat(t.TypedDict):
     """The format in which the LLM should respond.
 
@@ -69,7 +83,7 @@ class ResponseFormat(t.TypedDict):
     """
 
     type: str
-    schema: str
+    json_schema: JsonSchema
 
 
 class ChatCompletionRequest(t.TypedDict):
