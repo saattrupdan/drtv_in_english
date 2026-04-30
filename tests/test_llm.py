@@ -38,7 +38,7 @@ def llm_config() -> LLMConfig:
 
 def _make_mock_response(
     status_code: int = 200,
-    json_body: dict | None = None,
+    json_data: dict | list = {},
     content: str = '{"text": "translation"}',
 ) -> Response:
     """Create a fake httpx.Response.
@@ -46,7 +46,7 @@ def _make_mock_response(
     Args:
         status_code:
             The HTTP status code for the response.
-        json_body:
+        json_data:
             The JSON body content to return.
         content:
             The LLM response content string.
@@ -54,11 +54,11 @@ def _make_mock_response(
     Returns:
         A Response instance.
     """
-    if json_body is None:
-        json_body = {"choices": [{"message": {"content": content}}]}
+    if not json_data:
+        json_data = {"choices": [{"message": {"content": content}}]}
     return Response(
         status_code=status_code,
-        json=json_body,
+        json=json_data,
         request=Request("POST", "http://localhost:8000/chat/completions"),
     )
 
@@ -81,7 +81,7 @@ async def test_query_llm_string_response(llm_config: LLMConfig) -> None:
     client = AsyncClient()
     client.post = AsyncMock(
         return_value=_make_mock_response(
-            json_body={"choices": [{"message": {"content": "raw translation"}}]}
+            json_data={"choices": [{"message": {"content": "raw translation"}}]}
         )
     )
 
