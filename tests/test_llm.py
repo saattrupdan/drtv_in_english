@@ -4,7 +4,7 @@ This module contains tests for ``query_llm``, covering unmodified behaviour
 without a callback and the raw string response path.
 """
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient, Request, Response
@@ -167,31 +167,51 @@ async def test_detect_unknown_on_vllm_exception():
 
 @pytest.mark.asyncio
 async def test_server_type_cache():
-    """Test that detected server types are cached per api_base."""
+    """Test that detected server types are cached per api_base via query_llm."""
     from but_with_subs import llm
 
     llm._server_type_cache.clear()
 
-    mock_resp = _make_mock_response(
+    detection_resp = _make_mock_response(
         status_code=200, json_data={"data": [{"id": "gpt-4"}]}
     )
+    query_resp = _make_mock_response(
+        json_data={"choices": [{"message": {"content": "cached test"}}]}
+    )
 
-    mock_client = AsyncMock(spec=AsyncClient)
-    mock_client.get = AsyncMock(return_value=mock_resp)
+    query_client = AsyncMock(spec=AsyncClient)
+    query_client.post = AsyncMock(return_value=query_resp)
 
-    result1 = await llm._detect_server_type("http://cache-test:8000", mock_client)
-    assert result1 == LLMServerType.VLLM
-    call_count_after_first = mock_client.get.call_count
+    # First call: patch AsyncClient constructor to return our detection client,
+    # and patch the internal detection get() to return vLLM response
+    detect_client = AsyncMock(spec=AsyncClient)
+    detect_client.get = AsyncMock(return_value=detection_resp)
+    detect_client.aclose = AsyncMock()
 
-    result2 = await llm._detect_server_type("http://cache-test:8000", mock_client)
-    assert result2 == LLMServerType.VLLM
-    assert mock_client.get.call_count == call_count_after_first
+    def mock_async_client_init(self, *args, **kwargs):
+        pass
 
-    mock_client2 = AsyncMock(spec=AsyncClient)
-    mock_client2.get = AsyncMock(return_value=mock_resp)
-    result3 = await llm._detect_server_type("http://other-server:8000", mock_client2)
-    assert result3 == LLMServerType.VLLM
-    mock_client2.get.assert_called_once()
+    with patch.object(AsyncClient, "__init__", mock_async_client_init):
+        with patch.object(AsyncClient, "aclose", AsyncMock()):
+            with patch("but_with_subs.llm.AsyncClient.get", side_effect=lambda *a, **kw: detection_resp):
+                config = LLMConfig(
+                    model="test", temperature=0.0, max_tokens=100,
+                    api_base="http://cache-test:8000"
+                )
+                result = await query_llm(prompt="test", config=config, client=query_client)
+
+    assert result == "cached test"
+    assert llm._server_type_cache.get("http://cache-test:8000") == LLMServerType.VLLM
+
+    # Second call with same api_base should use cache (no extra detection calls)
+    with patch.object(AsyncClient, "__init__", mock_async_client_init):
+        with patch.object(AsyncClient, "aclose", AsyncMock()):
+            with patch("but_with_subs.llm.AsyncClient.get", side_effect=lambda *a, **kw: detection_resp) as mock_get:
+                result2 = await query_llm(prompt="test", config=config, client=query_client)
+
+    assert result2 == "cached test"
+    # get() should NOT have been called since cache was hit
+    mock_get.assert_not_called()
 
     llm._server_type_cache.clear()
 
