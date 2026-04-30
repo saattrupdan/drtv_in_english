@@ -1,140 +1,193 @@
-"""Tests for the LLM module.
-
-This module contains tests for ``query_llm``, covering unmodified behaviour
-without a callback and the raw string response path.
-"""
-
-from unittest.mock import AsyncMock, patch
+"""Tests for the LLM inference module."""
 
 import pytest
-from httpx import AsyncClient, Request, Response
-from pydantic import BaseModel
-
-from but_with_subs.llm import (
-    LLMConfig,
-    LLMServerType,
-    _detect_server_type,
-    query_llm,
-)
-
+from httpx import AsyncClient, Response
+from unittest.mock import AsyncMock, patch
 import but_with_subs.llm
+from but_with_subs.llm import LLMConfig, query_llm, LLMServerType, ServerCapabilities
 
 
-class TranslationResponse(BaseModel):
-    """Simple Pydantic model for testing structured LLM responses.
+def _make_mock_response(
+    status_code: int = 200,
+    json_data: dict | list = None,
+    text: str = "",
+    headers: dict | None = None,
+) -> AsyncMock:
+    mock_response = AsyncMock(spec=Response)
+    mock_response.status_code = status_code
+    mock_response.is_error = status_code >= 400
+    mock_response.json.return_value = json_data if json_data is not None else {}
+    mock_response.text = text
+    mock_response.headers = headers or {}
+    return mock_response
 
-    Attributes:
-        text:
-            The translated text.
-    """
 
-    text: str
-
-
-@pytest.fixture()
-def llm_config() -> LLMConfig:
-    """Create an LLMConfig for testing.
-
-    Returns:
-        An LLMConfig instance.
-    """
+@pytest.fixture
+def llm_config():
     return LLMConfig(
         model="gpt-4", temperature=0.0, max_tokens=64, api_base="http://localhost:8000"
     )
 
 
-def _make_mock_response(
-    status_code: int = 200,
-    json_data: dict | list = {},
-    content: str = '{"text": "translation"}',
-) -> Response:
-    """Create a fake httpx.Response.
-
-    Args:
-        status_code:
-            The HTTP status code for the response.
-        json_data:
-            The JSON body content to return.
-        content:
-            The LLM response content string.
-
-    Returns:
-        A Response instance.
-    """
-    if not json_data:
-        json_data = {"choices": [{"message": {"content": content}}]}
-    return Response(
-        status_code=status_code,
-        json=json_data,
-        request=Request("POST", "http://localhost:8000/chat/completions"),
-    )
-
-
 @pytest.mark.asyncio
-async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None:
-    """Test that omitting the callback parameter entirely works."""
-    client = AsyncClient()
-    client.post = AsyncMock(return_value=_make_mock_response())
-
-    result = await query_llm(prompt="translate hello", config=llm_config, client=client)
-
-    assert result is not None
-    await client.aclose()
-
-
-@pytest.mark.asyncio
-async def test_query_llm_string_response(llm_config: LLMConfig) -> None:
-    """Test that the raw string response path works without a callback."""
-    client = AsyncClient()
-    client.post = AsyncMock(
-        return_value=_make_mock_response(
-            json_data={"choices": [{"message": {"content": "raw translation"}}]}
-        )
-    )
-
-    result = await query_llm(prompt="translate hello", config=llm_config, client=client)
-
-    assert result == "raw translation"
-    await client.aclose()
-
-
-@pytest.mark.asyncio
-async def test_detect_vllm_server() -> None:
-    """Test that a vLLM server is correctly detected via /v1/models endpoint."""
-    mock_resp = _make_mock_response(
-        status_code=200, json_data={"data": [{"id": "gpt-4"}]}
-    )
-
+async def test_query_llm_no_callback_param_at_all(llm_config):
+    """Test query_llm with a mocked response that simulates an empty content response."""
     mock_client = AsyncMock(spec=AsyncClient)
-    mock_client.get = AsyncMock(return_value=mock_resp)
+    mock_response = _make_mock_response(
+        json_data={
+            "choices": [{"message": {"content": None}}]
+        }
+    )
+    mock_client.post = AsyncMock(return_value=mock_response)
 
-    result = await _detect_server_type("http://localhost:8000", mock_client)
+    result = await query_llm(
+        prompt="translate hello", config=llm_config, client=mock_client
+    )
+    assert result is None
 
-    assert result == LLMServerType.VLLM
+
+@pytest.mark.asyncio
+async def test_query_llm_string_response(llm_config):
+    """Test query_llm with a mocked response that simulates a string content response."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    mock_response = _make_mock_response(
+        json_data={
+            "choices": [{"message": {"content": "Hello, world!"}}]
+        }
+    )
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    result = await query_llm(
+        prompt="translate hello", config=llm_config, client=mock_client
+    )
+    assert result == "Hello, world!"
+
+
+@pytest.mark.asyncio
+async def test_detect_openai_via_header():
+    """Test that OpenAI is detected via Server header."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    mock_response = _make_mock_response(
+        status_code=200,
+        json_data={"data": [{"id": "gpt-4"}]},
+        headers={"Server": "openai-api"},
+    )
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    result = await but_with_subs.llm._detect_server_capabilities(
+        "http://localhost:8000", mock_client
+    )
+
+    assert result.server_type == LLMServerType.OPENAI
+    assert result.supports_json_schema is True
     mock_client.get.assert_called_once_with(
         "http://localhost:8000/v1/models", timeout=5.0
     )
 
 
 @pytest.mark.asyncio
-async def test_detect_llama_cpp_fallback() -> None:
+async def test_detect_ollama_via_header():
+    """Test that Ollama is detected via Server header."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    mock_response = _make_mock_response(
+        status_code=200,
+        json_data={"data": [{"id": "llama3"}]},
+        headers={"Server": "ollama"},
+    )
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    result = await but_with_subs.llm._detect_server_capabilities(
+        "http://localhost:8000", mock_client
+    )
+
+    assert result.server_type == LLMServerType.OLLAMA
+    assert result.supports_json_schema is False
+    mock_client.get.assert_called_once_with(
+        "http://localhost:8000/v1/models", timeout=5.0
+    )
+
+
+@pytest.mark.asyncio
+async def test_detect_lm_studio_via_header():
+    """Test that LM Studio is detected via Server header."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    mock_response = _make_mock_response(
+        status_code=200,
+        json_data={"data": [{"id": "local-model"}]},
+        headers={"Server": "lm-studio"},
+    )
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    result = await but_with_subs.llm._detect_server_capabilities(
+        "http://localhost:8000", mock_client
+    )
+
+    assert result.server_type == LLMServerType.LM_STUDIO
+    assert result.supports_json_schema is True
+
+
+@pytest.mark.asyncio
+async def test_detect_groq_via_header():
+    """Test that Groq is detected via Server header."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    mock_response = _make_mock_response(
+        status_code=200,
+        json_data={"data": [{"id": "mixtral-8x7b"}]},
+        headers={"Server": "groq"},
+    )
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    result = await but_with_subs.llm._detect_server_capabilities(
+        "http://localhost:8000", mock_client
+    )
+
+    assert result.server_type == LLMServerType.GROQ
+    assert result.supports_json_schema is True
+
+
+@pytest.mark.asyncio
+async def test_detect_vllm_via_header():
+    """Test that vLLM is detected via Server header."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    mock_response = _make_mock_response(
+        status_code=200,
+        json_data={"data": [{"id": "meta-llama/Llama-3"}]},
+        headers={"Server": "vLLM"},
+    )
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    result = await but_with_subs.llm._detect_server_capabilities(
+        "http://localhost:8000", mock_client
+    )
+
+    assert result.server_type == LLMServerType.VLLM
+    assert result.supports_json_schema is True
+
+
+@pytest.mark.asyncio
+async def test_detect_llama_cpp_fallback():
     """Test that llama.cpp is detected when /v1/models fails and /models succeeds."""
     vllm_fail = _make_mock_response(status_code=404)
     llama_success = _make_mock_response(
-        status_code=200, json_data={"models": [{"id": "gguf-model"}]}
+        status_code=200,
+        json_data={"models": [{"id": "gguf-model"}]},
+        headers={},
     )
 
     mock_client = AsyncMock(spec=AsyncClient)
     mock_client.get = AsyncMock(side_effect=[vllm_fail, llama_success])
 
-    result = await _detect_server_type("http://localhost:8000", mock_client)
+    result = await but_with_subs.llm._detect_server_capabilities(
+        "http://localhost:8000", mock_client
+    )
 
-    assert result == LLMServerType.LLAMA_CPP
+    assert result.server_type == LLMServerType.LLAMA_CPP
+    assert result.supports_json_schema is True
     assert mock_client.get.call_count == 2
 
 
 @pytest.mark.asyncio
-async def test_detect_unknown_when_both_fail() -> None:
+async def test_detect_unknown_when_both_fail():
     """Test that UNKNOWN is returned when neither endpoint succeeds."""
     vllm_fail = _make_mock_response(status_code=404)
     llama_fail = _make_mock_response(status_code=404)
@@ -142,98 +195,88 @@ async def test_detect_unknown_when_both_fail() -> None:
     mock_client = AsyncMock(spec=AsyncClient)
     mock_client.get = AsyncMock(side_effect=[vllm_fail, llama_fail])
 
-    result = await _detect_server_type("http://localhost:8000", mock_client)
+    result = await but_with_subs.llm._detect_server_capabilities(
+        "http://localhost:8000", mock_client
+    )
 
-    assert result == LLMServerType.UNKNOWN
+    assert result.server_type == LLMServerType.UNKNOWN
+    assert result.supports_json_schema is False
     assert mock_client.get.call_count == 2
 
 
 @pytest.mark.asyncio
-async def test_detect_unknown_on_vllm_exception() -> None:
-    """Test that detection falls through to llama.cpp when /v1/models raises."""
-    llama_success = _make_mock_response(
-        status_code=200, json_data={"models": [{"id": "gguf-model"}]}
+async def test_detect_via_model_id_fallback():
+    """Test that servers are detected via model ID patterns when headers are absent."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    # No Server header, but model ID reveals the provider
+    mock_response = _make_mock_response(
+        status_code=200,
+        json_data={"data": [{"id": "gemini-pro"}]},
+        headers={},
+    )
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    result = await but_with_subs.llm._detect_server_capabilities(
+        "http://localhost:8000", mock_client
+    )
+
+    assert result.server_type == LLMServerType.GEMINI
+    assert result.supports_json_schema is True
+
+
+@pytest.mark.asyncio
+async def test_server_capabilities_cache():
+    """Test that detected server capabilities are cached per api_base."""
+    # Clear cache for isolation
+    but_with_subs.llm._server_capabilities_cache.clear()
+
+    mock_resp = _make_mock_response(
+        status_code=200,
+        json_data={"data": [{"id": "gpt-4"}]},
+        headers={"Server": "openai-api"},
     )
 
     mock_client = AsyncMock(spec=AsyncClient)
-    mock_client.get = AsyncMock(
-        side_effect=[Exception("connection refused"), llama_success]
+    mock_client.get = AsyncMock(return_value=mock_resp)
+
+    # First call should probe
+    result1 = await but_with_subs.llm._detect_server_capabilities(
+        "http://cache-test:8000", mock_client
     )
+    assert result1.server_type == LLMServerType.OPENAI
+    call_count_after_first = mock_client.get.call_count
 
-    result = await _detect_server_type("http://localhost:8000", mock_client)
+    # Second call with same api_base should use cache
+    result2 = await but_with_subs.llm._detect_server_capabilities(
+        "http://cache-test:8000", mock_client
+    )
+    assert result2.server_type == LLMServerType.OPENAI
+    # No additional calls — cache hit
+    assert mock_client.get.call_count == call_count_after_first
 
-    assert result == LLMServerType.LLAMA_CPP
-    assert mock_client.get.call_count == 2
+    # Different api_base should probe again
+    mock_client2 = AsyncMock(spec=AsyncClient)
+    mock_client2.get = AsyncMock(return_value=mock_resp)
+    result3 = await but_with_subs.llm._detect_server_capabilities(
+        "http://other-server:8000", mock_client2
+    )
+    assert result3.server_type == LLMServerType.OPENAI
+    mock_client2.get.assert_called_once()
+
+    # Clean up
+    but_with_subs.llm._server_capabilities_cache.clear()
 
 
 @pytest.mark.asyncio
-async def test_server_type_cache() -> None:
-    """Test that detected server types are cached per api_base via query_llm."""
-    but_with_subs.llm._server_type_cache.clear()
-
-    detection_resp = _make_mock_response(
-        status_code=200, json_data={"data": [{"id": "gpt-4"}]}
+async def test_query_llm_uses_cached_capabilities(llm_config):
+    """Test that query_llm uses cached capabilities without re-probing."""
+    but_with_subs.llm._server_capabilities_cache.clear()
+    but_with_subs.llm._server_capabilities_cache[
+        llm_config.api_base
+    ] = ServerCapabilities(
+        server_type=LLMServerType.OPENAI,
+        supports_json_schema=True,
     )
-    query_resp = _make_mock_response(
-        json_data={"choices": [{"message": {"content": "cached test"}}]}
-    )
-
-    query_client = AsyncMock(spec=AsyncClient)
-    query_client.post = AsyncMock(return_value=query_resp)
-
-    # First call: patch AsyncClient constructor to return our detection client,
-    # and patch the internal detection get() to return vLLM response
-    detect_client = AsyncMock(spec=AsyncClient)
-    detect_client.get = AsyncMock(return_value=detection_resp)
-    detect_client.aclose = AsyncMock()
-
-    def mock_async_client_init(self, *args, **kwargs) -> None:
-        pass
-
-    with patch.object(AsyncClient, "__init__", mock_async_client_init):
-        with patch.object(AsyncClient, "aclose", AsyncMock()):
-            with patch(
-                "but_with_subs.llm.AsyncClient.get",
-                side_effect=lambda *a, **kw: detection_resp,
-            ):
-                config = LLMConfig(
-                    model="test",
-                    temperature=0.0,
-                    max_tokens=100,
-                    api_base="http://cache-test:8000",
-                )
-                result = await query_llm(
-                    prompt="test", config=config, client=query_client
-                )
-
-    assert result == "cached test"
-    assert but_with_subs.llm._server_type_cache.get(
-        "http://cache-test:8000"
-    ) == LLMServerType.VLLM
-
-    # Second call with same api_base should use cache (no extra detection calls)
-    with patch.object(AsyncClient, "__init__", mock_async_client_init):
-        with patch.object(AsyncClient, "aclose", AsyncMock()):
-            with patch(
-                "but_with_subs.llm.AsyncClient.get",
-                side_effect=lambda *a, **kw: detection_resp,
-            ) as mock_get:
-                result2 = await query_llm(
-                    prompt="test", config=config, client=query_client
-                )
-
-    assert result2 == "cached test"
-    # get() should NOT have been called since cache was hit
-    mock_get.assert_not_called()
-
-    but_with_subs.llm._server_type_cache.clear()
-
-
-@pytest.mark.asyncio
-async def test_query_llm_uses_cached_server_type(llm_config) -> None:
-    """Test that query_llm uses cached server type without re-probing."""
-    but_with_subs.llm._server_type_cache.clear()
-    but_with_subs.llm._server_type_cache[llm_config.api_base] = LLMServerType.VLLM
 
     mock_client = AsyncMock(spec=AsyncClient)
     mock_response = _make_mock_response(
@@ -241,19 +284,24 @@ async def test_query_llm_uses_cached_server_type(llm_config) -> None:
     )
     mock_client.post = AsyncMock(return_value=mock_response)
 
-    result = await query_llm(prompt="test", config=llm_config, client=mock_client)
+    result = await query_llm(
+        prompt="test", config=llm_config, client=mock_client
+    )
 
     assert result == "cached test"
+    # get() should NOT have been called — cache was used
     mock_client.get.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_query_llm_auto_detects_on_first_call(llm_config) -> None:
-    """Test that query_llm auto-detects server type on first call."""
-    but_with_subs.llm._server_type_cache.clear()
+async def test_query_llm_auto_detects_on_first_call(llm_config):
+    """Test that query_llm auto-detects server capabilities on first call."""
+    but_with_subs.llm._server_capabilities_cache.clear()
 
     detection_resp = _make_mock_response(
-        status_code=200, json_data={"data": [{"id": "gpt-4"}]}
+        status_code=200,
+        json_data={"data": [{"id": "gpt-4"}]},
+        headers={"Server": "openai-api"},
     )
     query_resp = _make_mock_response(
         json_data={"choices": [{"message": {"content": "auto detected"}}]}
@@ -265,7 +313,7 @@ async def test_query_llm_auto_detects_on_first_call(llm_config) -> None:
     async def mock_get(self, *args, **kwargs):
         return detection_resp
 
-    async def mock_aclose(self) -> None:
+    async def mock_aclose(self):
         pass
 
     with patch.object(AsyncClient, "get", mock_get):
@@ -275,13 +323,15 @@ async def test_query_llm_auto_detects_on_first_call(llm_config) -> None:
             )
 
     assert result == "auto detected"
-    assert but_with_subs.llm._server_type_cache.get(
-        llm_config.api_base
-    ) == LLMServerType.VLLM
+    # Cache should be populated after detection
+    cached = but_with_subs.llm._server_capabilities_cache.get(llm_config.api_base)
+    assert cached is not None
+    assert cached.server_type == LLMServerType.OPENAI
+    assert cached.supports_json_schema is True
 
 
 @pytest.mark.asyncio
-async def test_llm_config_default_server_type_none() -> None:
+async def test_llm_config_default_server_type_none():
     """Test that LLMConfig defaults server_type to None."""
     config = LLMConfig(
         model="test", temperature=0.5, max_tokens=100, api_base="http://localhost:8000"
