@@ -20,15 +20,8 @@ from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
 class LLMServerType(str, Enum):
     """Detected type of LLM backend server."""
 
-    OPENAI = "openai"
-    VLLM = "vllm"
-    OLLAMA = "ollama"
-    LM_STUDIO = "lm_studio"
-    GROQ = "groq"
-    TOGETHER = "together"
-    MISTRAL = "mistral"
-    GEMINI = "gemini"
     LLAMA_CPP = "llama_cpp"
+    OPENAI_COMPATIBLE = "openai_compatible"
     UNKNOWN = "unknown"
 
 
@@ -37,45 +30,24 @@ class ServerCapabilities:
     """Capabilities of a detected LLM server."""
 
     server_type: LLMServerType
-    supports_json_schema: bool
 
 
 # Cache detected server capabilities per api_base to avoid repeated probing
-_server_capabilities_cache: dict[str, ServerCapabilities] = {}
+_server_capabilities_cache: dict[str, LLMServerType] = {}
 
 
-def _is_known_groq_model(model_id: str) -> bool:
-    """Check if a model ID looks like a known Groq model."""
-    groq_models = {
-        "mixtral",
-        "llama3",
-        "gemma",
-        "llama-3",
-        "llama3-70b",
-        "llama3-8b",
-        "mixtral-8x7b",
-        "gemma-7b",
-        "gemma2-9b",
-    }
-    mid = model_id.lower()
-    return any(gm in mid for gm in groq_models)
-
-
-async def _detect_server_capabilities(
-    api_base: str, client: AsyncClient
-) -> ServerCapabilities:
-    """Detect server type and capabilities by probing endpoints.
+async def _detect_server_type(api_base: str, client: AsyncClient) -> LLMServerType:
+    """Detect server type by probing endpoints.
 
     Step 1: Probe /v1/models (OpenAI-compatible servers).
     Step 2: Probe /models (llama.cpp fallback).
-    Step 3: Determine json_schema support based on server type.
 
     Args:
         api_base: The base URL of the LLM API.
         client: An httpx AsyncClient to use for the request.
 
     Returns:
-        ServerCapabilities with the detected server type and json_schema support.
+        LLMServerType indicating the detected server type.
     """
     # Step 1: Probe /v1/models
     try:
@@ -83,46 +55,8 @@ async def _detect_server_capabilities(
         if resp.status_code == 200:
             data = resp.json()
             if isinstance(data, dict) and "data" in data:
-                # OpenAI-compatible endpoint found. Identify the provider.
-                headers_lower = {k.lower(): v for k, v in resp.headers.items()}
-                server_header = headers_lower.get("server", "").lower()
-                model_ids = []
-                for item in data.get("data", []):
-                    if isinstance(item, dict):
-                        mid = item.get("id", "")
-                        if mid:
-                            model_ids.append(mid)
-                first_model_id = model_ids[0] if model_ids else ""
-
-                # Prioritize HTTP response headers for identification
-                if "openai" in server_header:
-                    server_type = LLMServerType.OPENAI
-                elif "ollama" in server_header:
-                    server_type = LLMServerType.OLLAMA
-                elif "lm-studio" in server_header:
-                    server_type = LLMServerType.LM_STUDIO
-                elif "groq" in server_header:
-                    server_type = LLMServerType.GROQ
-                elif "together" in server_header:
-                    server_type = LLMServerType.TOGETHER
-                elif "mistral" in server_header:
-                    server_type = LLMServerType.MISTRAL
-                elif "vllm" in server_header:
-                    server_type = LLMServerType.VLLM
-                elif "gemini" in server_header or first_model_id.startswith("gemini-"):
-                    server_type = LLMServerType.GEMINI
-                elif _is_known_groq_model(first_model_id):
-                    server_type = LLMServerType.GROQ
-                else:
-                    server_type = LLMServerType.OPENAI
-
-                logger.debug(
-                    "Detected %s server at %s", server_type.value, api_base
-                )
-                return ServerCapabilities(
-                    server_type=server_type,
-                    supports_json_schema=_json_schema_supported(server_type),
-                )
+                logger.debug("Detected OpenAI-compatible server at %s", api_base)
+                return LLMServerType.OPENAI_COMPATIBLE
     except Exception:
         pass
 
@@ -133,35 +67,14 @@ async def _detect_server_capabilities(
             data = resp.json()
             if isinstance(data, dict) and "models" in data:
                 logger.debug("Detected llama.cpp server at %s", api_base)
-                return ServerCapabilities(
-                    server_type=LLMServerType.LLAMA_CPP,
-                    supports_json_schema=True,
-                )
+                return LLMServerType.LLAMA_CPP
     except Exception:
         pass
 
     logger.warning(
         "Could not detect LLM server type at %s, defaulting to UNKNOWN", api_base
     )
-    return ServerCapabilities(
-        server_type=LLMServerType.UNKNOWN,
-        supports_json_schema=False,
-    )
-
-
-def _json_schema_supported(server_type: LLMServerType) -> bool:
-    """Return whether a server type supports json_schema response_format."""
-    supported = {
-        LLMServerType.OPENAI,
-        LLMServerType.VLLM,
-        LLMServerType.LM_STUDIO,
-        LLMServerType.GROQ,
-        LLMServerType.TOGETHER,
-        LLMServerType.MISTRAL,
-        LLMServerType.GEMINI,
-        LLMServerType.LLAMA_CPP,
-    }
-    return server_type in supported
+    return LLMServerType.UNKNOWN
 
 
 class LLMConfig(BaseModel):
@@ -251,39 +164,26 @@ async def query_llm[ResponseModel: BaseModel](
     try:
         start_time = time.monotonic()
 
-        # Auto-detect server capabilities if not already known
+        # Auto-detect server type if not already known
         if config.server_type is None:
             cached = _server_capabilities_cache.get(config.api_base)
             if cached is not None:
-                caps = cached
+                server_type = cached
             else:
                 detect_client = AsyncClient()
                 try:
-                    caps = await _detect_server_capabilities(
-                        config.api_base, detect_client
-                    )
-                    _server_capabilities_cache[config.api_base] = caps
+                    server_type = await _detect_server_type(config.api_base, detect_client)
+                    _server_capabilities_cache[config.api_base] = server_type
                 finally:
                     await detect_client.aclose()
         else:
-            caps = ServerCapabilities(
-                server_type=config.server_type,
-                supports_json_schema=True,  # Assume true if user set it manually
-            )
+            server_type = config.server_type
 
         logger.info(
             "Using LLM server: %s at %s",
-            caps.server_type.value,
+            server_type.value,
             config.api_base,
         )
-
-        # Warn if structured output may not work
-        if not caps.supports_json_schema and config.response_model is not None:
-            logger.warning(
-                "Server %s (%s) may not support json_schema response_format. "
-                "Structured output may not work as expected.",
-                config.api_base, caps.server_type.value,
-            )
 
         response: Response = await client.post(
             url=url, json=payload, headers=headers, timeout=600
