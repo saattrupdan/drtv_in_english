@@ -140,38 +140,46 @@ async def test_detect_llama_cpp_on_vllm_exception():
 
 @pytest.mark.asyncio
 async def test_server_type_cache():
-    """Test that detected server types are cached per api_base."""
+    """Test that detected server types are cached via query_llm."""
     but_with_subs.llm._server_capabilities_cache.clear()
 
-    mock_resp = _make_mock_response(
+    detection_resp = _make_mock_response(
         status_code=200, json_data={"data": [{"id": "gpt-4"}]}
     )
-
-    mock_client = AsyncMock(spec=AsyncClient)
-    mock_client.get = AsyncMock(return_value=mock_resp)
-
-    # First call should probe
-    result1 = await but_with_subs.llm._detect_server_type(
-        "http://cache-test:8000", mock_client
+    query_resp = _make_mock_response(
+        json_data={"choices": [{"message": {"content": "cached test"}}]}
     )
-    assert result1 == LLMServerType.OPENAI_COMPATIBLE
-    call_count_after_first = mock_client.get.call_count
 
-    # Second call with same api_base should use cache
-    result2 = await but_with_subs.llm._detect_server_type(
-        "http://cache-test:8000", mock_client
-    )
-    assert result2 == LLMServerType.OPENAI_COMPATIBLE
-    assert mock_client.get.call_count == call_count_after_first
+    query_client = AsyncMock(spec=AsyncClient)
+    query_client.post = AsyncMock(return_value=query_resp)
 
-    # Different api_base should probe again
-    mock_client2 = AsyncMock(spec=AsyncClient)
-    mock_client2.get = AsyncMock(return_value=mock_resp)
-    result3 = await but_with_subs.llm._detect_server_type(
-        "http://other-server:8000", mock_client2
-    )
-    assert result3 == LLMServerType.OPENAI_COMPATIBLE
-    mock_client2.get.assert_called_once()
+    detect_client = AsyncMock(spec=AsyncClient)
+    detect_client.get = AsyncMock(return_value=detection_resp)
+    detect_client.aclose = AsyncMock()
+
+    with patch.object(AsyncClient, "__init__", lambda self, *a, **kw: None):
+        with patch.object(AsyncClient, "aclose", AsyncMock()):
+            with patch("but_with_subs.llm.AsyncClient.get", side_effect=lambda *a, **kw: detection_resp):
+                config = LLMConfig(
+                    model="test", temperature=0.0, max_tokens=100,
+                    api_base="http://cache-test:8000"
+                )
+                result = await query_llm(prompt="test", config=config, client=query_client)
+
+    assert result == "cached test"
+    assert but_with_subs.llm._server_capabilities_cache.get(
+        "http://cache-test:8000"
+    ) == LLMServerType.OPENAI_COMPATIBLE
+
+    # Second call with same api_base should use cache (no detection probing)
+    with patch.object(AsyncClient, "__init__", lambda self, *a, **kw: None):
+        with patch.object(AsyncClient, "aclose", AsyncMock()):
+            with patch("but_with_subs.llm.AsyncClient.get") as mock_get:
+                result2 = await query_llm(prompt="test", config=config, client=query_client)
+
+    assert result2 == "cached test"
+    # get() should NOT have been called since cache was hit
+    mock_get.assert_not_called()
 
     but_with_subs.llm._server_capabilities_cache.clear()
 
