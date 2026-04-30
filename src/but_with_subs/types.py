@@ -69,7 +69,7 @@ class JsonSchema(t.TypedDict):
     """
 
     name: str
-    schema: str
+    schema: dict[str, t.Any]
 
 
 class ResponseFormat(t.TypedDict):

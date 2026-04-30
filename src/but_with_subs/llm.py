@@ -6,8 +6,8 @@ as Pydantic BaseModels.
 """
 
 import time
-from enum import Enum
 import typing as t
+from enum import Enum
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
@@ -18,6 +18,7 @@ from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
 
 class LLMServerType(str, Enum):
     """Detected type of LLM backend server."""
+
     VLLM = "vllm"
     LLAMA_CPP = "llama_cpp"
     UNKNOWN = "unknown"
@@ -184,12 +185,10 @@ async def query_llm[ResponseModel: BaseModel](
         )
 
         if response.is_error:
-            (time.monotonic() - start_time) * 1000
             logger.error(f"LLM API error {response.status_code}: {response.text}")
             response.raise_for_status()
 
         response_data: ChatCompletionResponse = response.json()
-        (time.monotonic() - start_time) * 1000
 
         # Log raw response for diagnosing null content issues
         logger.debug("Raw LLM response: %s", response_data)
@@ -227,10 +226,10 @@ async def query_llm[ResponseModel: BaseModel](
 
             return parsed
         except ValidationError as exc:
-            (time.monotonic() - start_time) * 1000
+            elapsed_ms = (time.monotonic() - start_time) * 1000
             logger.error(
-                f"Failed to parse LLM response with {config.response_model.__name__}: "
-                f"{exc}"
+                f"Failed to parse LLM response with {config.response_model.__name__} "
+                f"(took {elapsed_ms:.0f}ms): {exc}"
             )
             raise ValueError(
                 f"Failed to parse LLM response with {config.response_model.__name__}"
