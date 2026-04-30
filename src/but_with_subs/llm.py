@@ -6,6 +6,7 @@ as Pydantic BaseModels.
 """
 
 import time
+from enum import Enum
 import typing as t
 
 from httpx import AsyncClient, Response
@@ -13,6 +14,17 @@ from pydantic import BaseModel, ValidationError
 
 from .logging_config import logger
 from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
+
+
+class LLMServerType(str, Enum):
+    """Detected type of LLM backend server."""
+    VLLM = "vllm"
+    LLAMA_CPP = "llama_cpp"
+    UNKNOWN = "unknown"
+
+
+# Cache detected server types per api_base to avoid repeated probing
+_server_type_cache: dict[str, LLMServerType] = {}
 
 
 class LLMConfig(BaseModel):
@@ -29,6 +41,9 @@ class LLMConfig(BaseModel):
             The base URL of the LLM API. Required.
         api_key:
             The API key to use for the LLM API. Not required for local LLMs.
+        server_type:
+            The detected type of LLM backend server. Auto-detected on first
+            query if not explicitly set. Not required for operation.
         response_model:
             A Pydantic BaseModel subclass that will be used to parse the response. Can
             be None if no structured generation is used.
@@ -39,7 +54,49 @@ class LLMConfig(BaseModel):
     max_tokens: int
     api_base: str
     api_key: str | None = None
+    server_type: LLMServerType | None = None
     response_model: type[BaseModel] | None = None
+
+
+async def _detect_server_type(api_base: str, client: AsyncClient) -> LLMServerType:
+    """Detect whether the LLM backend is vLLM or llama.cpp by probing endpoints.
+
+    vLLM exposes /v1/models with an OpenAI-style response containing a "data" key.
+    llama.cpp exposes /models with a simpler response containing a "models" key.
+
+    Args:
+        api_base: The base URL of the LLM API.
+        client: An httpx AsyncClient to use for the request.
+
+    Returns:
+        LLMServerType indicating the detected backend, or UNKNOWN if neither matches.
+    """
+    # Try vLLM endpoint first
+    try:
+        resp = await client.get(f"{api_base}/v1/models", timeout=5.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and "data" in data:
+                logger.debug("Detected vLLM server at %s", api_base)
+                return LLMServerType.VLLM
+    except Exception:
+        pass
+
+    # Fall back to llama.cpp endpoint
+    try:
+        resp = await client.get(f"{api_base}/models", timeout=5.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and "models" in data:
+                logger.debug("Detected llama.cpp server at %s", api_base)
+                return LLMServerType.LLAMA_CPP
+    except Exception:
+        pass
+
+    logger.warning(
+        "Could not detect LLM server type at %s, defaulting to UNKNOWN", api_base
+    )
+    return LLMServerType.UNKNOWN
 
 
 async def query_llm[ResponseModel: BaseModel](
@@ -97,6 +154,30 @@ async def query_llm[ResponseModel: BaseModel](
 
     try:
         start_time = time.monotonic()
+
+        # Auto-detect server type if not already known
+        if config.server_type is None:
+            cached = _server_type_cache.get(config.api_base)
+            if cached is not None:
+                effective_server_type = cached
+            else:
+                # Create a temporary client for detection
+                detect_client = AsyncClient()
+                try:
+                    effective_server_type = await _detect_server_type(
+                        config.api_base, detect_client
+                    )
+                    _server_type_cache[config.api_base] = effective_server_type
+                finally:
+                    await detect_client.aclose()
+        else:
+            effective_server_type = config.server_type
+
+        logger.info(
+            "Using LLM server type: %s for %s",
+            effective_server_type.value,
+            config.api_base,
+        )
 
         response: Response = await client.post(
             url=url, json=payload, headers=headers, timeout=600
