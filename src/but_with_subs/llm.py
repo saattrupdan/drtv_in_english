@@ -213,7 +213,7 @@ async def query_llm[ResponseModel: BaseModel](
 
 async def query_llm_batch(
     items: list[QueryLLMBatchItem],
-    batch_size: int = 10,
+    progress_callback: t.Callable[[int, t.Any], None] | None = None,
     client: AsyncClient | None = None,
     desc: str | None = None,
 ) -> list[t.Any]:
@@ -224,9 +224,13 @@ async def query_llm_batch(
 
     Args:
         items:
-            A list of (prompt, config) tuples to send to the LLM.
-        batch_size:
-            Number of items to process concurrently per batch.
+            A list of QueryLLMBatchItem objects to send to the LLM.
+        progress_callback (optional):
+            A callable ``callback(index, result)`` that is invoked each time
+            a task completes.  ``index`` is the position of the item in the
+            original ``items`` list and ``result`` is the response for that
+            item.  Useful for custom progress tracking outside of the built-in
+            ``tqdm`` bar.
         client (optional):
             An optional httpx AsyncClient to share across requests. If not provided,
             a new client will be created for each request.
@@ -237,20 +241,26 @@ async def query_llm_batch(
         A list of responses in the same order as the input items.
     """
 
-    async def _run(item: QueryLLMBatchItem) -> t.Any:
-        return await query_llm(prompt=item.prompt, config=item.config, client=client)
-
     results: list[t.Any] = [None] * len(items)
-    total_batches = (len(items) + batch_size - 1) // batch_size
 
-    with tqdm(total=len(items), desc=desc, disable=len(items) == 0) as pbar:
-        for batch_idx in range(total_batches):
-            start = batch_idx * batch_size
-            end = min(start + batch_size, len(items))
-            batch = items[start:end]
-            coroutines = [_run(item) for item in batch]
-            batch_results = await asyncio.gather(*coroutines)
-            results[start:end] = batch_results
-            pbar.update(end - start)
+    async def _task(idx: int, item: QueryLLMBatchItem) -> tuple[int, t.Any]:
+        result = await query_llm(prompt=item.prompt, config=item.config, client=client)
+        if progress_callback is not None:
+            progress_callback(idx, result)
+        return (idx, result)
+
+    if not items:
+        return []
+
+    tasks = [_task(i, items[i]) for i in range(len(items))]
+    ordered_results = await asyncio.gather(*tasks)
+
+    for idx, result in ordered_results:
+        results[idx] = result
+
+    with tqdm(total=len(items), desc=desc) as pbar:
+        for _ in results:
+            pbar.update(1)
+        pbar.close()
 
     return results
