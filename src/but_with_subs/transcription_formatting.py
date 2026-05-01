@@ -4,14 +4,13 @@ This module uses an LLM to format raw word-level transcriptions into
 properly punctuated, properly casemapped subtitle segments.
 """
 
-import asyncio
 import logging
 from textwrap import dedent
 
 from pydantic import BaseModel
 from tqdm.auto import tqdm
 
-from .llm import LLMConfig, query_llm
+from .llm import LLMConfig, QueryLLMBatchItem, query_llm_batch
 from .transcribing import Transcription
 
 logger = logging.getLogger(__package__)
@@ -128,58 +127,36 @@ async def format_transcriptions(
             position_to_transcription[position_index] = transcription
             position_index += 1
 
-    # Split into batches
+    # Split into batches and build prompts
     batches: list[list[list[Transcription]]] = [
         chunk_transcriptions[i : i + 4] for i in range(0, len(chunk_transcriptions), 4)
     ]
 
-    tasks = [
-        asyncio.create_task(_process_batch(batch=batch, batch_idx=batch_idx, llm_config=llm_config))
-        for batch_idx, batch in enumerate(tqdm(batches, desc="Processing transcription batches"))
+    config = llm_config.model_copy(update={"response_model": TranscribedSegmentsResponse})
+    items = [
+        QueryLLMBatchItem(prompt=_build_prompt(batch), config=config)
+        for batch in tqdm(batches, desc="Processing transcription batches")
     ]
-    results = await asyncio.gather(*tasks)
+
+    results = await query_llm_batch(items)
+
     all_segments: list[Transcription] = []
-    for segments in results:
-        all_segments.extend(segments)
+    for batch_idx, response in enumerate(results):
+        if isinstance(response, str):
+            logger.warning("LLM returned raw string instead of structured data")
+            continue
+
+        if response is None:
+            logger.warning(
+                "LLM returned None for batch %d, skipping. "
+                "response_model=%s, prompt_len=%d. "
+                "Check LLM provider and prompt context.",
+                batch_idx,
+                TranscribedSegmentsResponse.__name__,
+                len(items[batch_idx].prompt),
+            )
+            continue
+
+        all_segments.extend(response.segments)
 
     return all_segments
-
-
-async def _process_batch(
-    batch: list[list[Transcription]], batch_idx: int, llm_config: LLMConfig
-) -> list[Transcription]:
-    """Process a single batch of chunks through the LLM.
-
-    Args:
-        batch:
-            A list of 4 or fewer chunk transcription lists.
-        batch_idx:
-            Zero-based index of the batch within the full set of batches.
-        llm_config:
-            Configuration for the LLM API call.
-
-    Returns:
-        A list of formatted segments from the LLM response.
-    """
-    prompt = _build_prompt(batch)
-    config = llm_config.model_copy(
-        update={"response_model": TranscribedSegmentsResponse}
-    )
-    response = await query_llm(prompt=prompt, config=config)
-
-    if isinstance(response, str):
-        logger.warning("LLM returned raw string instead of structured data")
-        return []
-
-    if response is None:
-        logger.warning(
-            "LLM returned None for batch %d, skipping. "
-            "response_model=%s, prompt_len=%d. "
-            "Check LLM provider and prompt context.",
-            batch_idx,
-            TranscribedSegmentsResponse.__name__,
-            len(prompt),
-        )
-        return []
-
-    return response.segments

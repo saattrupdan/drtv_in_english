@@ -5,10 +5,12 @@ compatibility with OpenAI-compatible APIs. It supports arbitrary response models
 as Pydantic BaseModels.
 """
 
+import asyncio
 import time
 import typing as t
 from dataclasses import dataclass
 from enum import Enum
+from typing import NamedTuple
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
@@ -260,3 +262,43 @@ async def query_llm[ResponseModel: BaseModel](
     finally:
         if close_after:
             await client.aclose()
+
+
+class QueryLLMBatchItem(NamedTuple):
+    """A single item in a batch LLM query.
+
+    Attributes:
+        prompt:
+            The prompt text to send to the LLM.
+        config:
+            Configuration for the LLM API call.
+    """
+
+    prompt: str
+    config: LLMConfig
+
+
+async def query_llm_batch(
+    items: list[QueryLLMBatchItem],
+    client: AsyncClient | None = None,
+) -> list[t.Any]:
+    """Query an LLM API with multiple prompts concurrently.
+
+    Sends all prompts to the LLM API in parallel and returns results
+    in the same order as the input list.
+
+    Args:
+        items:
+            A list of (prompt, config) tuples to send to the LLM.
+        client (optional):
+            An optional httpx AsyncClient to share across requests. If not provided,
+            a new client will be created for each request.
+
+    Returns:
+        A list of responses in the same order as the input items.
+    """
+
+    async def _run(item: QueryLLMBatchItem) -> t.Any:
+        return await query_llm(prompt=item.prompt, config=item.config, client=client)
+
+    return await asyncio.gather(*[_run(item) for item in items])
