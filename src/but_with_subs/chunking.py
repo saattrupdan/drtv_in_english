@@ -11,30 +11,12 @@ import numpy as np
 import scipy.io.wavfile
 import scipy.signal
 import torch
-from pydantic import BaseModel
 from silero_vad import get_speech_timestamps, load_silero_vad
 from tqdm.auto import tqdm
 
+from .data_models import Chunk
+
 logger = logging.getLogger(__package__)
-
-
-class Chunk(BaseModel):
-    """A chunk of audio data.
-
-    Attributes:
-        start_time:
-            Start time of the chunk in seconds.
-        end_time:
-            End time of the chunk in seconds.
-        audio:
-            Numpy array containing the audio data for the chunk.
-    """
-
-    model_config = {"arbitrary_types_allowed": True}
-
-    start_time: float
-    end_time: float
-    audio: np.ndarray
 
 
 def chunk_audio(audio_path: pl.Path) -> list[Chunk]:
@@ -109,7 +91,6 @@ def _resample_to_16k_mono(audio: np.ndarray, original_sr: int) -> np.ndarray:
         logger.info(f"Resampling audio from {original_sr:,} Hz to 16,000 Hz...")
         n_samples = int(audio.size * target_sr / original_sr)
         mono_audio = scipy.signal.resample(x=audio, num=n_samples)
-    logger.info(f"Resampled audio from {original_sr:,} Hz to {target_sr:,} Hz")
     return mono_audio
 
 

@@ -6,26 +6,16 @@ as Pydantic BaseModels.
 """
 
 import asyncio
-import time
 import typing as t
 from dataclasses import dataclass
-from enum import Enum
-from typing import NamedTuple
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
 from tqdm.auto import tqdm
 
+from .data_models import LLMServerType, LLMConfig, QueryLLMBatchItem
 from .logging_config import logger
 from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
-
-
-class LLMServerType(str, Enum):
-    """Detected type of LLM backend server."""
-
-    LLAMA_CPP = "llama_cpp"
-    OPENAI_COMPATIBLE = "openai_compatible"
-    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -82,37 +72,6 @@ async def _detect_server_type(
     return LLMServerType.UNKNOWN
 
 
-class LLMConfig(BaseModel):
-    """Configuration for an LLM API call.
-
-    Attributes:
-        model:
-            The name of the LLM model to use.
-        temperature:
-            The temperature to use for the LLM API. Required.
-        max_tokens:
-            The maximum number of tokens to generate.
-        api_base:
-            The base URL of the LLM API. Required.
-        api_key:
-            The API key to use for the LLM API. Not required for local LLMs.
-        server_type:
-            The type of LLM backend server. Auto-detected on first query
-            if not explicitly set. Can be manually set to override autodetection.
-        response_model:
-            A Pydantic BaseModel subclass that will be used to parse the response. Can
-            be None if no structured generation is used.
-    """
-
-    model: str
-    temperature: float
-    max_tokens: int
-    api_base: str
-    api_key: str | None = None
-    server_type: LLMServerType | None = None
-    response_model: type[BaseModel] | None = None
-
-
 async def query_llm[ResponseModel: BaseModel](
     prompt: str, config: LLMConfig, client: AsyncClient | None = None
 ) -> ResponseModel | str | None:
@@ -167,8 +126,6 @@ async def query_llm[ResponseModel: BaseModel](
         close_after = True
 
     try:
-        start_time = time.monotonic()
-
         # Auto-detect server type if not already known
         if config.server_type is None:
             cached = _server_capabilities_cache.get(config.api_base)
@@ -252,10 +209,8 @@ async def query_llm[ResponseModel: BaseModel](
 
             return parsed
         except ValidationError as exc:
-            elapsed_ms = (time.monotonic() - start_time) * 1000
             logger.error(
-                f"Failed to parse LLM response with {config.response_model.__name__} "
-                f"(took {elapsed_ms:.0f}ms): {exc}"
+                f"Failed to parse LLM response with {config.response_model.__name__}: {exc}"
             )
             raise ValueError(
                 f"Failed to parse LLM response with {config.response_model.__name__}"
@@ -263,20 +218,6 @@ async def query_llm[ResponseModel: BaseModel](
     finally:
         if close_after:
             await client.aclose()
-
-
-class QueryLLMBatchItem(NamedTuple):
-    """A single item in a batch LLM query.
-
-    Attributes:
-        prompt:
-            The prompt text to send to the LLM.
-        config:
-            Configuration for the LLM API call.
-    """
-
-    prompt: str
-    config: LLMConfig
 
 
 async def query_llm_batch(
