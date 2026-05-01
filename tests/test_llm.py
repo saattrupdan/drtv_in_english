@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 from pydantic import BaseModel
 
 import but_with_subs.llm
@@ -17,7 +17,7 @@ def _make_mock_response(
     text: str = "",
     headers: dict | None = None,
 ) -> AsyncMock:
-    mock_response = AsyncMock(spec=AsyncClient)
+    mock_response = AsyncMock(spec=Response)
     mock_response.status_code = status_code
     mock_response.is_error = status_code >= 400
     mock_response.json.return_value = json_data if json_data is not None else {}
