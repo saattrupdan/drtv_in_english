@@ -110,7 +110,7 @@ def main(
     llm_config = LLMConfig(
         model=llm_model,
         temperature=0.0,
-        max_tokens=1000,
+        max_tokens=32_768,
         api_base=llm_api_base,
         api_key=llm_api_key,
     )
