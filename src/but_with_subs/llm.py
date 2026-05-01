@@ -97,6 +97,7 @@ async def query_llm[ResponseModel: BaseModel](
         "messages": [message],
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,
+        "thinking_token_budget": 512,
     }
     if config.response_model is not None:
         payload["response_format"] = {
@@ -214,6 +215,7 @@ async def query_llm_batch(
     items: list[QueryLLMBatchItem],
     client: AsyncClient | None = None,
     desc: str | None = None,
+    batch_size: int = 10,
 ) -> list[t.Any]:
     """Query an LLM API with multiple prompts concurrently.
 
@@ -228,17 +230,27 @@ async def query_llm_batch(
             a new client will be created for each request.
         desc (optional):
             Description string for the progress bar.
+        batch_size (optional):
+            Number of items to process concurrently per batch. Defaults to 10.
 
     Returns:
         A list of responses in the same order as the input items.
     """
 
-    async def _run(item: QueryLLMBatchItem) -> t.Any:  # noqa: ANN401
+    async def _run(item: QueryLLMBatchItem) -> t.Any:
         return await query_llm(prompt=item.prompt, config=item.config, client=client)
 
-    coroutines = [_run(item) for item in items]
+    results: list[t.Any] = [None] * len(items)
+    total_batches = (len(items) + batch_size - 1) // batch_size
+
     with tqdm(total=len(items), desc=desc, disable=len(items) == 0) as pbar:
-        results = await asyncio.gather(*coroutines)
-        pbar.update(len(items))
+        for batch_idx in range(total_batches):
+            start = batch_idx * batch_size
+            end = min(start + batch_size, len(items))
+            batch = items[start:end]
+            coroutines = [_run(item) for item in batch]
+            batch_results = await asyncio.gather(*coroutines)
+            results[start:end] = batch_results
+            pbar.update(end - start)
 
     return results
