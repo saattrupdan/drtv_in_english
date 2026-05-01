@@ -39,37 +39,31 @@ _server_capabilities_cache: dict[str, LLMServerType] = {}
 async def _detect_server_type(api_base: str, client: AsyncClient) -> LLMServerType:
     """Detect server type by probing endpoints.
 
-    Step 1: Probe /v1/models (OpenAI-compatible servers).
-    Step 2: Probe /models (llama.cpp fallback).
-
     Args:
-        api_base: The base URL of the LLM API.
-        client: An httpx AsyncClient to use for the request.
+        api_base:
+            The base URL of the LLM API.
+        client:
+            An httpx AsyncClient to use for the request.
 
     Returns:
         LLMServerType indicating the detected server type.
     """
-    # Step 1: Probe /v1/models
-    try:
-        resp = await client.get(f"{api_base}/v1/models", timeout=5.0)
-        if resp.status_code == 200:
-            data = resp.json()
-            if isinstance(data, dict) and "data" in data:
-                logger.debug("Detected OpenAI-compatible server at %s", api_base)
-                return LLMServerType.OPENAI_COMPATIBLE
-    except Exception:
-        pass
-
-    # Step 2: Fall back to llama.cpp endpoint
-    try:
-        resp = await client.get(f"{api_base}/models", timeout=5.0)
-        if resp.status_code == 200:
-            data = resp.json()
-            if isinstance(data, dict) and "models" in data:
-                logger.debug("Detected llama.cpp server at %s", api_base)
+    resp = await client.get(f"{api_base}/models", timeout=5.0)
+    if resp.status_code == 200:
+        payload = resp.json()
+        if (
+            isinstance(payload, dict)
+            and "data" in payload
+            and isinstance(payload["data"], list)
+            and len(payload["data"]) > 0
+            and "owned_by" in payload["data"][0]
+        ):
+            if payload["data"][0]["owned_by"] == "llamacpp":
+                logger.info("Detected Llama.cpp server at %s", api_base)
                 return LLMServerType.LLAMA_CPP
-    except Exception:
-        pass
+            else:
+                logger.info("Detected OpenAI-compatible server at %s", api_base)
+                return LLMServerType.OPENAI_COMPATIBLE
 
     logger.warning(
         "Could not detect LLM server type at %s, defaulting to UNKNOWN", api_base
@@ -172,18 +166,35 @@ async def query_llm[ResponseModel: BaseModel](
             else:
                 detect_client = AsyncClient()
                 try:
-                    server_type = await _detect_server_type(config.api_base, detect_client)
+                    server_type = await _detect_server_type(
+                        config.api_base, detect_client
+                    )
                     _server_capabilities_cache[config.api_base] = server_type
                 finally:
                     await detect_client.aclose()
         else:
             server_type = config.server_type
 
-        logger.info(
-            "Using LLM server: %s at %s",
-            server_type.value,
-            config.api_base,
-        )
+        if config.response_model is not None:
+            match server_type:
+                case LLMServerType.LLAMA_CPP:
+                    payload["response_format"] = {
+                        "type": "json_schema",
+                        "schema": config.response_model.model_json_schema(),
+                    }
+                case LLMServerType.OPENAI_COMPATIBLE:
+                    payload["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": config.response_model.__name__,
+                            "schema": config.response_model.model_json_schema(),
+                        },
+                    }
+                case LLMServerType.UNKNOWN:
+                    raise ValueError(
+                        "Using `response_format` is not supported when the LLM server "
+                        "type is unknown."
+                    )
 
         response: Response = await client.post(
             url=url, json=payload, headers=headers, timeout=600
@@ -194,9 +205,6 @@ async def query_llm[ResponseModel: BaseModel](
             response.raise_for_status()
 
         response_data: ChatCompletionResponse = response.json()
-
-        # Log raw response for diagnosing null content issues
-        logger.debug("Raw LLM response: %s", response_data)
 
         # Defensive extraction of content with full structure logging on failure
         choices = response_data.get("choices")

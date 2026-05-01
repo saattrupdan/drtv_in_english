@@ -72,8 +72,10 @@ class JsonSchema(t.TypedDict):
     schema: dict[str, t.Any]
 
 
-class ResponseFormat(t.TypedDict):
+class OpenAICompatibleResponseFormat(t.TypedDict):
     """The format in which the LLM should respond.
+
+    This is specific to models that are compatible with OpenAI's API.
 
     Attributes:
         type:
@@ -84,6 +86,22 @@ class ResponseFormat(t.TypedDict):
 
     type: str
     json_schema: JsonSchema
+
+
+class LlamacppResponseFormat(t.TypedDict):
+    """The format in which the LLM should respond.
+
+    This is specific to models that are compatible with Llama.cpp.
+
+    Attributes:
+        type:
+            The type of response format (e.g. "json").
+        schema:
+            The schema for the response format.
+    """
+
+    type: str
+    schema: dict[str, t.Any]
 
 
 class ChatCompletionRequest(t.TypedDict):
@@ -106,4 +124,6 @@ class ChatCompletionRequest(t.TypedDict):
     messages: list[InputMessage]
     temperature: float
     max_tokens: int
-    response_format: t.NotRequired[ResponseFormat]
+    response_format: t.NotRequired[
+        OpenAICompatibleResponseFormat | LlamacppResponseFormat
+    ]
