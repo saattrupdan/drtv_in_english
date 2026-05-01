@@ -247,13 +247,12 @@ async def query_llm_batch(
             progress_callback(idx, result)
         return (idx, result)
 
-    tasks = [_task(i, items[i]) for i in range(len(items))]
-    ordered_results = await asyncio.gather(*tasks)
+    tasks = [asyncio.create_task(_task(i, items[i])) for i in range(len(items))]
 
     with tqdm(total=len(items), desc=desc) as pbar:
-        for idx, result in ordered_results:
+        for completed_task in asyncio.as_completed(tasks):
+            idx, result = await completed_task
             results[idx] = result
             pbar.update(1)
-        pbar.close()
 
     return results
