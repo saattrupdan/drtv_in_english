@@ -14,7 +14,6 @@ from pathlib import Path
 
 import bits_and_bobs as bnb
 import click
-from but_with_subs.transcription_formatting import process_transcriptions
 from tqdm.auto import tqdm
 from transformers import pipeline
 
@@ -23,6 +22,7 @@ from but_with_subs.data_models import LLMConfig, Transcription
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.transcribing import transcribe
+from but_with_subs.transcription_processing import process_transcriptions
 
 logger = logging.getLogger(__package__)
 
