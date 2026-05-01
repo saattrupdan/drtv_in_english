@@ -35,5 +35,6 @@ def main(audio_path: str) -> None:
 
     logger.info(f"Total chunks: {len(chunks)}")
 
+
 if __name__ == "__main__":
     main()

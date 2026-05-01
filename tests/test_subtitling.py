@@ -9,13 +9,13 @@ yielding, and error handling.
 import pathlib as pl
 import tempfile as tf
 
+from but_with_subs.data_models import Transcription
 from but_with_subs.subtitling import (
     _escape_vtt_text,
     _format_vtt_timestamp,
     _group_transcriptions,
     generate_subtitles,
 )
-from but_with_subs.data_models import Transcription
 
 # ---------------------------------------------------------------------------
 # Helpers

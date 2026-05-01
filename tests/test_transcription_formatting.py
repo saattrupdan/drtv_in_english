@@ -5,10 +5,13 @@ functions, covering prompt generation, empty text handling, and various LLM
 response types.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, patch
 
-from but_with_subs.data_models import LLMConfig, Transcription, TranscribedSegmentsResponse
+from but_with_subs.data_models import (
+    LLMConfig,
+    TranscribedSegmentsResponse,
+    Transcription,
+)
 from but_with_subs.transcription_formatting import _build_prompt, format_transcriptions
 
 # ---------------------------------------------------------------------------
@@ -127,18 +130,20 @@ def test_build_prompt_includes_schema() -> None:
 # ---------------------------------------------------------------------------
 
 
-@patch("but_with_subs.llm.query_llm", new_callable=AsyncMock)
+@patch("but_with_subs.transcription_formatting.query_llm_batch", new_callable=AsyncMock)
 async def test_format_transcriptions_with_mocked_llm(mock_query_llm: AsyncMock) -> None:
     """Test that format_transcriptions returns formatted transcription segments.
 
-    Verifies that when ``query_llm`` returns a structured
+    Verifies that when ``query_llm_batch`` returns a structured
     ``TranscribedSegmentsResponse``, ``format_transcriptions`` returns a list
     of ``Transcription`` objects.
     """
     llm_config = _make_llm_config()
-    mock_query_llm.return_value = TranscribedSegmentsResponse(segments=[])
+    mock_query_llm.return_value = [TranscribedSegmentsResponse(segments=[])]
 
-    chunk_transcriptions: list[list[Transcription]] = [[_make_transcription(text="hello")]]
+    chunk_transcriptions: list[list[Transcription]] = [
+        [_make_transcription(text="hello")]
+    ]
     result = await format_transcriptions(
         chunk_transcriptions=chunk_transcriptions, llm_config=llm_config
     )
@@ -146,19 +151,19 @@ async def test_format_transcriptions_with_mocked_llm(mock_query_llm: AsyncMock) 
     assert isinstance(result, list)
 
 
-@patch("but_with_subs.llm.query_llm", new_callable=AsyncMock)
-async def test_format_transcriptions_with_raw_string(
-    mock_query_llm: AsyncMock,
-) -> None:
+@patch("but_with_subs.transcription_formatting.query_llm_batch", new_callable=AsyncMock)
+async def test_format_transcriptions_with_raw_string(mock_query_llm: AsyncMock) -> None:
     """Test that format_transcriptions skips raw string responses.
 
-    If ``query_llm`` returns a plain string instead of structured data,
+    If ``query_llm_batch`` returns a plain string instead of structured data,
     ``format_transcriptions`` should log a warning and skip the batch.
     """
     llm_config = _make_llm_config()
-    mock_query_llm.return_value = "raw unrecognized response"
+    mock_query_llm.return_value = ["raw unrecognized response"]
 
-    chunk_transcriptions: list[list[Transcription]] = [[_make_transcription(text="hello")]]
+    chunk_transcriptions: list[list[Transcription]] = [
+        [_make_transcription(text="hello")]
+    ]
     result = await format_transcriptions(
         chunk_transcriptions=chunk_transcriptions, llm_config=llm_config
     )
@@ -166,19 +171,21 @@ async def test_format_transcriptions_with_raw_string(
     assert result == []
 
 
-@patch("but_with_subs.llm.query_llm", new_callable=AsyncMock)
+@patch("but_with_subs.transcription_formatting.query_llm_batch", new_callable=AsyncMock)
 async def test_format_transcriptions_with_none_response(
     mock_query_llm: AsyncMock,
 ) -> None:
     """Test that format_transcriptions skips None responses.
 
-    If ``query_llm`` returns None, ``format_transcriptions`` should log a
+    If ``query_llm_batch`` returns None, ``format_transcriptions`` should log a
     warning and skip the batch.
     """
     llm_config = _make_llm_config()
-    mock_query_llm.return_value = None
+    mock_query_llm.return_value = [None]
 
-    chunk_transcriptions: list[list[Transcription]] = [[_make_transcription(text="hello")]]
+    chunk_transcriptions: list[list[Transcription]] = [
+        [_make_transcription(text="hello")]
+    ]
     result = await format_transcriptions(
         chunk_transcriptions=chunk_transcriptions, llm_config=llm_config
     )
@@ -186,7 +193,7 @@ async def test_format_transcriptions_with_none_response(
     assert result == []
 
 
-@patch("but_with_subs.llm.query_llm", new_callable=AsyncMock)
+@patch("but_with_subs.transcription_formatting.query_llm_batch", new_callable=AsyncMock)
 async def test_format_transcriptions_returns_segments(
     mock_query_llm: AsyncMock,
 ) -> None:
@@ -197,11 +204,13 @@ async def test_format_transcriptions_returns_segments(
     """
     llm_config = _make_llm_config()
     expected_segment = _make_transcription(text="Hello, world!")
-    mock_query_llm.return_value = TranscribedSegmentsResponse(
-        segments=[expected_segment]
-    )
+    mock_query_llm.return_value = [
+        TranscribedSegmentsResponse(segments=[expected_segment])
+    ]
 
-    chunk_transcriptions: list[list[Transcription]] = [[_make_transcription(text="hello")]]
+    chunk_transcriptions: list[list[Transcription]] = [
+        [_make_transcription(text="hello")]
+    ]
     result = await format_transcriptions(
         chunk_transcriptions=chunk_transcriptions, llm_config=llm_config
     )

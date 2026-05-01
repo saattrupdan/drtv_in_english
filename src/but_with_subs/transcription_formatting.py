@@ -7,7 +7,12 @@ properly punctuated, properly casemapped subtitle segments.
 import logging
 from textwrap import dedent
 
-from .data_models import LLMConfig, QueryLLMBatchItem, TranscribedSegmentsResponse, Transcription
+from .data_models import (
+    LLMConfig,
+    QueryLLMBatchItem,
+    TranscribedSegmentsResponse,
+    Transcription,
+)
 from .llm import query_llm_batch
 
 logger = logging.getLogger(__package__)
@@ -104,7 +109,9 @@ async def format_transcriptions(
         chunk_transcriptions[i : i + 4] for i in range(0, len(chunk_transcriptions), 4)
     ]
 
-    config = llm_config.model_copy(update={"response_model": TranscribedSegmentsResponse})
+    config = llm_config.model_copy(
+        update={"response_model": TranscribedSegmentsResponse}
+    )
     items = [
         QueryLLMBatchItem(prompt=_build_prompt(batch), config=config)
         for batch in batches

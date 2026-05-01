@@ -7,23 +7,14 @@ as Pydantic BaseModels.
 
 import asyncio
 import typing as t
-from dataclasses import dataclass
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
 from tqdm.auto import tqdm
 
-from .data_models import LLMServerType, LLMConfig, QueryLLMBatchItem
+from .data_models import LLMConfig, LLMServerType, QueryLLMBatchItem
 from .logging_config import logger
 from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
-
-
-@dataclass
-class ServerCapabilities:
-    """Capabilities of a detected LLM server."""
-
-    server_type: LLMServerType
-
 
 # Cache detected server capabilities per api_base to avoid repeated probing
 _server_capabilities_cache: dict[str, LLMServerType] = {}
@@ -210,7 +201,8 @@ async def query_llm[ResponseModel: BaseModel](
             return parsed
         except ValidationError as exc:
             logger.error(
-                f"Failed to parse LLM response with {config.response_model.__name__}: {exc}"
+                f"Failed to parse LLM response with "
+                f"{config.response_model.__name__}: {exc}"
             )
             raise ValueError(
                 f"Failed to parse LLM response with {config.response_model.__name__}"
@@ -243,7 +235,7 @@ async def query_llm_batch(
         A list of responses in the same order as the input items.
     """
 
-    async def _run(item: QueryLLMBatchItem) -> t.Any:
+    async def _run(item: QueryLLMBatchItem) -> t.Any:  # noqa: ANN401
         return await query_llm(prompt=item.prompt, config=item.config, client=client)
 
     coroutines = [_run(item) for item in items]
