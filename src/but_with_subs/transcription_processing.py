@@ -123,7 +123,7 @@ def _build_prompt(
         - Prioritise that sentences are shown together, rather than broken up across
           several segments.
         - Return valid JSON with an array of segments matching the schema:
-          {"segments": [{"text": str, "start_time": float, "end_time": float}]}
+          {{"segments": [{{"text": str, "start_time": float, "end_time": float}}]}}
         - start_time and end_time are in seconds.
 
         Raw transcription:
