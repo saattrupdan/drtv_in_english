@@ -8,7 +8,8 @@ as Pydantic BaseModels.
 import asyncio
 import typing as t
 
-from httpx import AsyncClient, Response
+import httpx
+from httpx import AsyncClient, Limits, Response
 from pydantic import BaseModel, ValidationError
 from tqdm.auto import tqdm
 
@@ -119,7 +120,10 @@ async def query_llm[ResponseModel: BaseModel](
 
     close_after = False
     if client is None:
-        client = AsyncClient()
+        client = AsyncClient(
+            limits=Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=600,
+        )
         close_after = True
 
     try:
@@ -233,7 +237,14 @@ async def query_llm_batch(
     if not items:
         return []
 
-    client = AsyncClient()
+    # Bound concurrency to avoid overwhelming the LLM server.
+    max_concurrent = min(len(items), 3)
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    client = AsyncClient(
+        limits=Limits(max_connections=10, max_keepalive_connections=5),
+        timeout=httpx.Timeout(connect=10.0, read=600.0, write=10.0, pool=10.0),
+    )
     try:
         results: list[t.Any] = [None] * len(items)
 
@@ -246,12 +257,13 @@ async def query_llm_batch(
         )
 
         async def _task(idx: int, item: QueryLLMBatchItem) -> tuple[int, t.Any]:
-            result = await query_llm(
-                prompt=item.prompt,
-                config=item.config,
-                client=client,
-                server_type=server_type,
-            )
+            async with semaphore:
+                result = await query_llm(
+                    prompt=item.prompt,
+                    config=item.config,
+                    client=client,
+                    server_type=server_type,
+                )
             if progress_callback is not None:
                 progress_callback(idx, result)
             return (idx, result)
