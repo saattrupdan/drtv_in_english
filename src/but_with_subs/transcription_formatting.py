@@ -4,6 +4,7 @@ This module uses an LLM to format raw word-level transcriptions into
 properly punctuated, properly casemapped subtitle segments.
 """
 
+import asyncio
 import logging
 from textwrap import dedent
 
@@ -132,13 +133,13 @@ async def format_transcriptions(
         chunk_transcriptions[i : i + 4] for i in range(0, len(chunk_transcriptions), 4)
     ]
 
+    tasks = [
+        asyncio.create_task(_process_batch(batch=batch, batch_idx=batch_idx, llm_config=llm_config))
+        for batch_idx, batch in enumerate(tqdm(batches, desc="Processing transcription batches"))
+    ]
+    results = await asyncio.gather(*tasks)
     all_segments: list[Transcription] = []
-    for batch_idx, batch in enumerate(
-        tqdm(batches, desc="Processing transcription batches")
-    ):
-        segments = await _process_batch(
-            batch=batch, batch_idx=batch_idx, llm_config=llm_config
-        )
+    for segments in results:
         all_segments.extend(segments)
 
     return all_segments
