@@ -213,9 +213,9 @@ async def query_llm[ResponseModel: BaseModel](
 
 async def query_llm_batch(
     items: list[QueryLLMBatchItem],
+    batch_size: int = 10,
     client: AsyncClient | None = None,
     desc: str | None = None,
-    batch_size: int = 10,
 ) -> list[t.Any]:
     """Query an LLM API with multiple prompts concurrently.
 
@@ -225,13 +225,13 @@ async def query_llm_batch(
     Args:
         items:
             A list of (prompt, config) tuples to send to the LLM.
+        batch_size:
+            Number of items to process concurrently per batch.
         client (optional):
             An optional httpx AsyncClient to share across requests. If not provided,
             a new client will be created for each request.
         desc (optional):
             Description string for the progress bar.
-        batch_size (optional):
-            Number of items to process concurrently per batch. Defaults to 10.
 
     Returns:
         A list of responses in the same order as the input items.

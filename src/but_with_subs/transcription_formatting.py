@@ -92,6 +92,8 @@ async def format_transcriptions(
             Transcription objects from a single audio chunk.
         llm_config:
             Configuration for the LLM API call.
+        batch_size:
+            Number of items to process concurrently per batch.
 
     Returns:
         A list of ``Transcription`` objects with formatted text and correct

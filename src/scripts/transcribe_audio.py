@@ -86,6 +86,8 @@ def main(
             Base URL for the LLM API.
         llm_api_key:
             API key for the LLM.
+        batch_size:
+            Number of items to process in each batch.
     """
     path = Path(audio_path)
     if not path.is_file():
