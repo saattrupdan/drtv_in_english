@@ -105,7 +105,6 @@ async def query_llm[ResponseModel: BaseModel](
         "messages": [message],
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,
-        "thinking_token_budget": 2048,
     }
     if config.response_model is not None:
         payload["response_format"] = {
@@ -121,8 +120,7 @@ async def query_llm[ResponseModel: BaseModel](
     close_after = False
     if client is None:
         client = AsyncClient(
-            limits=Limits(max_connections=10, max_keepalive_connections=5),
-            timeout=600,
+            limits=Limits(max_connections=10, max_keepalive_connections=5), timeout=600
         )
         close_after = True
 
