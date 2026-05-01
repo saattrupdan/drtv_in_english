@@ -97,7 +97,7 @@ async def query_llm[ResponseModel: BaseModel](
         "messages": [message],
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,
-        "thinking_token_budget": 512,
+        "thinking_token_budget": 2048,
     }
     if config.response_model is not None:
         payload["response_format"] = {
@@ -243,10 +243,10 @@ async def query_llm_batch(
     try:
         results: list[t.Any] = [None] * len(items)
 
-        async def _task(
-            idx: int, item: QueryLLMBatchItem
-        ) -> tuple[int, t.Any]:
-            result = await query_llm(prompt=item.prompt, config=item.config, client=client)
+        async def _task(idx: int, item: QueryLLMBatchItem) -> tuple[int, t.Any]:
+            result = await query_llm(
+                prompt=item.prompt, config=item.config, client=client
+            )
             if progress_callback is not None:
                 progress_callback(idx, result)
             return (idx, result)
