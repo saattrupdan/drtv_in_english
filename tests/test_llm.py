@@ -1,9 +1,10 @@
 """Tests for the LLM inference module."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
+from pydantic import BaseModel
 
 import but_with_subs.llm
 from but_with_subs.data_models import LLMConfig, LLMServerType
@@ -16,7 +17,7 @@ def _make_mock_response(
     text: str = "",
     headers: dict | None = None,
 ) -> AsyncMock:
-    mock_response = AsyncMock(spec=Response)
+    mock_response = AsyncMock(spec=AsyncClient)
     mock_response.status_code = status_code
     mock_response.is_error = status_code >= 400
     mock_response.json.return_value = json_data if json_data is not None else {}
@@ -40,7 +41,6 @@ def llm_config() -> LLMConfig:
 @pytest.mark.asyncio
 async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None:
     """Test query_llm with a mocked response."""
-    llm_config.server_type = LLMServerType.OPENAI_COMPATIBLE
     mock_client = AsyncMock(spec=AsyncClient)
     mock_response = _make_mock_response(
         json_data={"choices": [{"message": {"content": None}}]}
@@ -48,7 +48,10 @@ async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None
     mock_client.post = AsyncMock(return_value=mock_response)
 
     result = await query_llm(
-        prompt="translate hello", config=llm_config, client=mock_client
+        prompt="translate hello",
+        config=llm_config,
+        client=mock_client,
+        server_type=LLMServerType.OPENAI_COMPATIBLE,
     )
     assert result is None
 
@@ -56,7 +59,6 @@ async def test_query_llm_no_callback_param_at_all(llm_config: LLMConfig) -> None
 @pytest.mark.asyncio
 async def test_query_llm_string_response(llm_config: LLMConfig) -> None:
     """Test query_llm with a mocked string response."""
-    llm_config.server_type = LLMServerType.OPENAI_COMPATIBLE
     mock_client = AsyncMock(spec=AsyncClient)
     mock_response = _make_mock_response(
         json_data={"choices": [{"message": {"content": "Hello, world!"}}]}
@@ -64,9 +66,64 @@ async def test_query_llm_string_response(llm_config: LLMConfig) -> None:
     mock_client.post = AsyncMock(return_value=mock_response)
 
     result = await query_llm(
-        prompt="translate hello", config=llm_config, client=mock_client
+        prompt="translate hello",
+        config=llm_config,
+        client=mock_client,
+        server_type=LLMServerType.OPENAI_COMPATIBLE,
     )
     assert result == "Hello, world!"
+
+
+@pytest.mark.asyncio
+async def test_query_llm_string_response_works_without_server_type(
+    llm_config: LLMConfig,
+) -> None:
+    """Test query_llm string response works without server_type (no response_model)."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    mock_response = _make_mock_response(
+        json_data={"choices": [{"message": {"content": "Hello, world!"}}]}
+    )
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    result = await query_llm(
+        prompt="translate hello", config=llm_config, client=mock_client, server_type=None
+    )
+    assert result == "Hello, world!"
+
+
+@pytest.mark.asyncio
+async def test_query_llm_raises_valueerror_without_server_type_and_response_model(
+    llm_config: LLMConfig,
+) -> None:
+    """Test that query_llm raises ValueError when server_type is None and response_model is set."""
+
+    class MyResponse(BaseModel):
+        answer: str
+
+    llm_config.response_model = MyResponse
+    mock_client = AsyncMock(spec=AsyncClient)
+
+    with pytest.raises(ValueError, match="requires a known server type"):
+        await query_llm(
+            prompt="test", config=llm_config, client=mock_client, server_type=None
+        )
+
+
+@pytest.mark.asyncio
+async def test_query_llm_passes_explicit_server_type(llm_config: LLMConfig) -> None:
+    """Test that query_llm accepts and uses an explicit server_type param."""
+    mock_client = AsyncMock(spec=AsyncClient)
+    mock_response = _make_mock_response(
+        json_data={"choices": [{"message": {"content": "explicit type"}}]}
+    )
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    result = await query_llm(
+        prompt="test", config=llm_config, client=mock_client, server_type=LLMServerType.OPENAI_COMPATIBLE
+    )
+
+    assert result == "explicit type"
+    mock_client.get.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -144,104 +201,6 @@ async def test_detect_unknown_on_error() -> None:
 
     assert result == LLMServerType.UNKNOWN
     mock_client.get.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_server_type_cache() -> None:
-    """Test that detected server types are cached via query_llm."""
-    but_with_subs.llm._server_capabilities_cache.clear()
-
-    query_resp = _make_mock_response(
-        json_data={"choices": [{"message": {"content": "cached test"}}]}
-    )
-
-    query_client = AsyncMock(spec=AsyncClient)
-    query_client.post = AsyncMock(return_value=query_resp)
-
-    config = LLMConfig(
-        model="test",
-        temperature=0.0,
-        max_tokens=100,
-        api_base="http://cache-test:8000",
-        server_type=LLMServerType.OPENAI_COMPATIBLE,
-    )
-
-    # Pre-populate the cache
-    but_with_subs.llm._server_capabilities_cache["http://cache-test:8000"] = (
-        LLMServerType.OPENAI_COMPATIBLE
-    )
-
-    result = await query_llm(prompt="test", config=config, client=query_client)
-
-    assert result == "cached test"
-    assert (
-        but_with_subs.llm._server_capabilities_cache.get("http://cache-test:8000")
-        == LLMServerType.OPENAI_COMPATIBLE
-    )
-
-    # Second call with same api_base should use cache (no detection probing)
-    with patch.object(AsyncClient, "aclose", AsyncMock()):
-        result2 = await query_llm(prompt="test", config=config, client=query_client)
-
-    assert result2 == "cached test"
-
-    but_with_subs.llm._server_capabilities_cache.clear()
-
-
-@pytest.mark.asyncio
-async def test_query_llm_uses_cached_server_type(llm_config: LLMConfig) -> None:
-    """Test that query_llm uses cached server type without re-probing."""
-    but_with_subs.llm._server_capabilities_cache.clear()
-    but_with_subs.llm._server_capabilities_cache[llm_config.api_base] = (
-        LLMServerType.OPENAI_COMPATIBLE
-    )
-
-    mock_client = AsyncMock(spec=AsyncClient)
-    mock_response = _make_mock_response(
-        json_data={"choices": [{"message": {"content": "cached test"}}]}
-    )
-    mock_client.post = AsyncMock(return_value=mock_response)
-
-    result = await query_llm(prompt="test", config=llm_config, client=mock_client)
-
-    assert result == "cached test"
-    mock_client.get.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_query_llm_auto_detects_on_first_call(llm_config: LLMConfig) -> None:
-    """Test that query_llm auto-detects server type on first call."""
-    but_with_subs.llm._server_capabilities_cache.clear()
-
-    detection_resp = _make_mock_response(
-        status_code=200, json_data={"data": [{"id": "gpt-4", "owned_by": "llamacpp"}]}
-    )
-    query_resp = _make_mock_response(
-        json_data={"choices": [{"message": {"content": "auto detected"}}]}
-    )
-
-    mock_client = AsyncMock(spec=AsyncClient)
-    mock_client.post = AsyncMock(return_value=query_resp)
-
-    async def mock_get(self: AsyncClient, *args, **kwargs) -> AsyncMock:
-        return detection_resp
-
-    async def mock_aclose(self: AsyncClient) -> None:
-        pass
-
-    with patch.object(AsyncClient, "get", mock_get):
-        with patch.object(AsyncClient, "aclose", mock_aclose):
-            result = await query_llm(
-                prompt="test", config=llm_config, client=mock_client
-            )
-
-    assert result == "auto detected"
-    cached = but_with_subs.llm._server_capabilities_cache.get(llm_config.api_base)
-    assert cached == LLMServerType.LLAMA_CPP
-
-    assert result == "auto detected"
-    cached = but_with_subs.llm._server_capabilities_cache.get(llm_config.api_base)
-    assert cached == LLMServerType.LLAMA_CPP
 
 
 @pytest.mark.asyncio

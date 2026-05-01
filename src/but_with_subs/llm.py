@@ -62,7 +62,10 @@ async def _detect_server_type(
 
 
 async def query_llm[ResponseModel: BaseModel](
-    prompt: str, config: LLMConfig, client: AsyncClient | None = None
+    prompt: str,
+    config: LLMConfig,
+    client: AsyncClient | None = None,
+    server_type: LLMServerType | None = None,
 ) -> ResponseModel | str | None:
     """Query an LLM API with a prompt and return a parsed response.
 
@@ -77,6 +80,9 @@ async def query_llm[ResponseModel: BaseModel](
         client (optional):
             An optional httpx AsyncClient to use for the request. If not provided,
             a new client will be created.
+        server_type (optional):
+            The type of LLM backend server. If not provided and
+            ``config.response_model`` is set, a ``ValueError`` is raised.
 
     Returns:
         The parsed response as an instance of the response model, a string,
@@ -84,7 +90,8 @@ async def query_llm[ResponseModel: BaseModel](
 
     Raises:
         ValueError:
-            If the response cannot be parsed according to the response model.
+            If the response cannot be parsed according to the response model, or
+            if ``server_type`` is ``None`` and ``config.response_model`` is set.
     """
     message: InputMessage = {"role": "user", "content": prompt}
 
@@ -116,24 +123,11 @@ async def query_llm[ResponseModel: BaseModel](
         close_after = True
 
     try:
-        # Auto-detect server type if not already known
-        if config.server_type is None:
-            cached = _server_capabilities_cache.get(config.api_base)
-            if cached is not None:
-                server_type = cached
-            else:
-                detect_client = AsyncClient()
-                try:
-                    server_type = await _detect_server_type(
-                        api_base=config.api_base,
-                        api_key=config.api_key,
-                        client=detect_client,
-                    )
-                    _server_capabilities_cache[config.api_base] = server_type
-                finally:
-                    await detect_client.aclose()
-        else:
-            server_type = config.server_type
+        if config.response_model is not None and server_type is None:
+            raise ValueError(
+                "Using `response_format` requires a known server type. "
+                "Pass `server_type` to `query_llm`."
+            )
 
         if config.response_model is not None:
             match server_type:
@@ -243,9 +237,20 @@ async def query_llm_batch(
     try:
         results: list[t.Any] = [None] * len(items)
 
+        # Detect server type from the first item's config
+        first_item = items[0]
+        server_type = await _detect_server_type(
+            api_base=first_item.config.api_base,
+            api_key=first_item.config.api_key,
+            client=client,
+        )
+
         async def _task(idx: int, item: QueryLLMBatchItem) -> tuple[int, t.Any]:
             result = await query_llm(
-                prompt=item.prompt, config=item.config, client=client
+                prompt=item.prompt,
+                config=item.config,
+                client=client,
+                server_type=server_type,
             )
             if progress_callback is not None:
                 progress_callback(idx, result)
