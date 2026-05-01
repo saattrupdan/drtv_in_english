@@ -214,7 +214,6 @@ async def query_llm[ResponseModel: BaseModel](
 async def query_llm_batch(
     items: list[QueryLLMBatchItem],
     progress_callback: t.Callable[[int, t.Any], None] | None = None,
-    client: AsyncClient | None = None,
     desc: str | None = None,
 ) -> list[t.Any]:
     """Query an LLM API with multiple prompts concurrently.
@@ -231,35 +230,29 @@ async def query_llm_batch(
             original ``items`` list and ``result`` is the response for that
             item.  Useful for custom progress tracking outside of the built-in
             ``tqdm`` bar.
-        client (optional):
-            An optional httpx AsyncClient to share across requests. If not provided,
-            a new client will be created for each request.
         desc (optional):
             Description string for the progress bar.
 
     Returns:
         A list of responses in the same order as the input items.
     """
+    if not items:
+        return []
 
     results: list[t.Any] = [None] * len(items)
 
     async def _task(idx: int, item: QueryLLMBatchItem) -> tuple[int, t.Any]:
-        result = await query_llm(prompt=item.prompt, config=item.config, client=client)
+        result = await query_llm(prompt=item.prompt, config=item.config)
         if progress_callback is not None:
             progress_callback(idx, result)
         return (idx, result)
 
-    if not items:
-        return []
-
     tasks = [_task(i, items[i]) for i in range(len(items))]
     ordered_results = await asyncio.gather(*tasks)
 
-    for idx, result in ordered_results:
-        results[idx] = result
-
     with tqdm(total=len(items), desc=desc) as pbar:
-        for _ in results:
+        for idx, result in ordered_results:
+            results[idx] = result
             pbar.update(1)
         pbar.close()
 
