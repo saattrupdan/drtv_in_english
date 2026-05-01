@@ -51,10 +51,8 @@ async def _detect_server_type(
             and "owned_by" in payload["data"][0]
         ):
             if payload["data"][0]["owned_by"] == "llamacpp":
-                logger.info("Detected Llama.cpp server at %s", api_base)
                 return LLMServerType.LLAMA_CPP
             else:
-                logger.info("Detected OpenAI-compatible server at %s", api_base)
                 return LLMServerType.OPENAI_COMPATIBLE
 
     logger.warning(
