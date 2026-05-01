@@ -19,7 +19,7 @@ def main(audio_path: str) -> None:
     """Run audio chunking on an audio file.
 
     Loads the audio file, splits it into chunks based on silence breaks,
-    and prints information about each chunk.
+    and logs the total number of chunks.
 
     Args:
         audio_path:
@@ -34,16 +34,6 @@ def main(audio_path: str) -> None:
     chunks = list(chunk_audio(audio_path=path))
 
     logger.info(f"Total chunks: {len(chunks)}")
-
-    for i, chunk in enumerate(chunks, start=1):
-        duration = chunk.end_time - chunk.start_time
-        logger.info(
-            f"Chunk {i}: "
-            f"start={chunk.start_time:.3f} s, "
-            f"end={chunk.end_time:.3f} s, "
-            f"duration={duration:.3f} s"
-        )
-
 
 if __name__ == "__main__":
     main()
