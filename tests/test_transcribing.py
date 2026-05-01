@@ -10,7 +10,8 @@ import unittest.mock as um
 
 import numpy as np
 
-from but_with_subs.transcribing import Transcription, transcribe
+from but_with_subs.data_models import Transcription
+from but_with_subs.transcribing import transcribe
 
 # ---------------------------------------------------------------------------
 # Transcription model tests

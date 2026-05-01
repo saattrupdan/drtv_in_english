@@ -9,7 +9,7 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 from but_with_subs import translation
-from but_with_subs.llm import LLMConfig
+from but_with_subs.data_models import LLMConfig
 
 # ---------------------------------------------------------------------------
 # Helpers

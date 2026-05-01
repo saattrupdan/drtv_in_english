@@ -7,7 +7,8 @@ Pydantic models, as well as the download function.
 import pathlib
 import unittest.mock as um
 
-from but_with_subs.downloading import DownloadProgress, File, download
+from but_with_subs.data_models import DownloadProgress, File
+from but_with_subs.downloading import download
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -8,13 +8,8 @@ response types.
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-from but_with_subs.llm import LLMConfig
-from but_with_subs.transcribing import Transcription
-from but_with_subs.transcription_formatting import (
-    TranscribedSegmentsResponse,
-    _build_prompt,
-    format_transcriptions,
-)
+from but_with_subs.data_models import LLMConfig, Transcription, TranscribedSegmentsResponse
+from but_with_subs.transcription_formatting import _build_prompt, format_transcriptions
 
 # ---------------------------------------------------------------------------
 # Helpers

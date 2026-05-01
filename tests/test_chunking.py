@@ -12,8 +12,8 @@ import unittest.mock as um
 import numpy as np
 import scipy.io.wavfile as wavio
 
+from but_with_subs.data_models import Chunk
 from but_with_subs.chunking import (
-    Chunk,
     _load_audio,
     _split_audio_into_chunks,
     chunk_audio,

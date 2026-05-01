@@ -4,7 +4,8 @@ import pytest
 from httpx import AsyncClient, Response
 from unittest.mock import AsyncMock, patch
 import but_with_subs.llm
-from but_with_subs.llm import LLMConfig, query_llm, LLMServerType
+from but_with_subs.data_models import LLMConfig, LLMServerType
+from but_with_subs.llm import query_llm
 
 
 def _make_mock_response(

@@ -15,7 +15,7 @@ from but_with_subs.subtitling import (
     _group_transcriptions,
     generate_subtitles,
 )
-from but_with_subs.transcribing import Transcription
+from but_with_subs.data_models import Transcription
 
 # ---------------------------------------------------------------------------
 # Helpers
