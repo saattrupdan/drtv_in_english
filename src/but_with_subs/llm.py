@@ -36,19 +36,27 @@ class ServerCapabilities:
 _server_capabilities_cache: dict[str, LLMServerType] = {}
 
 
-async def _detect_server_type(api_base: str, client: AsyncClient) -> LLMServerType:
+async def _detect_server_type(
+    api_base: str, api_key: str | None, client: AsyncClient
+) -> LLMServerType:
     """Detect server type by probing endpoints.
 
     Args:
         api_base:
             The base URL of the LLM API.
+        api_key:
+            The API key to use for the LLM API.
         client:
             An httpx AsyncClient to use for the request.
 
     Returns:
         LLMServerType indicating the detected server type.
     """
-    resp = await client.get(f"{api_base}/models", timeout=5.0)
+    resp = await client.get(
+        f"{api_base}/models",
+        timeout=5.0,
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
     if resp.status_code == 200:
         payload = resp.json()
         if (
@@ -167,7 +175,9 @@ async def query_llm[ResponseModel: BaseModel](
                 detect_client = AsyncClient()
                 try:
                     server_type = await _detect_server_type(
-                        config.api_base, detect_client
+                        api_base=config.api_base,
+                        api_key=config.api_key,
+                        client=detect_client,
                     )
                     _server_capabilities_cache[config.api_base] = server_type
                 finally:
