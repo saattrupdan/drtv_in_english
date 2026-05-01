@@ -54,12 +54,19 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
     default=None,
     help="Target language for translation (e.g. 'French', 'Spanish').",
 )
+@click.option(
+    "--batch-size",
+    type=int,
+    default=10,
+    help="Number of items to process in each batch.",
+)
 def main(
     audio_path: str,
     language: str | None,
     llm_model: str,
     llm_api_base: str,
     llm_api_key: str | None,
+    batch_size: int,
 ) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
@@ -116,7 +123,9 @@ def main(
     )
     formatted = asyncio.run(
         format_transcriptions(
-            chunk_transcriptions=chunk_transcriptions, llm_config=llm_config
+            chunk_transcriptions=chunk_transcriptions,
+            llm_config=llm_config,
+            batch_size=batch_size,
         )
     )
 
