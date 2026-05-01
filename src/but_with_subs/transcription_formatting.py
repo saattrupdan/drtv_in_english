@@ -5,6 +5,7 @@ properly punctuated, properly casemapped subtitle segments.
 """
 
 import logging
+from textwrap import dedent
 
 from pydantic import BaseModel
 from tqdm.auto import tqdm
@@ -29,31 +30,6 @@ class InvalidInputError(ValueError):
     pass
 
 
-class FormattedSegment(BaseModel):
-    """A single formatted segment with text and timing.
-
-    Attributes:
-        text:
-            The formatted text for this segment.
-        start_position:
-            1-based inclusive position of the first word in the flattened
-            word list.
-        end_position:
-            1-based inclusive position of the last word in the flattened
-            word list.
-        start_time:
-            Approximate start time of the segment in seconds.
-        end_time:
-            Approximate end time of the segment in seconds.
-    """
-
-    text: str
-    start_position: int
-    end_position: int
-    start_time: float
-    end_time: float
-
-
 class TranscribedSegmentsResponse(BaseModel):
     """Response containing a list of formatted segments.
 
@@ -62,7 +38,7 @@ class TranscribedSegmentsResponse(BaseModel):
             List of formatted subtitle segments.
     """
 
-    segments: list[FormattedSegment]
+    segments: list[Transcription]
 
 
 def _build_prompt(chunk_transcriptions: list[list[Transcription]]) -> str:
@@ -91,34 +67,32 @@ def _build_prompt(chunk_transcriptions: list[list[Transcription]]) -> str:
     ]
 
     lines.append(
-        "Rules:"
-        "\n- Fix all casing and punctuation."
-        "\n- Split into coherent short segments suitable for subtitle display."
-        "\n- Remove filler words (um, uh, you know, like) and stutters."
-        "\n- Keep the meaning of the original words intact."
-        "\n- Each segment should be 6-12 words long at most."
-        "\n- Return valid JSON with an array of segments matching this "
-        'schema: {"segments": [{"text": str, '
-        '"start_position": int, "end_position": int, '
-        '"start_time": float, "end_time": float}]}'
-        "\n- start_position and end_position are 1-based inclusive indices "
-        "into the flattened word list below."
-        "\n- start_time and end_time are in seconds."
+        dedent("""
+        Rules:
+        - Fix all casing and punctuation.
+        - Split into coherent short segments suitable for subtitle display.
+        - Remove filler words (um, uh, you know, like) and stutters.
+        - You need to translate the
+        - Keep the meaning of the original words intact.
+        - Each segment should be have at most 12 words
+        - Prioritise that sentences are shown together, rather than broken up across
+          several segments.
+        - Return valid JSON with an array of segments matching the schema:
+          {"segments": [{"text": str, "start_time": float, "end_time": float}]}
+        - start_time and end_time are in seconds.
+        """).strip()
     )
 
     lines.append("\nRaw transcription:\n")
 
     chunk_start = 1
-
     for chunk_index, chunk in enumerate(chunk_transcriptions, start=1):
         if len(chunk_transcriptions) > 1:
             lines.append(f"Chunk {chunk_index}:\n")
-
         for transcription in chunk:
             lines.append(
-                f'{chunk_start}. "{transcription.text}" '
-                f"[{transcription.start_time:.2f}-"
-                f"{transcription.end_time:.2f}]"
+                f"{chunk_start}. {transcription.text!r} "
+                f"[{transcription.start_time:.2f}-{transcription.end_time:.2f}]"
             )
             chunk_start += 1
 
@@ -153,47 +127,26 @@ async def format_transcriptions(
             position_to_transcription[position_index] = transcription
             position_index += 1
 
-    # Split into batches of 4 chunks.
+    # Split into batches
     batches: list[list[list[Transcription]]] = [
         chunk_transcriptions[i : i + 4] for i in range(0, len(chunk_transcriptions), 4)
     ]
 
-    all_segments: list[FormattedSegment] = []
-
-    for batch_idx, batch in tqdm(
-        enumerate(batches), desc="Processing transcription batches"
+    all_segments: list[Transcription] = []
+    for batch_idx, batch in enumerate(
+        tqdm(batches, desc="Processing transcription batches")
     ):
-        segments = await _process_batch(batch, batch_idx, llm_config)
+        segments = await _process_batch(
+            batch=batch, batch_idx=batch_idx, llm_config=llm_config
+        )
         all_segments.extend(segments)
 
-    # Map position intervals back to timestamps.
-    formatted_transcriptions: list[Transcription] = []
-    for segment in all_segments:
-        start_word = position_to_transcription.get(segment.start_position)
-        end_word = position_to_transcription.get(segment.end_position)
-
-        if start_word is None or end_word is None:
-            logger.warning(
-                "Position %d-%d not found in transcription, skipping segment",
-                segment.start_position,
-                segment.end_position,
-            )
-            continue
-
-        formatted_transcriptions.append(
-            Transcription(
-                start_time=start_word.start_time,
-                end_time=end_word.end_time,
-                text=segment.text,
-            )
-        )
-
-    return formatted_transcriptions
+    return all_segments
 
 
 async def _process_batch(
     batch: list[list[Transcription]], batch_idx: int, llm_config: LLMConfig
-) -> list[FormattedSegment]:
+) -> list[Transcription]:
     """Process a single batch of chunks through the LLM.
 
     Args:
