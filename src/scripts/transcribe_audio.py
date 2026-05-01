@@ -90,12 +90,11 @@ def main(
             task="automatic-speech-recognition", model=MODEL_ID, device=get_device()
         )
 
-    # Split the audio into chunks using VAD
-    chunks = chunk_audio(audio_path=path)
+    audio_chunks = chunk_audio(audio_path=path)
 
     # Transcribe each chunk, with word-level timestamps
     chunk_transcriptions: list[list[Transcription]] = list()
-    for chunk in tqdm(chunks, unit="chunk", desc="Transcribing"):
+    for chunk in tqdm(audio_chunks, unit="chunk", desc="Transcribing"):
         segments = transcribe(
             audio_data=chunk.audio, model=model, chunk_offset=chunk.start_time
         )

@@ -16,7 +16,7 @@ logger = logging.getLogger(__package__)
 
 async def process_transcriptions(
     chunk_transcriptions: list[list[Transcription]],
-    target_language: str,
+    target_language: str | None,
     llm_config: LLMConfig,
 ) -> list[Transcription]:
     """Process raw transcriptions into subtitle-ready segments using an LLM.
@@ -26,7 +26,7 @@ async def process_transcriptions(
             A list of chunk transcription lists. Each inner list contains
             Transcription objects from a single audio chunk.
         target_language:
-            The target language for the subtitles.
+            The target language for the subtitles, or None if no translation is desired.
         llm_config:
             Configuration for the LLM API call.
 
@@ -85,7 +85,7 @@ async def process_transcriptions(
 
 
 def _build_prompt(
-    chunk_transcriptions: list[list[Transcription]], target_language: str
+    chunk_transcriptions: list[list[Transcription]], target_language: str | None
 ) -> str:
     """Build an LLM prompt for processing raw transcriptions.
 
@@ -94,7 +94,7 @@ def _build_prompt(
             A list of chunk transcription lists. Each inner list contains
             Transcription objects from a single audio chunk.
         target_language:
-            The target language for the subtitles.
+            The target language for the subtitles, or None if no translation is desired.
 
     Returns:
         A prompt string suitable for sending to an LLM.
@@ -108,6 +108,11 @@ def _build_prompt(
                 )
                 break
 
+    translation_line = (
+        f"- You need to translate the segments into {target_language}\n"
+        if target_language
+        else ""
+    )
     lines: list[str] = [
         dedent(f"""
         You are a subtitle processing assistant. Process the following raw word-level
@@ -117,8 +122,7 @@ def _build_prompt(
         - Fix all casing and punctuation.
         - Split into coherent short segments suitable for subtitle display.
         - Remove filler words (um, uh, you know, like) and stutters.
-        - You need to translate the segments into {target_language}
-        - Keep the meaning of the original words intact.
+        {translation_line}- Keep the meaning of the original words intact.
         - Each segment should be have at most 12 words
         - Prioritise that sentences are shown together, rather than broken up across
           several segments.
