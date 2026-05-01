@@ -77,7 +77,9 @@ def _build_prompt(chunk_transcriptions: list[list[Transcription]]) -> str:
 
 
 async def format_transcriptions(
-    chunk_transcriptions: list[list[Transcription]], llm_config: LLMConfig
+    chunk_transcriptions: list[list[Transcription]],
+    llm_config: LLMConfig,
+    batch_size: int = 10,
 ) -> list[Transcription]:
     """Format raw transcriptions into subtitle-ready segments using an LLM.
 
@@ -118,7 +120,7 @@ async def format_transcriptions(
     ]
 
     results = await query_llm_batch(
-        items=items, desc="Processing transcription batches"
+        items=items, desc="Processing transcription batches", batch_size=batch_size
     )
 
     all_segments: list[Transcription] = []
