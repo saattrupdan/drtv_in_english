@@ -33,6 +33,7 @@ file = "LICENSE"
 [dependency-groups]
 dev = [
   "pytest>=8.4.1",
+  "pytest-asyncio>=1.0.0",
   "pytest-cov>=6.2.1",
   "pre-commit>=4.3.0",
   "readme-coverage-badger>=1.0.1",
@@ -115,6 +116,7 @@ addopts = [
   '--cov=src/but_with_subs',
 ]
 xfail_strict = true
+asyncio_mode = "auto"
 filterwarnings = [
   "error",
   "ignore::UserWarning",

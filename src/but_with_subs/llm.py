@@ -14,6 +14,7 @@ from typing import NamedTuple
 
 from httpx import AsyncClient, Response
 from pydantic import BaseModel, ValidationError
+from tqdm.auto import tqdm
 
 from .logging_config import logger
 from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
@@ -281,6 +282,7 @@ class QueryLLMBatchItem(NamedTuple):
 async def query_llm_batch(
     items: list[QueryLLMBatchItem],
     client: AsyncClient | None = None,
+    desc: str | None = None,
 ) -> list[t.Any]:
     """Query an LLM API with multiple prompts concurrently.
 
@@ -293,6 +295,8 @@ async def query_llm_batch(
         client (optional):
             An optional httpx AsyncClient to share across requests. If not provided,
             a new client will be created for each request.
+        desc (optional):
+            Description string for the progress bar.
 
     Returns:
         A list of responses in the same order as the input items.
@@ -301,4 +305,9 @@ async def query_llm_batch(
     async def _run(item: QueryLLMBatchItem) -> t.Any:
         return await query_llm(prompt=item.prompt, config=item.config, client=client)
 
-    return await asyncio.gather(*[_run(item) for item in items])
+    coroutines = [_run(item) for item in items]
+    with tqdm(total=len(items), desc=desc, disable=len(items) == 0) as pbar:
+        results = await asyncio.gather(*coroutines)
+        pbar.update(len(items))
+
+    return results

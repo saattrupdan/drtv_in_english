@@ -8,7 +8,6 @@ import logging
 from textwrap import dedent
 
 from pydantic import BaseModel
-from tqdm.auto import tqdm
 
 from .llm import LLMConfig, QueryLLMBatchItem, query_llm_batch
 from .transcribing import Transcription
@@ -135,10 +134,12 @@ async def format_transcriptions(
     config = llm_config.model_copy(update={"response_model": TranscribedSegmentsResponse})
     items = [
         QueryLLMBatchItem(prompt=_build_prompt(batch), config=config)
-        for batch in tqdm(batches, desc="Processing transcription batches")
+        for batch in batches
     ]
 
-    results = await query_llm_batch(items)
+    results = await query_llm_batch(
+        items=items, desc="Processing transcription batches"
+    )
 
     all_segments: list[Transcription] = []
     for batch_idx, response in enumerate(results):
