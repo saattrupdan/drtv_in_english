@@ -1,8 +1,4 @@
-"""Audio chunking functionality for splitting audio into segments.
-
-This module provides functions to split audio files into chunks based on
-natural breaks detected through silence detection.
-"""
+"""Audio chunking functionality for splitting audio into segments."""
 
 import logging
 import pathlib as pl

@@ -1,6 +1,6 @@
 """Tests for the chunking module.
 
-This module contains tests for the Chunk model and _load_audio function.
+This module contains tests for the Chunk model.
 """
 
 import contextlib as ct
@@ -12,8 +12,8 @@ import unittest.mock as um
 import numpy as np
 import scipy.io.wavfile as wavio
 
-from but_with_subs.chunking import _load_audio, _split_audio_into_chunks, chunk_audio
 from but_with_subs.data_models import Chunk
+from but_with_subs.vad import _load_audio, _split_audio_into_chunks, chunk_audio
 
 # ---------------------------------------------------------------------------
 # Helpers
