@@ -239,20 +239,26 @@ async def query_llm_batch(
     if not items:
         return []
 
-    results: list[t.Any] = [None] * len(items)
+    client = AsyncClient()
+    try:
+        results: list[t.Any] = [None] * len(items)
 
-    async def _task(idx: int, item: QueryLLMBatchItem) -> tuple[int, t.Any]:
-        result = await query_llm(prompt=item.prompt, config=item.config)
-        if progress_callback is not None:
-            progress_callback(idx, result)
-        return (idx, result)
+        async def _task(
+            idx: int, item: QueryLLMBatchItem
+        ) -> tuple[int, t.Any]:
+            result = await query_llm(prompt=item.prompt, config=item.config, client=client)
+            if progress_callback is not None:
+                progress_callback(idx, result)
+            return (idx, result)
 
-    tasks = [asyncio.create_task(_task(i, items[i])) for i in range(len(items))]
+        tasks = [asyncio.create_task(_task(i, items[i])) for i in range(len(items))]
 
-    with tqdm(total=len(items), desc=desc) as pbar:
-        for completed_task in asyncio.as_completed(tasks):
-            idx, result = await completed_task
-            results[idx] = result
-            pbar.update(1)
+        with tqdm(total=len(items), desc=desc) as pbar:
+            for completed_task in asyncio.as_completed(tasks):
+                idx, result = await completed_task
+                results[idx] = result
+                pbar.update(1)
 
-    return results
+        return results
+    finally:
+        await client.aclose()
