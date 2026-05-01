@@ -7,37 +7,10 @@ properly punctuated, properly casemapped subtitle segments.
 import logging
 from textwrap import dedent
 
-from pydantic import BaseModel
-
-from .llm import LLMConfig, QueryLLMBatchItem, query_llm_batch
-from .transcribing import Transcription
+from .data_models import LLMConfig, QueryLLMBatchItem, TranscribedSegmentsResponse, Transcription
+from .llm import query_llm_batch
 
 logger = logging.getLogger(__package__)
-
-
-class InvalidInputError(ValueError):
-    """Raised when the transcription input is invalid.
-
-    This is used to signal that one or more transcriptions passed to the
-    formatting pipeline contain empty or otherwise unacceptable content.
-
-    Attributes:
-        message:
-            A human-readable explanation of the validation failure.
-    """
-
-    pass
-
-
-class TranscribedSegmentsResponse(BaseModel):
-    """Response containing a list of formatted segments.
-
-    Attributes:
-        segments:
-            List of formatted subtitle segments.
-    """
-
-    segments: list[Transcription]
 
 
 def _build_prompt(chunk_transcriptions: list[list[Transcription]]) -> str:

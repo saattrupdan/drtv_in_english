@@ -10,43 +10,9 @@ import typing as t
 from pathlib import Path
 
 import yt_dlp
-from pydantic import BaseModel
 
+from .data_models import DownloadProgress, File
 from .logging_config import logger
-
-
-class File(BaseModel):
-    """Model representing downloaded media files.
-
-    Attributes:
-        url:
-            The original URL that was downloaded.
-        video_path:
-            Path to the downloaded video file, or None if not found.
-        audio_path:
-            Path to the downloaded audio file, or None if not found.
-    """
-
-    url: str
-    video_path: Path | None
-    audio_path: Path | None
-
-
-class DownloadProgress(BaseModel):
-    """Model representing download progress.
-
-    Attributes:
-        status:
-            Human-readable status string (e.g., downloading, finished).
-        current_file:
-            Name of the file currently being downloaded, or None.
-        percentage:
-            Download progress as a float from 0.0 to 100.0.
-    """
-
-    status: str
-    current_file: str | None = None
-    percentage: float
 
 
 def _parse_progress_info(

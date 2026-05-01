@@ -4,7 +4,7 @@ import asyncio
 
 import click
 
-from but_with_subs.llm import LLMConfig
+from but_with_subs.data_models import LLMConfig
 from but_with_subs.translation import translate
 
 

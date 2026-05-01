@@ -18,10 +18,10 @@ from tqdm.auto import tqdm
 from transformers import pipeline
 
 from but_with_subs.chunking import chunk_audio
+from but_with_subs.data_models import LLMConfig, Transcription
 from but_with_subs.device import get_device
-from but_with_subs.llm import LLMConfig
 from but_with_subs.subtitling import generate_subtitles
-from but_with_subs.transcribing import Transcription, transcribe
+from but_with_subs.transcribing import transcribe
 from but_with_subs.transcription_formatting import format_transcriptions
 from but_with_subs.translation import translate
 

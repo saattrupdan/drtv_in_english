@@ -10,8 +10,8 @@ import collections.abc as c
 import pathlib as pl
 from pathlib import Path
 
+from .data_models import Transcription
 from .logging_config import logger
-from .transcribing import Transcription
 
 _SENTENCE_ENDINGS = frozenset(".?!")
 

@@ -4,15 +4,8 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pydantic import BaseModel
-
-from .llm import LLMConfig, query_llm
-
-
-class TranslatedText(BaseModel):
-    """A model representing translated text."""
-
-    text: str = ""
+from .data_models import LLMConfig, TranslatedText
+from .llm import query_llm
 
 
 async def translate(

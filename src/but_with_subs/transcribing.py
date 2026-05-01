@@ -9,29 +9,11 @@ import typing as t
 
 import bits_and_bobs as bnb
 import numpy as np
-from pydantic import BaseModel
 from transformers import AutomaticSpeechRecognitionPipeline
 
+from .data_models import Transcription
+
 logger = logging.getLogger(__package__)
-
-
-class Transcription(BaseModel):
-    """A transcribed text segment from an audio chunk.
-
-    Attributes:
-        start_time:
-            Start time of the segment, in seconds from the beginning of the
-            full audio (including any chunk offset).
-        end_time:
-            End time of the segment, in seconds from the beginning of the
-            full audio (including any chunk offset).
-        text:
-            The transcribed text for this segment.
-    """
-
-    start_time: float
-    end_time: float
-    text: str
 
 
 def transcribe(
