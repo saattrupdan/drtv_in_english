@@ -27,7 +27,11 @@ def _make_mock_response(
 
 @pytest.fixture
 def llm_config() -> LLMConfig:
-    """Provide a default LLMConfig for testing."""
+    """Provide a default LLMConfig for testing.
+
+    Returns:
+        The default LLMConfig for testing.
+    """
     return LLMConfig(
         model="gpt-4", temperature=0.0, max_tokens=64, api_base="http://localhost:8000"
     )

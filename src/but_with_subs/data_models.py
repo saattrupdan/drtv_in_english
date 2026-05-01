@@ -12,10 +12,6 @@ from typing import NamedTuple
 import numpy as np
 from pydantic import BaseModel
 
-# --------------------------------------------------------------------------- #
-# Moved from llm.py
-# --------------------------------------------------------------------------- #
-
 
 class LLMServerType(str, Enum):
     """Detected type of LLM backend server."""
@@ -70,11 +66,6 @@ class QueryLLMBatchItem(NamedTuple):
     config: LLMConfig
 
 
-# --------------------------------------------------------------------------- #
-# Moved from transcribing.py
-# --------------------------------------------------------------------------- #
-
-
 class Transcription(BaseModel):
     """A transcribed text segment from an audio chunk.
 
@@ -94,11 +85,6 @@ class Transcription(BaseModel):
     text: str
 
 
-# --------------------------------------------------------------------------- #
-# Moved from chunking.py
-# --------------------------------------------------------------------------- #
-
-
 class Chunk(BaseModel):
     """A chunk of audio data.
 
@@ -116,11 +102,6 @@ class Chunk(BaseModel):
     start_time: float
     end_time: float
     audio: np.ndarray
-
-
-# --------------------------------------------------------------------------- #
-# Moved from downloading.py
-# --------------------------------------------------------------------------- #
 
 
 class File(BaseModel):
@@ -157,11 +138,6 @@ class DownloadProgress(BaseModel):
     percentage: float
 
 
-# --------------------------------------------------------------------------- #
-# Moved from transcription_formatting.py
-# --------------------------------------------------------------------------- #
-
-
 class TranscribedSegmentsResponse(BaseModel):
     """Response containing a list of formatted segments.
 
@@ -171,11 +147,6 @@ class TranscribedSegmentsResponse(BaseModel):
     """
 
     segments: list[Transcription]
-
-
-# --------------------------------------------------------------------------- #
-# Moved from translation.py
-# --------------------------------------------------------------------------- #
 
 
 class TranslatedText(BaseModel):

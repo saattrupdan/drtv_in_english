@@ -118,6 +118,8 @@ class ChatCompletionRequest(t.TypedDict):
             The maximum number of tokens to generate.
         response_format:
             The format in which the LLM should respond.
+        thinking_token_budget:
+            The maximum number of tokens to use in the reasoning trace.
     """
 
     model: str
@@ -127,3 +129,4 @@ class ChatCompletionRequest(t.TypedDict):
     response_format: t.NotRequired[
         OpenAICompatibleResponseFormat | LlamacppResponseFormat
     ]
+    thinking_token_budget: t.NotRequired[int]
