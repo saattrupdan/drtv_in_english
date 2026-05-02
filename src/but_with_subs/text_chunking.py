@@ -13,13 +13,15 @@ nltk.download("punkt", quiet=True)
 
 
 def chunk_transcriptions(
-    transcriptions: list[Transcription], max_words: int
+    transcriptions: list[Transcription], punctuation_model: PunctFixer, max_words: int
 ) -> list[Transcription]:
     """Split transcriptions into segments.
 
     Args:
         transcriptions:
             A list of Transcription objects to be chunked.
+        punctuation_model:
+            The punctuation model to use for fixing punctuation.
         max_words:
             The maximum number of words per segment.
 
@@ -28,13 +30,17 @@ def chunk_transcriptions(
         transcription.
     """
     text = " ".join([transcription.text for transcription in transcriptions])
-    text = PunctFixer(language="da").punctuate(text=text)
-
-    segments = _split_text(text=text, max_words=max_words)
+    text = punctuation_model.punctuate(text=text)
 
     result: list[Transcription] = []
-    for segment in segments:
-        first_word = segment.split(" ")[0].lower().strip(string.punctuation)
+    for segment in _split_text(text=text, max_words=max_words):
+        segment_without_punctuation = re.sub(
+            rf"[{string.punctuation}]", "", segment
+        ).strip()
+        if segment_without_punctuation == "":
+            continue
+
+        first_word = segment_without_punctuation.split()[0].lower()
         first_word_candidates = [
             transcription
             for transcription in transcriptions
@@ -47,7 +53,7 @@ def chunk_transcriptions(
             continue
         first_word_time = first_word_candidates[0].start_time
 
-        last_word = segment.split(" ")[-1].lower().strip(string.punctuation)
+        last_word = segment_without_punctuation.split(" ")[-1].lower()
         last_word_candidates = [
             transcription
             for transcription in transcriptions
@@ -67,67 +73,48 @@ def chunk_transcriptions(
     return result
 
 
-def _split_text(*, text: str, max_words: int, _depth: int = 0, max_depth: int = 5) -> list[str]:
+def _split_text(*, text: str, max_words: int) -> list[str]:
     """Split text into smaller segments if they exceed max_words.
-
-    Uses recursion to progressively split long segments until they fit.
 
     Args:
         text:
             The text to split.
         max_words:
             The maximum number of words per segment.
-        _depth:
-            Internal recursion depth counter (do not pass).
-        max_depth:
-            Maximum recursion depth to prevent infinite loops (do not pass).
 
     Returns:
         A list of text segments, each with at most max_words words.
     """
-    if not text:
-        return []
+    segments: list[str] = [text]
 
-    words = text.split()
-    if len(words) <= max_words:
-        return [text]
+    # Try sentence segmentation
+    sentence_segments: list[str] = list()
+    for segment in segments:
+        if len(segment.split()) <= max_words:
+            sentence_segments.append(segment)
+            continue
+        sentence_segments.extend(nltk.sent_tokenize(text=segment, language="danish"))
 
-    # Max recursion depth prevents infinite loops
-    if _depth >= max_depth:
-        return [
-            " ".join(words[i : i + max_words]) for i in range(0, len(words), max_words)
-        ]
+    # Try punctuation segmentation
+    punctuation_segments: list[str] = list()
+    for segment in sentence_segments:
+        if len(segment.split()) <= max_words:
+            punctuation_segments.append(segment)
+            continue
+        punctuation_segments.extend(segment.split(",;:-"))
 
-    # Prevent infinite recursion if the same text is passed
-    if _depth > 0 and text == words[0] + " " + " ".join(words[1:]):
-        return [
-            " ".join(words[i : i + max_words]) for i in range(0, len(words), max_words)
-        ]
+    # Fall back to word segmentation
+    word_segments: list[str] = list()
+    for segment in punctuation_segments:
+        if len(segment.split()) <= max_words:
+            word_segments.append(segment)
+            continue
+        words = nltk.word_tokenize(text=segment, language="danish")
+        word_segments.extend(
+            [
+                " ".join(words[i : i + max_words])
+                for i in range(0, len(words), max_words)
+            ]
+        )
 
-    # Strategy 1: Sentence tokenization
-    sentences = nltk.sent_tokenize(text=text, language="danish")
-    if sentences:
-        result = []
-        for sentence in sentences:
-            result.extend(
-                _split_text(text=sentence, max_words=max_words, _depth=_depth + 1, max_depth=max_depth)
-            )
-        return result
-
-    # Strategy 2: Split on punctuation pauses
-    pause_pattern = re.compile(r"([,;\:\!\?])")
-    parts = re.split(pattern=pause_pattern, string=text)
-    if len(parts) > 1:
-        result = []
-        for part in parts:
-            if part.strip():
-                result.extend(
-                    _split_text(text=part, max_words=max_words, _depth=_depth + 1, max_depth=max_depth)
-                )
-        return result
-
-    # Strategy 3: Fallback chunk by word count
-    return [
-        " ".join(words[i : i + max_words])
-        for i in range(0, len(words), max_words)
-    ]
+    return word_segments

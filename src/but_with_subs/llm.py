@@ -15,7 +15,12 @@ from tqdm.auto import tqdm
 
 from .data_models import LLMConfig, LLMServerType, QueryLLMBatchItem
 from .logging_config import logger
-from .types import ChatCompletionRequest, ChatCompletionResponse, InputMessage
+from .types import (
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    InputMessage,
+    OutputMessage,
+)
 
 # Cache detected server capabilities per api_base to avoid repeated probing
 _server_capabilities_cache: dict[str, LLMServerType] = {}
@@ -171,7 +176,7 @@ async def query_llm[ResponseModel: BaseModel](
             return None
 
         first_choice = choices[0]
-        message = first_choice.get("message")
+        message: OutputMessage = first_choice.get("message")
         if not message:
             logger.warning(
                 "LLM response choice has no message. Full response: %s", response_data

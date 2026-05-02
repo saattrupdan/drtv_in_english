@@ -86,7 +86,10 @@ async def test_query_llm_string_response_works_without_server_type(
     mock_client.post = AsyncMock(return_value=mock_response)
 
     result = await query_llm(
-        prompt="translate hello", config=llm_config, client=mock_client, server_type=None
+        prompt="translate hello",
+        config=llm_config,
+        client=mock_client,
+        server_type=None,
     )
     assert result == "Hello, world!"
 
@@ -95,7 +98,10 @@ async def test_query_llm_string_response_works_without_server_type(
 async def test_query_llm_raises_valueerror_without_server_type_and_response_model(
     llm_config: LLMConfig,
 ) -> None:
-    """Test that query_llm raises ValueError when server_type is None and response_model is set."""
+    """Test that query_llm raises ValueError when server_type is None.
+
+    and response_model is set.
+    """
 
     class MyResponse(BaseModel):
         answer: str
@@ -119,7 +125,10 @@ async def test_query_llm_passes_explicit_server_type(llm_config: LLMConfig) -> N
     mock_client.post = AsyncMock(return_value=mock_response)
 
     result = await query_llm(
-        prompt="test", config=llm_config, client=mock_client, server_type=LLMServerType.OPENAI_COMPATIBLE
+        prompt="test",
+        config=llm_config,
+        client=mock_client,
+        server_type=LLMServerType.OPENAI_COMPATIBLE,
     )
 
     assert result == "explicit type"

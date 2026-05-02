@@ -14,6 +14,7 @@ from pathlib import Path
 
 import bits_and_bobs as bnb
 import click
+from punctfix.inference import PunctFixer
 from tqdm.auto import tqdm
 from transformers import pipeline
 
@@ -21,6 +22,7 @@ from but_with_subs.audio_chunking import chunk_audio
 from but_with_subs.data_models import Transcription
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
+from but_with_subs.text_chunking import chunk_transcriptions
 from but_with_subs.transcribing import transcribe
 
 logger = logging.getLogger(__package__)
@@ -91,16 +93,22 @@ def main(
             task="automatic-speech-recognition", model=MODEL_ID, device=get_device()
         )
 
-    audio_chunks = chunk_audio(audio_path=path)
+    logger.info("Loading the punctuation model...")
+    with bnb.no_terminal_output():
+        punctuation_model = PunctFixer(language="da")
 
-    # Transcribe each chunk, with word-level timestamps
-    chunk_transcriptions: list[list[Transcription]] = list()
-    for chunk in tqdm(audio_chunks, unit="chunk", desc="Transcribing"):
-        segments = transcribe(
+    transcriptions: list[Transcription] = list()
+    for chunk in tqdm(chunk_audio(audio_path=path), unit="chunk", desc="Transcribing"):
+        word_transcriptions = transcribe(
             audio_data=chunk.audio, model=model, chunk_offset=chunk.start_time
         )
-        chunk_transcriptions.append(segments)
-    if not chunk_transcriptions:
+        chunked_transcriptions = chunk_transcriptions(
+            transcriptions=word_transcriptions,
+            punctuation_model=punctuation_model,
+            max_words=12,
+        )
+        transcriptions.extend(chunked_transcriptions)
+    if not transcriptions:
         logger.warning("No transcription segments found. Skipping subtitle generation.")
         return
 
@@ -120,12 +128,7 @@ def main(
     # )
     # )
 
-    generate_subtitles(
-        transcriptions=[
-            transcription for chunk in chunk_transcriptions for transcription in chunk
-        ],
-        audio_path=path,
-    )
+    generate_subtitles(transcriptions=transcriptions, audio_path=path)
 
 
 if __name__ == "__main__":

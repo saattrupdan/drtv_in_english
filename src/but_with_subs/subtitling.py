@@ -1,10 +1,4 @@
-"""Subtitle generation module for creating WebVTT files.
-
-This module provides functions to convert a list of ``Transcription`` models
-into a WebVTT (``.vtt``) subtitle file. Word-level transcriptions are grouped
-into readable subtitle cues by splitting on sentence-ending punctuation or a
-maximum word count, whichever comes first.
-"""
+"""Subtitle generation module for creating WebVTT files."""
 
 import collections.abc as c
 import pathlib as pl
@@ -13,19 +7,11 @@ from pathlib import Path
 from .data_models import Transcription
 from .logging_config import logger
 
-_SENTENCE_ENDINGS = frozenset(".?!")
-
 
 def generate_subtitles(
-    transcriptions: list[Transcription],
-    audio_path: str | pl.Path,
-    max_words_per_group: int = 12,
+    transcriptions: list[Transcription], audio_path: str | pl.Path
 ) -> c.Generator[tuple[int, int], None, Path]:
     """Generate a WebVTT subtitle file from word-level transcriptions.
-
-    Words are grouped into subtitle cues by splitting on sentence-ending
-    punctuation or when ``max_words_per_group`` is reached. Each cue spans
-    from the first word's ``start_time`` to the last word's ``end_time``.
 
     Yields ``(current_index, total)`` progress tuples as each group is
     written.
@@ -36,8 +22,6 @@ def generate_subtitles(
         audio_path:
             Path to the source audio file. The output ``.vtt`` file will be
             written to the same directory with the same base name.
-        max_words_per_group:
-            Maximum number of words in a single subtitle cue.
 
     Returns:
         The ``Path`` to the generated ``.vtt`` file.
@@ -67,58 +51,18 @@ def generate_subtitles(
         f"Generating subtitles for {len(transcriptions)} segments -> {output_path}"
     )
 
-    groups = _group_transcriptions(
-        transcriptions=transcriptions, max_words_per_group=max_words_per_group
-    )
-    total = len(groups)
+    total = len(transcriptions)
 
     with output_path.open(mode="a", encoding="utf-8") as f:
-        for index, group in enumerate(groups, start=1):
-            start_ts = _format_vtt_timestamp(seconds=group[0].start_time)
-            end_ts = _format_vtt_timestamp(seconds=group[-1].end_time)
-            text = " ".join(_escape_vtt_text(text=t.text) for t in group)
+        for index, transcription in enumerate(transcriptions, start=1):
+            start_ts = _format_vtt_timestamp(seconds=transcription.start_time)
+            end_ts = _format_vtt_timestamp(seconds=transcription.end_time)
+            text = _escape_vtt_text(text=transcription.text)
             f.writelines([str(index), f"{start_ts} --> {end_ts}", text, ""])
             yield (index, total)
 
     logger.info(f"Subtitles written to {output_path}")
     return output_path
-
-
-def _group_transcriptions(
-    transcriptions: list[Transcription], max_words_per_group: int
-) -> list[list[Transcription]]:
-    """Split word-level transcriptions into subtitle groups.
-
-    A new group is started after a word whose text ends with sentence-ending
-    punctuation (``.``, ``?``, ``!``) or when the current group reaches
-    ``max_words_per_group`` words.
-
-    Args:
-        transcriptions:
-            Word-level transcriptions to group.
-        max_words_per_group:
-            Maximum number of words allowed in a single group.
-
-    Returns:
-        A list of groups, where each group is a non-empty list of
-        consecutive ``Transcription`` objects.
-    """
-    groups: list[list[Transcription]] = []
-    current: list[Transcription] = []
-
-    for t in transcriptions:
-        current.append(t)
-        if (
-            t.text.rstrip()[-1:] in _SENTENCE_ENDINGS
-            or len(current) >= max_words_per_group
-        ):
-            groups.append(current)
-            current = []
-
-    if current:
-        groups.append(current)
-
-    return groups
 
 
 def _format_vtt_timestamp(seconds: float) -> str:
