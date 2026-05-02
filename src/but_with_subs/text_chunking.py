@@ -67,7 +67,7 @@ def chunk_transcriptions(
     return result
 
 
-def _split_text(*, text: str, max_words: int, _depth: int = 0) -> list[str]:
+def _split_text(*, text: str, max_words: int, _depth: int = 0, max_depth: int = 5) -> list[str]:
     """Split text into smaller segments if they exceed max_words.
 
     Uses recursion to progressively split long segments until they fit.
@@ -79,6 +79,8 @@ def _split_text(*, text: str, max_words: int, _depth: int = 0) -> list[str]:
             The maximum number of words per segment.
         _depth:
             Internal recursion depth counter (do not pass).
+        max_depth:
+            Maximum recursion depth to prevent infinite loops (do not pass).
 
     Returns:
         A list of text segments, each with at most max_words words.
@@ -90,27 +92,42 @@ def _split_text(*, text: str, max_words: int, _depth: int = 0) -> list[str]:
     if len(words) <= max_words:
         return [text]
 
+    # Max recursion depth prevents infinite loops
+    if _depth >= max_depth:
+        return [
+            " ".join(words[i : i + max_words]) for i in range(0, len(words), max_words)
+        ]
+
+    # Prevent infinite recursion if the same text is passed
+    if _depth > 0 and text == words[0] + " " + " ".join(words[1:]):
+        return [
+            " ".join(words[i : i + max_words]) for i in range(0, len(words), max_words)
+        ]
+
     # Strategy 1: Sentence tokenization
     sentences = nltk.sent_tokenize(text=text, language="danish")
     if sentences:
         result = []
         for sentence in sentences:
-            result.extend(_split_text(text=sentence, max_words=max_words, _depth=_depth + 1))
-        if all(len(s.split()) <= max_words for s in result):
-            return result
+            result.extend(
+                _split_text(text=sentence, max_words=max_words, _depth=_depth + 1, max_depth=max_depth)
+            )
+        return result
 
     # Strategy 2: Split on punctuation pauses
-    pause_pattern = re.compile(r"([,;:,\-\!\?\,])")
+    pause_pattern = re.compile(r"([,;\:\!\?])")
     parts = re.split(pattern=pause_pattern, string=text)
-    result = []
-    for part in parts:
-        result.extend(_split_text(text=part, max_words=max_words, _depth=_depth + 1))
-    if all(len(s.split()) <= max_words for s in result):
+    if len(parts) > 1:
+        result = []
+        for part in parts:
+            if part.strip():
+                result.extend(
+                    _split_text(text=part, max_words=max_words, _depth=_depth + 1, max_depth=max_depth)
+                )
         return result
 
     # Strategy 3: Fallback chunk by word count
-    part_words = nltk.word_tokenize(text=text, language="danish")
     return [
-        " ".join(part_words[i : i + max_words])
-        for i in range(0, len(part_words), max_words)
+        " ".join(words[i : i + max_words])
+        for i in range(0, len(words), max_words)
     ]
