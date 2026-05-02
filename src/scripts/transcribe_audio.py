@@ -7,9 +7,9 @@ The script transcribes the audio, splits it into chunks based on silence,
 and outputs a `.vtt` subtitle file alongside the original audio file.
 """
 
-import asyncio
 import logging
 import sys
+import warnings
 from pathlib import Path
 
 import bits_and_bobs as bnb
@@ -18,13 +18,14 @@ from tqdm.auto import tqdm
 from transformers import pipeline
 
 from but_with_subs.audio_chunking import chunk_audio
-from but_with_subs.data_models import LLMConfig, Transcription
+from but_with_subs.data_models import Transcription
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.transcribing import transcribe
-from but_with_subs.transcription_processing import process_transcriptions
 
 logger = logging.getLogger(__package__)
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
@@ -104,26 +105,27 @@ def main(
         return
 
     # Process the transcriptions
-    llm_config = LLMConfig(
-        model=llm_model,
-        temperature=0.0,
-        max_tokens=32_768,
-        api_base=llm_api_base,
-        api_key=llm_api_key,
-    )
-    transcriptions = asyncio.run(
-        process_transcriptions(
-            chunk_transcriptions=chunk_transcriptions,
-            target_language=language,
-            llm_config=llm_config,
-        )
-    )
+    # llm_config = LLMConfig(
+    # model=llm_model,
+    # temperature=0.0,
+    # max_tokens=32_768,
+    # api_base=llm_api_base,
+    # api_key=llm_api_key,
+    # )
+    # transcriptions = asyncio.run(
+    # process_transcriptions(
+    # chunk_transcriptions=chunk_transcriptions,
+    # target_language=language,
+    # llm_config=llm_config,
+    # )
+    # )
 
-    with tqdm(total=100, unit="percent", desc="Generating subtitles") as pbar:
-        for current, total in generate_subtitles(
-            transcriptions=transcriptions, audio_path=path
-        ):
-            pbar.update(int(100 * current / total) - pbar.n)
+    generate_subtitles(
+        transcriptions=[
+            transcription for chunk in chunk_transcriptions for transcription in chunk
+        ],
+        audio_path=path,
+    )
 
 
 if __name__ == "__main__":

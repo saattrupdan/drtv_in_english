@@ -1,14 +1,16 @@
 """Audio chunking functionality for splitting audio into segments."""
 
 import logging
+import os
 import pathlib as pl
+from typing import cast
 
 import numpy as np
 import scipy.io.wavfile
 import scipy.signal
 import torch
-from silero_vad import get_speech_timestamps, load_silero_vad
-from tqdm.auto import tqdm
+from pyannote.audio import Pipeline
+from pyannote.audio.pipelines.utils.hook import ProgressHook
 
 from .data_models import Chunk
 
@@ -100,22 +102,36 @@ def _split_audio_into_chunks(audio: np.ndarray) -> list[Chunk]:
     Returns:
         List of Chunk models for each segment.
     """
-    with tqdm(total=100, desc="Splitting audio into chunks", unit="chunk") as pbar:
-        speech_timestamps = get_speech_timestamps(
-            audio=torch.from_numpy(audio),
-            model=load_silero_vad(),
-            return_seconds=True,
-            threshold=0.4,
-            progress_tracking_callback=lambda progress: pbar.update(
-                int(progress) - pbar.n
-            ),
-        )
+    pipeline = cast(
+        Pipeline,
+        Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-community-1", token=os.getenv("HF_TOKEN")
+        ),
+    )
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    pipeline.to(device)
+
+    with ProgressHook() as hook:
+        speech_timestamps = pipeline(
+            dict(waveform=torch.from_numpy(audio).unsqueeze(dim=0), sample_rate=16_000),
+            hook=hook,
+        ).speaker_diarization
+
     chunks = []
-    for speech_timestamp_dct in speech_timestamps:
-        start_s = speech_timestamp_dct["start"]
-        end_s = speech_timestamp_dct["end"]
+    for turn, speaker in speech_timestamps:
+        start_s = turn.start
+        end_s = turn.end
+        if end_s - start_s < 0.05:  # Required for Wav2Vec2 models
+            continue
         chunk_audio = audio[int(start_s * 16_000) : int(end_s * 16_000)]
-        chunk = Chunk(start_time=start_s, end_time=end_s, audio=chunk_audio)
+        chunk = Chunk(
+            start_time=start_s, end_time=end_s, audio=chunk_audio, speaker=speaker
+        )
         chunks.append(chunk)
 
     logger.info(f"Split audio into {len(chunks)} chunks")

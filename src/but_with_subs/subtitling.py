@@ -19,7 +19,7 @@ _SENTENCE_ENDINGS = frozenset(".?!")
 def generate_subtitles(
     transcriptions: list[Transcription],
     audio_path: str | pl.Path,
-    max_words_per_group: int = 8,
+    max_words_per_group: int = 12,
 ) -> c.Generator[tuple[int, int], None, Path]:
     """Generate a WebVTT subtitle file from word-level transcriptions.
 
@@ -67,21 +67,18 @@ def generate_subtitles(
         f"Generating subtitles for {len(transcriptions)} segments -> {output_path}"
     )
 
-    groups = _group_transcriptions(transcriptions, max_words_per_group)
+    groups = _group_transcriptions(
+        transcriptions=transcriptions, max_words_per_group=max_words_per_group
+    )
     total = len(groups)
 
-    vtt_lines: list[str] = ["WEBVTT", ""]
-
-    for index, group in enumerate(groups, start=1):
-        start_ts = _format_vtt_timestamp(seconds=group[0].start_time)
-        end_ts = _format_vtt_timestamp(seconds=group[-1].end_time)
-        text = " ".join(_escape_vtt_text(text=t.text) for t in group)
-        vtt_lines.extend([str(index), f"{start_ts} --> {end_ts}", text, ""])
-        yield (index, total)
-
-    vtt_content = "\n".join(vtt_lines)
-
-    output_path.write_text(data=vtt_content, encoding="utf-8")
+    with output_path.open(mode="a", encoding="utf-8") as f:
+        for index, group in enumerate(groups, start=1):
+            start_ts = _format_vtt_timestamp(seconds=group[0].start_time)
+            end_ts = _format_vtt_timestamp(seconds=group[-1].end_time)
+            text = " ".join(_escape_vtt_text(text=t.text) for t in group)
+            f.writelines([str(index), f"{start_ts} --> {end_ts}", text, ""])
+            yield (index, total)
 
     logger.info(f"Subtitles written to {output_path}")
     return output_path

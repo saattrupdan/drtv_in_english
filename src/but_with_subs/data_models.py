@@ -95,6 +95,8 @@ class Chunk(BaseModel):
             End time of the chunk in seconds.
         audio:
             Numpy array containing the audio data for the chunk.
+        speaker:
+            The speaker name for this chunk, or None if not available.
     """
 
     model_config = {"arbitrary_types_allowed": True}
@@ -102,6 +104,7 @@ class Chunk(BaseModel):
     start_time: float
     end_time: float
     audio: np.ndarray
+    speaker: str | None
 
 
 class File(BaseModel):

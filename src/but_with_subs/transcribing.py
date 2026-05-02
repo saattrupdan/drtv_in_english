@@ -42,15 +42,13 @@ def transcribe(
         A list of ``Transcription`` models, each representing a segment of the
         audio file.
     """
-    with bnb.no_terminal_output():
+    with bnb.no_terminal_output(disable=True):
         result = t.cast(dict, model(audio_data, return_timestamps="word"))
-
-    segments: list[Transcription] = []
-    for chunk in result.get("chunks", []):
-        timestamp = chunk["timestamp"]
-        start_time = float(timestamp[0]) + chunk_offset
-        end_time = float(timestamp[1]) + chunk_offset
-        segments.append(
-            Transcription(start_time=start_time, end_time=end_time, text=chunk["text"])
+    return [
+        Transcription(
+            start_time=float(chunk["timestamp"][0]) + chunk_offset,
+            end_time=float(chunk["timestamp"][1]) + chunk_offset,
+            text=chunk["text"],
         )
-    return segments
+        for chunk in result["chunks"]
+    ]
