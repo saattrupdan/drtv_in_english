@@ -32,6 +32,7 @@ def chunk_transcriptions(
 
     segments = _split_text(text=text, max_words=max_words)
 
+    result: list[Transcription] = []
     for segment in segments:
         first_word = segment.split(" ")[0].lower().strip(string.punctuation)
         first_word_candidates = [
@@ -57,17 +58,27 @@ def chunk_transcriptions(
             continue
         last_word_time = last_word_candidates[0].end_time
 
-        Transcription(start_time=first_word_time, end_time=last_word_time, text=segment)
+        result.append(
+            Transcription(
+                start_time=first_word_time, end_time=last_word_time, text=segment
+            )
+        )
+
+    return result
 
 
-def _split_text(*, text: str, max_words: int) -> list[str]:
+def _split_text(*, text: str, max_words: int, _depth: int = 0) -> list[str]:
     """Split text into smaller segments if they exceed max_words.
+
+    Uses recursion to progressively split long segments until they fit.
 
     Args:
         text:
             The text to split.
         max_words:
             The maximum number of words per segment.
+        _depth:
+            Internal recursion depth counter (do not pass).
 
     Returns:
         A list of text segments, each with at most max_words words.
@@ -79,45 +90,27 @@ def _split_text(*, text: str, max_words: int) -> list[str]:
     if len(words) <= max_words:
         return [text]
 
-    # Try sentence tokenization
-    try:
-        sentences = nltk.sent_tokenize(text, language="danish")
-    except Exception:
-        sentences = []
-
+    # Strategy 1: Sentence tokenization
+    sentences = nltk.sent_tokenize(text=text, language="danish")
     if sentences:
-        # Check if all sentences are small enough
-        short_sentences = [s for s in sentences if len(s.split()) <= max_words]
-        long_sentences = [s for s in sentences if len(s.split()) > max_words]
-
-        if len(short_sentences) == len(sentences):
-            return sentences
-
-        # Process only long sentences further
-        segments: list[str] = []
+        result = []
         for sentence in sentences:
-            if len(sentence.split()) <= max_words:
-                segments.append(sentence)
-            else:
-                # Try splitting on punctuation pauses
-                pause_pattern = r"([.,;:!?\s])"
-                parts = re.split(pause_pattern, sentence)
-                joined_parts = "".join(parts)
-                if len(joined_parts.split()) <= max_words:
-                    segments.append(joined_parts)
-                else:
-                    # Chunk by word count
-                    sentence_words = sentence.split()
-                    word_chunks = [
-                        " ".join(sentence_words[i : i + max_words])
-                        for i in range(0, len(sentence_words), max_words)
-                    ]
-                    segments.extend(word_chunks)
-        return segments
+            result.extend(_split_text(text=sentence, max_words=max_words, _depth=_depth + 1))
+        if all(len(s.split()) <= max_words for s in result):
+            return result
 
-    # Fallback: chunk by word count
-    words = text.split()
+    # Strategy 2: Split on punctuation pauses
+    pause_pattern = re.compile(r"([,;:,\-\!\?\,])")
+    parts = re.split(pattern=pause_pattern, string=text)
+    result = []
+    for part in parts:
+        result.extend(_split_text(text=part, max_words=max_words, _depth=_depth + 1))
+    if all(len(s.split()) <= max_words for s in result):
+        return result
+
+    # Strategy 3: Fallback chunk by word count
+    part_words = nltk.word_tokenize(text=text, language="danish")
     return [
-        " ".join(words[i : i + max_words])
-        for i in range(0, len(words), max_words)
+        " ".join(part_words[i : i + max_words])
+        for i in range(0, len(part_words), max_words)
     ]
