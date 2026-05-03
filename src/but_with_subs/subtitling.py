@@ -42,6 +42,8 @@ def generate_subtitles(
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
     output_path = audio_path.with_suffix(suffix=".vtt")
+    output_path.unlink(missing_ok=True)
+
     logger.info(
         f"Generating subtitles for {len(transcriptions)} segments -> {output_path}"
     )
