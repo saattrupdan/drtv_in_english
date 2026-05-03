@@ -1,7 +1,6 @@
 """Subtitle generation module for creating WebVTT files."""
 
 from pathlib import Path
-from typing import Any
 
 from .constants import MIN_CHUNK_DISPLAY_LENGTH_SECONDS, OVERLAPPING_SPEAKER_COLORS
 from .data_models import Chunk
@@ -45,7 +44,16 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
     overlapping_speakers = _detect_overlapping_speakers(chunks)
     speaker_colors = _assign_speaker_colors(overlapping_speakers)
 
-    with output_path.open(mode="a", encoding="utf-8") as f:
+    with output_path.open(mode="w", encoding="utf-8") as f:
+        # Write WEBVTT header
+        f.write("WEBVTT\n\n")
+        
+        # Write STYLE section for speaker colors
+        style_section = _generate_style_section(speaker_colors)
+        if style_section:
+            f.write(style_section)
+            f.write("\n")
+        
         for index, chunk in enumerate(chunks, start=1):
             chunk.end_time = max(
                 chunk.end_time, chunk.start_time + MIN_CHUNK_DISPLAY_LENGTH_SECONDS
@@ -168,16 +176,60 @@ def _assign_speaker_colors(
     return speaker_colors
 
 
-def _apply_speaker_color(text: str, color_hex: str) -> str:
-    """Wrap text with WebVTT color styling.
+def _hex_to_css_class(color_hex: str) -> str:
+    """Convert a hex color to a valid CSS class name.
     
-    WebVTT uses the <c.color>text</c> syntax for inline styling.
+    Args:
+        color_hex: Hex color code (e.g., "#E69F00").
+        
+    Returns:
+        Valid CSS class name (e.g., "orange", "skyblue").
+    """
+    # Map known colors to friendly names
+    color_names = {
+        "#E69F00": "orange",
+        "#56B4E9": "skyblue",
+        "#009E73": "bluishgreen",
+        "#CC79A7": "reddishpurple",
+    }
+    return color_names.get(color_hex, color_hex.lstrip("#").lower())
+
+
+def _apply_speaker_color(text: str, color_hex: str) -> str:
+    """Wrap text with WebVTT color styling using CSS classes.
+    
+    WebVTT uses the <c.classname>text</c> syntax for inline styling
+    with predefined styles in the STYLE section.
     
     Args:
         text: The text to color.
         color_hex: Hex color code (e.g., "#E69F00").
         
     Returns:
-        Text wrapped with WebVTT color tags.
+        Text wrapped with WebVTT color tags using a CSS class.
     """
-    return f"<c.{color_hex}>{text}</c>"
+    css_class = _hex_to_css_class(color_hex)
+    return f"<c.{css_class}>{text}</c>"
+
+
+def _generate_style_section(speaker_colors: dict[str, str]) -> str:
+    """Generate the WebVTT STYLE section for speaker colors.
+    
+    Args:
+        speaker_colors: Dictionary mapping speaker names to hex colors.
+        
+    Returns:
+        Complete STYLE section as a string.
+    """
+    if not speaker_colors:
+        return ""
+    
+    lines = ["STYLE"]
+    for color_hex in set(speaker_colors.values()):
+        css_class = _hex_to_css_class(color_hex)
+        lines.append(f"::cue(.{css_class}) {{")
+        lines.append(f"  color: {color_hex};")
+        lines.append("}")
+        lines.append("")
+    
+    return "\n".join(lines)
