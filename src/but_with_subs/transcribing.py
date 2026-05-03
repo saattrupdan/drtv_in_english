@@ -58,7 +58,7 @@ def transcribe_chunk(
 
 def transcribe_chunks_batch(
     chunks: list[Chunk], model: AutomaticSpeechRecognitionPipeline
-) -> dict[Chunk, list[Chunk]]:
+) -> list[list[Chunk]]:
     """Transcribe multiple audio chunks in a single batch.
 
     This function processes multiple chunks simultaneously by:
@@ -108,9 +108,7 @@ def transcribe_chunks_batch(
     with bnb.no_terminal_output():
         results = t.cast(list[dict], model(padded_audio_list, return_timestamps="word"))
 
-    # Map results back to original chunks
-    chunk_transcriptions: dict[Chunk, list[Chunk]] = {}
-
+    chunk_transcriptions: list[list[Chunk]] = list()
     for chunk, result in zip(chunks, results):
         word_chunks: list[Chunk] = []
         for transcription_dct in result["chunks"]:
@@ -137,7 +135,7 @@ def transcribe_chunks_batch(
                 )
             )
 
-        chunk_transcriptions[chunk] = word_chunks
+        chunk_transcriptions.append(word_chunks)
 
     return chunk_transcriptions
 

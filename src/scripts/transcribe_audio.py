@@ -59,10 +59,7 @@ MODEL_ID = (
     "Lower values reduce padding waste for varied-length chunks but increase batch count.",
 )
 def main(
-    audio_path: str,
-    language: str | None,
-    batch_size: int,
-    max_duration: float,
+    audio_path: str, language: str | None, batch_size: int, max_duration: float
 ) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
@@ -121,7 +118,7 @@ def main(
     # Post-process each chunk's transcription
     chunks: list[Chunk] = list()
     for word_chunks in tqdm(
-        batch_results.values(), unit="batch", desc="Processing transcriptions"
+        batch_results, unit="batch", desc="Processing transcriptions"
     ):
         chunked_transcriptions = group_word_chunks(
             word_chunks=word_chunks, punctuation_model=punctuation_model, max_words=12
