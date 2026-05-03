@@ -36,7 +36,7 @@ def transcribe_chunk(
     for transcription_dct in result["chunks"]:
         start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
         end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
-        audio = chunk.audio[16_000 * start_time : 16_000 * end_time]
+        audio = chunk.audio[int(16_000 * start_time) : int(16_000 * end_time)]
         word_chunks.append(
             Chunk(
                 start_time=start_time,
