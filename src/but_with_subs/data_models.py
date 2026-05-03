@@ -10,6 +10,8 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel
 
+from .constants import MAX_CHUNK_LENGTH_SECONDS
+
 
 class Chunk(BaseModel):
     """A chunk of data.
@@ -37,7 +39,7 @@ class Chunk(BaseModel):
 
     def model_post_init(self, _context: dict) -> None:
         """Post-initialisation hook for the model."""
-        if self.end_time - self.start_time < 0.05:
+        if self.end_time - self.start_time < MAX_CHUNK_LENGTH_SECONDS:
             raise ValueError("Duration of chunk must be at least 50ms")
 
 

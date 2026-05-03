@@ -7,6 +7,7 @@ import nltk
 import numpy as np
 from punctfix import PunctFixer
 
+from .constants import MAX_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 from .logging_config import logger
 
@@ -67,8 +68,7 @@ def group_word_chunks(
             continue
         segment_end = last_word_candidates[0].end_time
 
-        # If the segment is too short, we discard it
-        if segment_end - segment_start < 0.05:
+        if segment_end - segment_start < MAX_CHUNK_LENGTH_SECONDS:
             continue
 
         # Identify all the word chunks that fall within the segment

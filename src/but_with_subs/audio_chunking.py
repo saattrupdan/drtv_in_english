@@ -9,6 +9,7 @@ import torch
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 
+from .constants import MAX_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 
 logger = logging.getLogger(__package__)
@@ -48,7 +49,7 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
     for turn, speaker in speech_timestamps:
         start_s = turn.start
         end_s = turn.end
-        if end_s - start_s < 0.05:  # Required for Wav2Vec2 models
+        if end_s - start_s < MAX_CHUNK_LENGTH_SECONDS:
             continue
         chunk_audio = audio[int(start_s * 16_000) : int(end_s * 16_000)]
         chunk = Chunk(

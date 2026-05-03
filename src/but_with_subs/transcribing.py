@@ -10,6 +10,7 @@ import typing as t
 import bits_and_bobs as bnb
 from transformers import AutomaticSpeechRecognitionPipeline
 
+from .constants import MAX_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 
 logger = logging.getLogger(__package__)
@@ -36,6 +37,8 @@ def transcribe_chunk(
     for transcription_dct in result["chunks"]:
         start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
         end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
+        if end_time - start_time < MAX_CHUNK_LENGTH_SECONDS:
+            continue
         audio = chunk.audio[int(16_000 * start_time) : int(16_000 * end_time)]
         word_chunks.append(
             Chunk(
