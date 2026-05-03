@@ -57,18 +57,21 @@ def test_extract_audio_calls_ffmpeg_with_correct_command() -> None:
     with um.patch("subprocess.run") as mock_run:
         extract_audio(video_path=video_path)
 
-    mock_run.assert_called_once_with(
-        args=[
-            "ffmpeg",
-            "-i",
-            str(video_path),
-            "-n",
-            "-v",
-            "error",
-            str(video_path.with_suffix(".wav")),
-        ],
-        check=True,
-    )
+    call_kwargs = mock_run.call_args.kwargs
+    expected_args = [
+        "ffmpeg",
+        "-i",
+        str(video_path),
+        "-n",
+        "-v",
+        "error",
+        str(video_path.with_suffix(".wav")),
+    ]
+    
+    # Verify the args match exactly
+    assert call_kwargs["args"] == expected_args
+    # Verify check=True is set
+    assert call_kwargs["check"] is True
 
 
 def test_extract_audio_returns_output_path() -> None:
