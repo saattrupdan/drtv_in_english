@@ -4,9 +4,9 @@ This module provides functions to transcribe audio chunks into text segments
 using a pretrained ASR pipeline from the Hugging Face transformers library.
 """
 
+import collections.abc as c
 import logging
 import typing as t
-from collections.abc import Iterator
 
 import bits_and_bobs as bnb
 import numpy as np
@@ -145,7 +145,7 @@ def create_dynamic_batches(
     chunks: list[Chunk],
     batch_size: int = 20,
     max_duration: float = 60.0,
-) -> Iterator[list[Chunk]]:
+) -> c.Iterator[list[Chunk]]:
     """Create dynamic batches from audio chunks for efficient transcription.
 
     This function implements an intelligent batching strategy that minimises
