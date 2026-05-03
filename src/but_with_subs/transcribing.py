@@ -6,6 +6,7 @@ using a pretrained ASR pipeline from the Hugging Face transformers library.
 
 import logging
 import typing as t
+from collections.abc import Iterator
 
 import bits_and_bobs as bnb
 import numpy as np
