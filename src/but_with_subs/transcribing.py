@@ -103,7 +103,7 @@ def transcribe_chunks_batch(
         padded_audio_list.append(padded_audio)
 
     # Run batch inference
-    with bnb.no_terminal_output(disable=True):
+    with bnb.no_terminal_output():
         results = t.cast(list[dict], model(padded_audio_list, return_timestamps="word"))
 
     # Map results back to original chunks
