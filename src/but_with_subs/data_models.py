@@ -104,7 +104,7 @@ class Chunk(BaseModel):
     start_time: float
     end_time: float
     audio: np.ndarray
-    speaker: str | None
+    speaker: str | None = None
 
 
 class File(BaseModel):

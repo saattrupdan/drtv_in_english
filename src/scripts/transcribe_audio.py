@@ -41,10 +41,7 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
     default=None,
     help="Target language for translation (e.g. 'French', 'Spanish').",
 )
-def main(
-    audio_path: str,
-    language: str | None,
-) -> None:
+def main(audio_path: str, language: str | None) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
     Loads the audio file, splits it into chunks based on silence breaks,

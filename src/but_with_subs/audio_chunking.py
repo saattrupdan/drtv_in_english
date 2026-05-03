@@ -1,23 +1,21 @@
 """Audio chunking functionality for splitting audio into segments."""
 
 import logging
-import os
-import pathlib as pl
-from typing import cast
+import pathlib
 
 import numpy as np
 import scipy.io.wavfile
 import scipy.signal
+import silero_vad
 import torch
-from pyannote.audio import Pipeline
-from pyannote.audio.pipelines.utils.hook import ProgressHook
+from silero_vad import get_speech_timestamps
 
 from .data_models import Chunk
 
 logger = logging.getLogger(__package__)
 
 
-def chunk_audio(audio_path: pl.Path) -> list[Chunk]:
+def chunk_audio(audio_path: pathlib.Path) -> list[Chunk]:
     """Split audio into chunks based on silence breaks.
 
     Loads the audio file, resamples it to 16 kHz mono, detects silence
@@ -36,7 +34,7 @@ def chunk_audio(audio_path: pl.Path) -> list[Chunk]:
     return _split_audio_into_chunks(audio=mono_audio)
 
 
-def _load_audio(path: pl.Path) -> tuple[int, np.ndarray]:
+def _load_audio(path: pathlib.Path) -> tuple[int, np.ndarray]:
     """Load a WAV audio file using scipy.io.wavfile.
 
     Reads the specified WAV file and returns the sample rate and audio
@@ -93,7 +91,10 @@ def _resample_to_16k_mono(audio: np.ndarray, original_sr: int) -> np.ndarray:
 
 
 def _split_audio_into_chunks(audio: np.ndarray) -> list[Chunk]:
-    """Split audio into chunks.
+    """Split audio into chunks based on speech detection.
+
+    Uses Silero VAD to detect speech segments and creates Chunk models
+    for each detected segment.
 
     Args:
         audio:
@@ -102,36 +103,20 @@ def _split_audio_into_chunks(audio: np.ndarray) -> list[Chunk]:
     Returns:
         List of Chunk models for each segment.
     """
-    pipeline = cast(
-        Pipeline,
-        Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-community-1", token=os.getenv("HF_TOKEN")
-        ),
+    speech_timestamps = get_speech_timestamps(
+        audio=torch.from_numpy(audio),
+        sampling_rate=16_000,
+        model=silero_vad.load_silero_vad(),
     )
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
-    pipeline.to(device)
 
-    with ProgressHook() as hook:
-        speech_timestamps = pipeline(
-            dict(waveform=torch.from_numpy(audio).unsqueeze(dim=0), sample_rate=16_000),
-            hook=hook,
-        ).speaker_diarization
-
-    chunks = []
-    for turn, speaker in speech_timestamps:
-        start_s = turn.start
-        end_s = turn.end
-        if end_s - start_s < 0.05:  # Required for Wav2Vec2 models
+    chunks: list[Chunk] = []
+    for ts in speech_timestamps:
+        start_s = float(ts["start"])
+        end_s = float(ts["end"])
+        if end_s - start_s < 0.05:
             continue
         chunk_audio = audio[int(start_s * 16_000) : int(end_s * 16_000)]
-        chunk = Chunk(
-            start_time=start_s, end_time=end_s, audio=chunk_audio, speaker=speaker
-        )
+        chunk = Chunk(start_time=start_s, end_time=end_s, audio=chunk_audio)
         chunks.append(chunk)
 
     logger.info(f"Split audio into {len(chunks)} chunks")

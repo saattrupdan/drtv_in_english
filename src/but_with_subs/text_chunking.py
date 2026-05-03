@@ -13,22 +13,28 @@ nltk.download("punkt", quiet=True)
 
 
 def chunk_transcriptions(
-    transcriptions: list[Transcription], punctuation_model: PunctFixer, max_words: int
+    transcriptions: list[Transcription],
+    max_words: int,
+    punctuation_model: PunctFixer | None = None,
 ) -> list[Transcription]:
     """Split transcriptions into segments.
 
     Args:
         transcriptions:
             A list of Transcription objects to be chunked.
-        punctuation_model:
-            The punctuation model to use for fixing punctuation.
         max_words:
             The maximum number of words per segment.
+        punctuation_model (optional):
+            The punctuation model to use for fixing punctuation.
+            Defaults to a fresh ``PunctFixer`` instance.
 
     Returns:
         A list of Transcription objects, each containing a segment of the original
         transcription.
     """
+    if punctuation_model is None:
+        punctuation_model = PunctFixer()
+
     text = " ".join([transcription.text for transcription in transcriptions])
     text = punctuation_model.punctuate(text=text)
 
@@ -85,15 +91,17 @@ def _split_text(*, text: str, max_words: int) -> list[str]:
     Returns:
         A list of text segments, each with at most max_words words.
     """
-    segments: list[str] = [text]
+    if not text:
+        return []
 
-    # Try sentence segmentation
+    # Try sentence segmentation first
     sentence_segments: list[str] = list()
-    for segment in segments:
-        if len(segment.split()) <= max_words:
-            sentence_segments.append(segment)
-            continue
-        sentence_segments.extend(nltk.sent_tokenize(text=segment, language="danish"))
+    sentences = nltk.sent_tokenize(text=text, language="danish")
+    if sentences:
+        for sentence in sentences:
+            sentence_segments.append(sentence)
+    else:
+        sentence_segments = [text]
 
     # Try punctuation segmentation
     punctuation_segments: list[str] = list()

@@ -105,7 +105,12 @@ def test_chunk_transcriptions_single_short_returns_single() -> None:
         Transcription(start_time=0.0, end_time=0.5, text="hello"),
         Transcription(start_time=0.5, end_time=1.0, text="world"),
     ]
-    result = chunk_transcriptions(transcriptions=transcriptions, max_words=10)
+    mock_punctuator = um.Mock()
+    mock_punctuator.punctuate = um.Mock(side_effect=lambda text: text)
+    with um.patch(
+        "but_with_subs.text_chunking.PunctFixer", return_value=mock_punctuator
+    ):
+        result = chunk_transcriptions(transcriptions=transcriptions, max_words=10)
 
     assert len(result) == 1
     assert result[0].text == "hello world"
@@ -125,7 +130,12 @@ def test_chunk_transcriptions_long_text_returns_multiple_segments() -> None:
         Transcription(start_time=2.0, end_time=2.5, text="five"),
         Transcription(start_time=2.5, end_time=3.0, text="six"),
     ]
-    result = chunk_transcriptions(transcriptions=transcriptions, max_words=3)
+    mock_punctuator = um.Mock()
+    mock_punctuator.punctuate = um.Mock(side_effect=lambda text: text)
+    with um.patch(
+        "but_with_subs.text_chunking.PunctFixer", return_value=mock_punctuator
+    ):
+        result = chunk_transcriptions(transcriptions=transcriptions, max_words=3)
 
     assert len(result) >= 2
 
@@ -141,10 +151,18 @@ def test_chunk_transcriptions_preserves_time_ranges() -> None:
         Transcription(start_time=0.5, end_time=1.0, text="beautiful"),
         Transcription(start_time=1.0, end_time=1.5, text="world"),
     ]
-    result = chunk_transcriptions(transcriptions=transcriptions, max_words=2)
+    mock_punctuator = um.Mock()
+    mock_punctuator.punctuate = um.Mock(side_effect=lambda text: text)
+    with um.patch(
+        "but_with_subs.text_chunking.PunctFixer", return_value=mock_punctuator
+    ):
+        result = chunk_transcriptions(transcriptions=transcriptions, max_words=2)
 
+    assert len(result) == 2
     assert result[0].start_time == 0.0
-    assert result[0].end_time == 1.5
+    assert result[0].end_time == 1.0
+    assert result[1].start_time == 1.0
+    assert result[1].end_time == 1.5
 
 
 def test_chunk_transcriptions_handles_punctuation_in_segments() -> None:
@@ -157,7 +175,12 @@ def test_chunk_transcriptions_handles_punctuation_in_segments() -> None:
         Transcription(start_time=0.0, end_time=0.5, text="hello"),
         Transcription(start_time=0.5, end_time=1.0, text="world"),
     ]
-    result = chunk_transcriptions(transcriptions=transcriptions, max_words=3)
+    mock_punctuator = um.Mock()
+    mock_punctuator.punctuate = um.Mock(side_effect=lambda text: text)
+    with um.patch(
+        "but_with_subs.text_chunking.PunctFixer", return_value=mock_punctuator
+    ):
+        result = chunk_transcriptions(transcriptions=transcriptions, max_words=3)
 
     assert len(result) == 1
     assert "hello" in result[0].text
@@ -179,7 +202,12 @@ def test_chunk_transcriptions_with_multiple_segments() -> None:
         Transcription(start_time=2.0, end_time=2.5, text="fifth"),
         Transcription(start_time=2.5, end_time=3.0, text="sixth"),
     ]
-    result = chunk_transcriptions(transcriptions=transcriptions, max_words=2)
+    mock_punctuator = um.Mock()
+    mock_punctuator.punctuate = um.Mock(side_effect=lambda text: text)
+    with um.patch(
+        "but_with_subs.text_chunking.PunctFixer", return_value=mock_punctuator
+    ):
+        result = chunk_transcriptions(transcriptions=transcriptions, max_words=2)
 
     assert len(result) >= 2
     for segment in result:

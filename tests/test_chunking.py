@@ -141,9 +141,10 @@ def test_split_audio_into_chunks_with_speech_returns_chunks() -> None:
 
     with (
         um.patch(
-            "but_with_subs.chunking.get_speech_timestamps", return_value=mock_timestamps
+            "but_with_subs.audio_chunking.get_speech_timestamps",
+            return_value=mock_timestamps,
         ),
-        um.patch("but_with_subs.chunking.load_silero_vad", return_value=None),
+        um.patch("silero_vad.load_silero_vad", return_value=None),
     ):
         chunks = _split_audio_into_chunks(audio=mock_audio)
 
@@ -160,8 +161,8 @@ def test_split_audio_into_chunks_with_no_speech_returns_empty() -> None:
     mock_audio = np.zeros(shape=16000, dtype=np.float64)
 
     with (
-        um.patch("but_with_subs.chunking.get_speech_timestamps", return_value=[]),
-        um.patch("but_with_subs.chunking.load_silero_vad", return_value=None),
+        um.patch("but_with_subs.audio_chunking.get_speech_timestamps", return_value=[]),
+        um.patch("silero_vad.load_silero_vad", return_value=None),
     ):
         chunks = _split_audio_into_chunks(audio=mock_audio)
 
@@ -182,15 +183,18 @@ def test_chunk_audio_returns_chunks() -> None:
 
     with (
         um.patch(
-            "but_with_subs.chunking._load_audio", return_value=(mock_sr, mock_audio)
+            "but_with_subs.audio_chunking._load_audio",
+            return_value=(mock_sr, mock_audio),
         ),
         um.patch(
-            "but_with_subs.chunking._resample_to_16k_mono", return_value=mock_audio
+            "but_with_subs.audio_chunking._resample_to_16k_mono",
+            return_value=mock_audio,
         ),
         um.patch(
-            "but_with_subs.chunking.get_speech_timestamps", return_value=mock_timestamps
+            "but_with_subs.audio_chunking.get_speech_timestamps",
+            return_value=mock_timestamps,
         ),
-        um.patch("but_with_subs.chunking.load_silero_vad", return_value=None),
+        um.patch("silero_vad.load_silero_vad", return_value=None),
     ):
         chunks = list(chunk_audio(audio_path=pt.Path("/fake/audio.wav")))
 

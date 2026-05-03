@@ -1,17 +1,64 @@
 """Subtitle generation module for creating WebVTT files."""
 
-import collections.abc as c
-import pathlib as pl
 from pathlib import Path
+from typing import Generator
 
 from .data_models import Transcription
 from .logging_config import logger
 
 
+def _group_transcriptions(
+    transcriptions: list[Transcription], max_words_per_group: int = 8
+) -> list[list[Transcription]]:
+    """Group transcriptions by sentence boundaries and max word count.
+
+    Splits groups on sentence-ending punctuation (``.``, ``!``, ``?``) and
+    also enforces a maximum number of words per group.
+
+    Args:
+        transcriptions:
+            List of ``Transcription`` models to group.
+        max_words_per_group (optional):
+            Maximum number of words allowed in a single group. Defaults to 8.
+
+    Returns:
+        A list of groups, where each group is a list of ``Transcription``
+        models.
+    """
+    if not transcriptions:
+        return []
+
+    groups: list[list[Transcription]] = []
+    current_group: list[Transcription] = []
+
+    for transcription in transcriptions:
+        current_group.append(transcription)
+
+        # Sentence-ending punctuation splits the group
+        if transcription.text and transcription.text[-1] in ".!?":
+            groups.append(current_group)
+            current_group = []
+
+        # Max words per group also splits
+        if len(current_group) >= max_words_per_group:
+            groups.append(current_group)
+            current_group = []
+
+    if current_group:
+        groups.append(current_group)
+
+    return groups
+
+
 def generate_subtitles(
-    transcriptions: list[Transcription], audio_path: str | pl.Path
-) -> c.Generator[tuple[int, int], None, Path]:
+    transcriptions: list[Transcription],
+    audio_path: str | Path,
+    max_words_per_group: int = 8,
+) -> Generator[tuple[int, int], None, Path]:
     """Generate a WebVTT subtitle file from word-level transcriptions.
+
+    Groups transcriptions into sentence-level cues based on punctuation and
+    word count, then writes each group as a single WebVTT cue block.
 
     Yields ``(current_index, total)`` progress tuples as each group is
     written.
@@ -22,13 +69,14 @@ def generate_subtitles(
         audio_path:
             Path to the source audio file. The output ``.vtt`` file will be
             written to the same directory with the same base name.
+        max_words_per_group (optional):
+            Maximum number of words allowed in a single group. Defaults to 8.
+
+    Yields:
+        Progress tuples ``(current_index, total)``.
 
     Returns:
         The ``Path`` to the generated ``.vtt`` file.
-
-    Yields:
-        A tuple of ``(current_index, total)`` progress markers for each
-        group processed, where ``current_index`` is 1-based.
 
     Raises:
         ValueError:
@@ -51,14 +99,27 @@ def generate_subtitles(
         f"Generating subtitles for {len(transcriptions)} segments -> {output_path}"
     )
 
-    total = len(transcriptions)
+    groups = _group_transcriptions(
+        transcriptions=transcriptions, max_words_per_group=max_words_per_group
+    )
+    total = len(groups)
 
-    with output_path.open(mode="a", encoding="utf-8") as f:
-        for index, transcription in enumerate(transcriptions, start=1):
-            start_ts = _format_vtt_timestamp(seconds=transcription.start_time)
-            end_ts = _format_vtt_timestamp(seconds=transcription.end_time)
-            text = _escape_vtt_text(text=transcription.text)
-            f.writelines([str(index), f"{start_ts} --> {end_ts}", text, ""])
+    with output_path.open(mode="w", encoding="utf-8") as f:
+        f.write("WEBVTT\n\n")
+
+        for index, group in enumerate(groups, start=1):
+            start_ts = _format_vtt_timestamp(seconds=group[0].start_time)
+            end_ts = _format_vtt_timestamp(seconds=group[-1].end_time)
+            text = " ".join(t.text for t in group)
+            escaped_text = _escape_vtt_text(text=text)
+            f.writelines(
+                [
+                    f"{str(index)}\n",
+                    f"{start_ts} --> {end_ts}\n",
+                    f"{escaped_text}\n",
+                    "\n",
+                ]
+            )
             yield (index, total)
 
     logger.info(f"Subtitles written to {output_path}")
