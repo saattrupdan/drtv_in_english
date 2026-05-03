@@ -88,7 +88,7 @@ def transcribe_chunks_batch(
           individually, especially for large numbers of chunks.
     """
     if not chunks:
-        return {}
+        return list()
 
     # Find the maximum length for padding
     max_length = max(len(chunk.audio) for chunk in chunks)
@@ -226,7 +226,7 @@ def transcribe_chunks_dynamic(
     batch_size: int = 20,
     max_duration: float = 60.0,
     show_progress: bool = True,
-) -> dict[Chunk, list[Chunk]]:
+) -> list[list[Chunk]]:
     """Transcribe audio chunks using dynamic batching with progress tracking.
 
     This function processes audio chunks in optimised batches, intelligently
@@ -271,7 +271,7 @@ def transcribe_chunks_dynamic(
         - Progress tracking helps monitor long-running transcriptions
     """
     if not chunks:
-        return {}
+        return list()
 
     # Create batches using the dynamic batching strategy
     batches = list(create_dynamic_batches(chunks, batch_size, max_duration))
@@ -282,10 +282,7 @@ def transcribe_chunks_dynamic(
         f"(batch_size={batch_size}, max_duration={max_duration:.1f}s)"
     )
 
-    # Aggregate all results
-    all_transcriptions: dict[Chunk, list[Chunk]] = {}
-
-    # Create progress iterator
+    all_transcriptions: list[list[Chunk]] = list()
     with tqdm(
         batches,
         total=total_batches,
@@ -302,7 +299,7 @@ def transcribe_chunks_dynamic(
 
             # Transcribe this batch
             batch_results = transcribe_chunks_batch(chunks=batch, model=model)
-            all_transcriptions.update(batch_results)
+            all_transcriptions.extend(batch_results)
 
     logger.info(f"Completed transcription of {len(all_transcriptions)} chunks")
 
