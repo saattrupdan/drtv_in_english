@@ -48,9 +48,7 @@ def group_word_chunks(
     for segment in _split_text(text=text, max_words=max_words):
         # Strip the punctuation from the segment, only to be able to locate it amongst
         # the word chunks
-        segment_without_punctuation = re.sub(
-            PUNCTUATION_PATTERN, "", segment
-        ).strip()
+        segment_without_punctuation = re.sub(PUNCTUATION_PATTERN, "", segment).strip()
         if segment_without_punctuation == "":
             continue
 
@@ -103,7 +101,7 @@ def group_word_chunks(
             Chunk(
                 start_time=segment_start,
                 end_time=segment_end,
-                audio=np.stack(
+                audio=np.concatenate(
                     [word_chunk.audio for word_chunk in word_chunks_in_segment], axis=0
                 ),
                 text=segment,
