@@ -31,9 +31,7 @@ logger = logging.getLogger(__package__)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-MODEL_ID = (
-    "CoRal-project/roest-v3-whisper-1.5b"  # "CoRal-project/roest-v3-wav2vec2-315m"
-)
+MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
 
 
 @click.command()
@@ -94,7 +92,7 @@ def main(
             task="automatic-speech-recognition",
             model=MODEL_ID,
             device=get_device(),
-            num_beams=1,
+            num_beams=5,
         )
 
     logger.info("Loading the punctuation model...")
