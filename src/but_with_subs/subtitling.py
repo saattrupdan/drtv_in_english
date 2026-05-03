@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from .constants import MIN_CHUNK_DISPLAY_LENGTH_SECONDS
 from .data_models import Chunk
 from .logging_config import logger
 
@@ -43,6 +44,10 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
 
     with output_path.open(mode="a", encoding="utf-8") as f:
         for index, chunk in enumerate(chunks, start=1):
+            chunk.end_time = max(
+                chunk.end_time, chunk.start_time + MIN_CHUNK_DISPLAY_LENGTH_SECONDS
+            )
+
             start_ts = _format_vtt_timestamp(seconds=chunk.start_time)
             end_ts = _format_vtt_timestamp(seconds=chunk.end_time)
             escaped_text = _escape_vtt_text(text=chunk.text or "")

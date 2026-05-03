@@ -10,8 +10,6 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel
 
-from .constants import MIN_CHUNK_DISPLAY_LENGTH_SECONDS, MIN_CHUNK_LENGTH_SECONDS
-
 
 class Chunk(BaseModel):
     """A chunk of data.
@@ -36,14 +34,6 @@ class Chunk(BaseModel):
     audio: np.ndarray
     text: str | None
     speaker: str | None
-
-    def model_post_init(self, _context: dict) -> None:
-        """Post-initialisation hook for the model."""
-        if self.end_time - self.start_time < MIN_CHUNK_LENGTH_SECONDS:
-            raise ValueError("Duration of chunk must be at least 50ms")
-        self.end_time = max(
-            self.end_time, self.start_time + MIN_CHUNK_DISPLAY_LENGTH_SECONDS
-        )
 
 
 class File(BaseModel):
