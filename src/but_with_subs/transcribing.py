@@ -10,6 +10,7 @@ import typing as t
 
 import bits_and_bobs as bnb
 import numpy as np
+from tqdm.auto import tqdm
 from transformers import AutomaticSpeechRecognitionPipeline
 
 from .constants import MIN_CHUNK_LENGTH_SECONDS
@@ -142,9 +143,7 @@ def transcribe_chunks_batch(
 
 
 def create_dynamic_batches(
-    chunks: list[Chunk],
-    batch_size: int = 20,
-    max_duration: float = 60.0,
+    chunks: list[Chunk], batch_size: int = 20, max_duration: float = 60.0
 ) -> c.Iterator[list[Chunk]]:
     """Create dynamic batches from audio chunks for efficient transcription.
 
@@ -264,10 +263,7 @@ def transcribe_chunks_dynamic(
     Example:
         >>> from but_with_subs.transcribing import transcribe_chunks_dynamic
         >>> all_results = transcribe_chunks_dynamic(
-        ...     chunks=all_chunks,
-        ...     model=model,
-        ...     batch_size=20,
-        ...     max_duration=60.0
+        ...     chunks=all_chunks, model=model, batch_size=20, max_duration=60.0
         ... )
 
     Performance Notes:
@@ -284,35 +280,32 @@ def transcribe_chunks_dynamic(
     total_batches = len(batches)
 
     logger.info(
-        "Processing %d chunks in %d dynamic batches (batch_size=%d, max_duration=%.1fs)",
-        len(chunks),
-        total_batches,
-        batch_size,
-        max_duration,
+        f"Processing {len(chunks)} chunks in {total_batches} dynamic batches "
+        f"(batch_size={batch_size}, max_duration={max_duration:.1f}s)"
     )
 
     # Aggregate all results
     all_transcriptions: dict[Chunk, list[Chunk]] = {}
 
     # Create progress iterator
-    batch_iterator = tqdm(
+    with tqdm(
         batches,
         total=total_batches,
         desc="Transcribing batches",
         disable=not show_progress,
-    )
+    ) as batch_iterator:
+        for batch_idx, batch in enumerate(batch_iterator):
+            # Update progress bar description with batch info
+            batch_duration = sum(c.end_time - c.start_time for c in batch)
+            batch_iterator.set_description(
+                f"Batch {batch_idx + 1}/{total_batches} "
+                f"({len(batch)} chunks, {batch_duration:.1f}s)"
+            )
 
-    for batch_idx, batch in enumerate(batch_iterator):
-        # Update progress bar description with batch info
-        batch_duration = sum(c.end_time - c.start_time for c in batch)
-        batch_iterator.set_description(
-            f"Batch {batch_idx + 1}/{total_batches} ({len(batch)} chunks, {batch_duration:.1f}s)"
-        )
+            # Transcribe this batch
+            batch_results = transcribe_chunks_batch(chunks=batch, model=model)
+            all_transcriptions.update(batch_results)
 
-        # Transcribe this batch
-        batch_results = transcribe_chunks_batch(chunks=batch, model=model)
-        all_transcriptions.update(batch_results)
-
-    logger.info("Completed transcription of %d chunks", len(all_transcriptions))
+    logger.info(f"Completed transcription of {len(all_transcriptions)} chunks")
 
     return all_transcriptions

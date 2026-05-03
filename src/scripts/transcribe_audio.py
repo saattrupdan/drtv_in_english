@@ -86,10 +86,10 @@ def main(
     """
     path = Path(audio_path)
     if not path.is_file():
-        logger.error("File not found: %s", audio_path)
+        logger.error(f"File not found: {audio_path}")
         sys.exit(1)
 
-    logger.info("Loading the %s model...", MODEL_ID)
+    logger.info(f"Loading the {MODEL_ID} model...")
     with bnb.no_terminal_output():
         model = pipeline(
             task="automatic-speech-recognition",
@@ -107,7 +107,7 @@ def main(
 
     # Generate all chunks first
     all_chunks = list(chunk_by_audio(audio=audio))
-    logger.info("Generated %d initial audio chunks", len(all_chunks))
+    logger.info(f"Generated {len(all_chunks)} initial audio chunks")
 
     # Process chunks using dynamic batching with configurable parameters
     batch_results = transcribe_chunks_dynamic(
