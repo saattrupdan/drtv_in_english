@@ -24,14 +24,16 @@ from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
-from but_with_subs.transcribing import transcribe_chunk
+from but_with_subs.transcribing import transcribe_chunk, transcribe_chunks_batch
 
 logger = logging.getLogger(__package__)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
+MODEL_ID = (
+    "CoRal-project/roest-v3-whisper-1.5b"  # "CoRal-project/roest-v3-wav2vec2-315m"
+)
 
 
 @click.command()
@@ -64,7 +66,10 @@ def main(audio_path: str, language: str | None) -> None:
     logger.info("Loading the %s model...", MODEL_ID)
     with bnb.no_terminal_output():
         model = pipeline(
-            task="automatic-speech-recognition", model=MODEL_ID, device=get_device()
+            task="automatic-speech-recognition",
+            model=MODEL_ID,
+            device=get_device(),
+            num_beams=1,
         )
 
     logger.info("Loading the punctuation model...")
@@ -74,11 +79,24 @@ def main(audio_path: str, language: str | None) -> None:
     logger.info("Loading the audio file...")
     audio = load_audio(path=path)
 
+    # Generate all chunks first
+    all_chunks = list(chunk_by_audio(audio=audio))
+    logger.info("Generated %d initial audio chunks", len(all_chunks))
+
+    # Process chunks in batches using batch transcription
     chunks: list[Chunk] = list()
-    for chunk in tqdm(chunk_by_audio(audio=audio), unit="chunk", desc="Transcribing"):
-        word_chunks = transcribe_chunk(chunk=chunk, model=model)
+    batch_results = transcribe_chunks_batch(chunks=all_chunks, model=model)
+
+    # Post-process each chunk's transcription
+    for original_chunk, word_chunks in tqdm(
+        batch_results.items(),
+        unit="batch",
+        desc="Processing transcriptions",
+    ):
         chunked_transcriptions = group_word_chunks(
-            word_chunks=word_chunks, punctuation_model=punctuation_model, max_words=12
+            word_chunks=word_chunks,
+            punctuation_model=punctuation_model,
+            max_words=12,
         )
         chunks.extend(chunked_transcriptions)
 
