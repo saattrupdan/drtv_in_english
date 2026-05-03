@@ -31,25 +31,10 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 
 MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
-# MODEL_ID = "CoRal-project/roest-v3-whisper-1.5b"
 
 
 @click.command()
 @click.argument("audio_path", type=str)
-@click.option(
-    "--llm-model",
-    type=str,
-    required=True,
-    default="Qwen/Qwen3.6-35B-A3B-FP8",
-    help="LLM model to use for translation.",
-)
-@click.option(
-    "--llm-api-base",
-    type=str,
-    default="http://100.102.237.34:8000/v1",
-    help="Base URL for the LLM API.",
-)
-@click.option("--llm-api-key", type=str, default=None, help="API key for the LLM.")
 @click.option(
     "--language",
     type=str,
@@ -59,28 +44,19 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
 def main(
     audio_path: str,
     language: str | None,
-    llm_model: str,
-    llm_api_base: str,
-    llm_api_key: str | None,
 ) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
     Loads the audio file, splits it into chunks based on silence breaks,
-    transcribes each chunk using a Wav2Vec2 ASR pipeline, optionally
-    translates the results, and outputs subtitle files.
+    transcribes each chunk using a Wav2Vec2 ASR pipeline, and outputs
+    subtitle files.
 
     Args:
         audio_path:
             Path to the input WAV audio file.
-        language:
+        language (optional):
             Target language for translation. If not provided, no translation
             is performed.
-        llm_model:
-            Name of the LLM model to use for translation.
-        llm_api_base:
-            Base URL for the LLM API.
-        llm_api_key:
-            API key for the LLM.
     """
     path = Path(audio_path)
     if not path.is_file():
@@ -111,22 +87,6 @@ def main(
     if not transcriptions:
         logger.warning("No transcription segments found. Skipping subtitle generation.")
         return
-
-    # Process the transcriptions
-    # llm_config = LLMConfig(
-    # model=llm_model,
-    # temperature=0.0,
-    # max_tokens=32_768,
-    # api_base=llm_api_base,
-    # api_key=llm_api_key,
-    # )
-    # transcriptions = asyncio.run(
-    # process_transcriptions(
-    # chunk_transcriptions=chunk_transcriptions,
-    # target_language=language,
-    # llm_config=llm_config,
-    # )
-    # )
 
     generate_subtitles(transcriptions=transcriptions, audio_path=path)
 

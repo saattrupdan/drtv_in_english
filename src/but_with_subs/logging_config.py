@@ -8,7 +8,6 @@ handlers and formatting.
 
 import logging
 import sys
-from functools import cache
 
 logger = logging.getLogger(__package__)
 
@@ -28,16 +27,3 @@ def configure_logging() -> None:
 
     # Ignore other loggers
     logging.getLogger("httpx").setLevel(logging.WARNING)
-
-
-@cache
-def log_once(message: str, level: int) -> None:
-    """Log a message once, regardless of the number of times it is called.
-
-    Args:
-        message:
-            The message to log.
-        level:
-            The logging level to use.
-    """
-    logger.log(msg=message, level=level)
