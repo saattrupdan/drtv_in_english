@@ -58,10 +58,10 @@ def group_word_chunks(
             word_chunk
             for word_chunk in word_chunks
             if word_chunk.text is not None
-            and word_chunk.text.strip().lower() == first_word.strip()
+            and re.sub(rf"[{string.punctuation}]", "", word_chunk.text).strip().lower()
+            == first_word.strip()
         ]
         if not first_word_candidates:
-            breakpoint()
             logger.warning(
                 f"Could not find transcription for {first_word!r}. Skipping."
             )
@@ -74,11 +74,11 @@ def group_word_chunks(
             word_chunk
             for word_chunk in word_chunks
             if word_chunk.text is not None
-            and word_chunk.text.strip().lower() == last_word.strip()
+            and re.sub(rf"[{string.punctuation}]", "", word_chunk.text).strip().lower()
+            == last_word.strip()
             and word_chunk.end_time > segment_start
         ]
         if not last_word_candidates:
-            breakpoint()
             logger.warning(f"Could not find transcription for {last_word!r}. Skipping.")
             continue
         segment_end = last_word_candidates[0].end_time
