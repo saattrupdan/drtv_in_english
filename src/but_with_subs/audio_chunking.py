@@ -5,6 +5,7 @@ import os
 from typing import cast
 
 import numpy as np
+import torch
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 
