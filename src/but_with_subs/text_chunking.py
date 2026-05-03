@@ -7,7 +7,7 @@ import nltk
 import numpy as np
 from punctfix import PunctFixer
 
-from .constants import MAX_CHUNK_LENGTH_SECONDS
+from .constants import MIN_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 from .logging_config import logger
 
@@ -31,7 +31,15 @@ def group_word_chunks(
         A list of Chunk objects, each containing a segment of the original
         transcription.
     """
-    text = " ".join([word_chunk.text for word_chunk in word_chunks if word_chunk.text])
+    # The punctuation model requires the input to be lower case and without any
+    # punctuation
+    text = " ".join(
+        [
+            re.sub(rf"[{string.punctuation}]", "", word_chunk.text.lower())
+            for word_chunk in word_chunks
+            if word_chunk.text
+        ]
+    )
     text = punctuation_model.punctuate(text=text)
 
     result: list[Chunk] = []
@@ -47,9 +55,13 @@ def group_word_chunks(
         # Get the starting time of the segment
         first_word = segment_without_punctuation.split()[0].lower()
         first_word_candidates = [
-            word_chunk for word_chunk in word_chunks if word_chunk.text == first_word
+            word_chunk
+            for word_chunk in word_chunks
+            if word_chunk.text is not None
+            and word_chunk.text.strip().lower() == first_word.strip()
         ]
         if not first_word_candidates:
+            breakpoint()
             logger.warning(
                 f"Could not find transcription for {first_word!r}. Skipping."
             )
@@ -61,14 +73,17 @@ def group_word_chunks(
         last_word_candidates = [
             word_chunk
             for word_chunk in word_chunks
-            if word_chunk.text == last_word and word_chunk.end_time > segment_start
+            if word_chunk.text is not None
+            and word_chunk.text.strip().lower() == last_word.strip()
+            and word_chunk.end_time > segment_start
         ]
         if not last_word_candidates:
+            breakpoint()
             logger.warning(f"Could not find transcription for {last_word!r}. Skipping.")
             continue
         segment_end = last_word_candidates[0].end_time
 
-        if segment_end - segment_start < MAX_CHUNK_LENGTH_SECONDS:
+        if segment_end - segment_start < MIN_CHUNK_LENGTH_SECONDS:
             continue
 
         # Identify all the word chunks that fall within the segment
@@ -133,7 +148,7 @@ def _split_text(*, text: str, max_words: int) -> list[str]:
         if len(segment.split()) <= max_words:
             word_segments.append(segment)
             continue
-        words = nltk.word_tokenize(text=segment, language="danish")
+        words = segment.split()
         word_segments.extend(
             [
                 " ".join(words[i : i + max_words])
