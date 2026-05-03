@@ -8,47 +8,43 @@ import logging
 import typing as t
 
 import bits_and_bobs as bnb
-import numpy as np
 from transformers import AutomaticSpeechRecognitionPipeline
 
-from .data_models import Transcription
+from .data_models import Chunk
 
 logger = logging.getLogger(__package__)
 
 
-def transcribe(
-    audio_data: np.ndarray,
-    model: AutomaticSpeechRecognitionPipeline,
-    chunk_offset: float = 0.0,
-) -> list[Transcription]:
+def transcribe_chunk(
+    chunk: Chunk, model: AutomaticSpeechRecognitionPipeline
+) -> list[Chunk]:
     """Transcribe an audio chunk using an ASR pipeline.
 
-    Runs the provided audio array through the Hugging Face automatic speech
-    recognition pipeline and returns a list of ``Transcription`` models.
-    The ``chunk_offset`` parameter is added to both ``start_time`` and
-    ``end_time`` so that they refer to the full audio timeline rather than
-    just the individual chunk.
-
     Args:
-        audio_data:
-            Mono audio data as a numpy array (16 kHz float32).
+        chunk:
+            A chunk of audio data.
         model:
             The transcription model.
-        chunk_offset:
-            Time offset in seconds representing where this chunk sits within
-            the full audio file. Added to each segment's start/end times.
 
     Returns:
-        A list of ``Transcription`` models, each representing a segment of the
-        audio file.
+        The chunk split into words with transcriptions.
     """
     with bnb.no_terminal_output(disable=True):
-        result = t.cast(dict, model(audio_data, return_timestamps="word"))
-    return [
-        Transcription(
-            start_time=float(chunk["timestamp"][0]) + chunk_offset,
-            end_time=float(chunk["timestamp"][1]) + chunk_offset,
-            text=chunk["text"],
+        result = t.cast(dict, model(chunk.audio, return_timestamps="word"))
+
+    word_chunks: list[Chunk] = list()
+    for transcription_dct in result["chunks"]:
+        start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
+        end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
+        audio = chunk.audio[16_000 * start_time : 16_000 * end_time]
+        word_chunks.append(
+            Chunk(
+                start_time=start_time,
+                end_time=end_time,
+                audio=audio,
+                text=transcription_dct["text"],
+                speaker=chunk.speaker,
+            )
         )
-        for chunk in result["chunks"]
-    ]
+
+    return word_chunks

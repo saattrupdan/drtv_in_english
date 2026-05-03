@@ -9,13 +9,13 @@ import torch
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 
-from .data_models import AudioChunk
+from .data_models import Chunk
 
 logger = logging.getLogger(__package__)
 
 
-def chunk_audio(audio: np.ndarray) -> list[AudioChunk]:
-    """Split audio into chunks.
+def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
+    """Split chunk based on the audio.
 
     Args:
         audio:
@@ -51,10 +51,14 @@ def chunk_audio(audio: np.ndarray) -> list[AudioChunk]:
         if end_s - start_s < 0.05:  # Required for Wav2Vec2 models
             continue
         chunk_audio = audio[int(start_s * 16_000) : int(end_s * 16_000)]
-        chunk = AudioChunk(
-            start_time=start_s, end_time=end_s, audio=chunk_audio, speaker=speaker
+        chunk = Chunk(
+            start_time=start_s,
+            end_time=end_s,
+            audio=chunk_audio,
+            text=None,
+            speaker=speaker,
         )
         chunks.append(chunk)
 
-    logger.info(f"Split audio into {len(chunks)} chunks")
+    logger.info(f"Split audio into {len(chunks)} chunks.")
     return chunks

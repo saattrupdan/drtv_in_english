@@ -1,40 +1,35 @@
 """Subtitle generation module for creating WebVTT files."""
 
-import pathlib as pl
 from pathlib import Path
 
-from .data_models import Transcription
+from .data_models import Chunk
 from .logging_config import logger
 
 
-def generate_subtitles(
-    transcriptions: list[Transcription], audio_path: str | pl.Path
-) -> Path:
+def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
     """Generate a WebVTT subtitle file from word-level transcriptions.
 
-    Yields ``(current_index, total)`` progress tuples as each group is
-    written.
-
     Args:
-        transcriptions:
-            List of ``Transcription`` models (one per word) to display.
+        chunks:
+            The list of chunks to generate subtitles from. Each chunk corresponds to one
+            piece of subtitle.
         audio_path:
             Path to the source audio file. The output ``.vtt`` file will be
             written to the same directory with the same base name.
 
     Returns:
-        The ``Path`` to the generated ``.vtt`` file.
+        The path to the generated subtitle file.
 
     Raises:
         ValueError:
-            If the transcriptions list is empty.
+            If there are no chunks.
         FileNotFoundError:
             If the audio path does not exist.
     """
     audio_path = Path(audio_path)
 
-    if not transcriptions:
-        logger.error("Cannot generate subtitles: transcriptions list is empty")
+    if not chunks:
+        logger.error("Cannot generate subtitles since there are no chunks")
         raise ValueError("Transcriptions list must not be empty")
 
     if not audio_path.exists():
@@ -44,16 +39,15 @@ def generate_subtitles(
     output_path = audio_path.with_suffix(suffix=".vtt")
     output_path.unlink(missing_ok=True)
 
-    logger.info(
-        f"Generating subtitles for {len(transcriptions)} segments -> {output_path}"
-    )
+    logger.info(f"Generating subtitles for {len(chunks)} chunks -> {output_path}")
 
     with output_path.open(mode="a", encoding="utf-8") as f:
-        for index, transcription in enumerate(transcriptions, start=1):
-            start_ts = _format_vtt_timestamp(seconds=transcription.start_time)
-            end_ts = _format_vtt_timestamp(seconds=transcription.end_time)
-            escaped_text = _escape_vtt_text(text=transcription.text)
-            f.write(f"{str(index)}\n")
+        for index, chunk in enumerate(chunks, start=1):
+            start_ts = _format_vtt_timestamp(seconds=chunk.start_time)
+            end_ts = _format_vtt_timestamp(seconds=chunk.end_time)
+            escaped_text = _escape_vtt_text(text=chunk.text or "")
+            speaker = chunk.speaker or "N/A"
+            f.write(f"{str(index)} ({speaker})\n")
             f.write(f"{start_ts} --> {end_ts}\n")
             f.write(f"{escaped_text}\n")
             f.write("\n")

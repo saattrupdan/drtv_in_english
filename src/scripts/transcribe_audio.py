@@ -18,13 +18,13 @@ from punctfix.inference import PunctFixer
 from tqdm.auto import tqdm
 from transformers import pipeline
 
-from but_with_subs.audio_chunking import chunk_audio
+from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
-from but_with_subs.data_models import Transcription
+from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
-from but_with_subs.text_chunking import chunk_transcriptions
-from but_with_subs.transcribing import transcribe
+from but_with_subs.text_chunking import group_word_chunks
+from but_with_subs.transcribing import transcribe_chunk
 
 logger = logging.getLogger(__package__)
 
@@ -74,22 +74,15 @@ def main(audio_path: str, language: str | None) -> None:
     logger.info("Loading the audio file...")
     audio = load_audio(path=path)
 
-    transcriptions: list[Transcription] = list()
-    for chunk in tqdm(chunk_audio(audio=audio), unit="chunk", desc="Transcribing"):
-        word_transcriptions = transcribe(
-            audio_data=chunk.audio, model=model, chunk_offset=chunk.start_time
+    chunks: list[Chunk] = list()
+    for chunk in tqdm(chunk_by_audio(audio=audio), unit="chunk", desc="Transcribing"):
+        word_chunks = transcribe_chunk(chunk=chunk, model=model)
+        chunked_transcriptions = group_word_chunks(
+            word_chunks=word_chunks, punctuation_model=punctuation_model, max_words=12
         )
-        chunked_transcriptions = chunk_transcriptions(
-            transcriptions=word_transcriptions,
-            punctuation_model=punctuation_model,
-            max_words=12,
-        )
-        transcriptions.extend(chunked_transcriptions)
-    if not transcriptions:
-        logger.warning("No transcription segments found. Skipping subtitle generation.")
-        return
+        chunks.extend(chunked_transcriptions)
 
-    generate_subtitles(transcriptions=transcriptions, audio_path=path)
+    generate_subtitles(chunks=chunks, audio_path=path)
 
 
 if __name__ == "__main__":

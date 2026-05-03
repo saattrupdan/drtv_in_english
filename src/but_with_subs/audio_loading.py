@@ -1,7 +1,7 @@
 """Loading audio for automatic speech recognition."""
 
 import logging
-import pathlib as pl
+from pathlib import Path
 
 import numpy as np
 import scipy.io.wavfile
@@ -10,7 +10,7 @@ import scipy.signal
 logger = logging.getLogger(__package__)
 
 
-def load_audio(path: pl.Path) -> np.ndarray:
+def load_audio(path: Path) -> np.ndarray:
     """Load a WAV audio file using scipy.io.wavfile.
 
     Reads the specified WAV file and returns the sample rate and audio

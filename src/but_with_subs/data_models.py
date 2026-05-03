@@ -5,88 +5,14 @@ across multiple submodules. Each class retains its original docstring and is ann
 with a comment indicating where it was moved from.
 """
 
-from enum import Enum
 from pathlib import Path
-from typing import NamedTuple
 
 import numpy as np
 from pydantic import BaseModel
 
 
-class LLMServerType(str, Enum):
-    """Detected type of LLM backend server."""
-
-    LLAMA_CPP = "llama_cpp"
-    OPENAI_COMPATIBLE = "openai_compatible"
-    UNKNOWN = "unknown"
-
-
-class LLMConfig(BaseModel):
-    """Configuration for an LLM API call.
-
-    Attributes:
-        model:
-            The name of the LLM model to use.
-        temperature:
-            The temperature to use for the LLM API. Required.
-        max_tokens:
-            The maximum number of tokens to generate.
-        api_base:
-            The base URL of the LLM API. Required.
-        api_key:
-            The API key to use for the LLM API. Not required for local LLMs.
-        server_type:
-            The type of LLM backend server. Auto-detected on first query
-            if not explicitly set. Can be manually set to override autodetection.
-        response_model:
-            A Pydantic BaseModel subclass that will be used to parse the response. Can
-            be None if no structured generation is used.
-    """
-
-    model: str
-    temperature: float
-    max_tokens: int
-    api_base: str
-    api_key: str | None = None
-    server_type: LLMServerType | None = None
-    response_model: type[BaseModel] | None = None
-
-
-class QueryLLMBatchItem(NamedTuple):
-    """A single item in a batch LLM query.
-
-    Attributes:
-        prompt:
-            The prompt text to send to the LLM.
-        config:
-            Configuration for the LLM API call.
-    """
-
-    prompt: str
-    config: LLMConfig
-
-
-class Transcription(BaseModel):
-    """A transcribed text segment from an audio chunk.
-
-    Attributes:
-        start_time:
-            Start time of the segment, in seconds from the beginning of the
-            full audio (including any chunk offset).
-        end_time:
-            End time of the segment, in seconds from the beginning of the
-            full audio (including any chunk offset).
-        text:
-            The transcribed text for this segment.
-    """
-
-    start_time: float
-    end_time: float
-    text: str
-
-
-class AudioChunk(BaseModel):
-    """A chunk of audio data.
+class Chunk(BaseModel):
+    """A chunk of data.
 
     Attributes:
         start_time:
@@ -95,6 +21,8 @@ class AudioChunk(BaseModel):
             End time of the chunk in seconds.
         audio:
             Numpy array containing the audio data for the chunk.
+        text:
+            The transcribed text for this segment, or None if not available yet.
         speaker:
             The speaker name for this chunk, or None if not available.
     """
@@ -104,7 +32,13 @@ class AudioChunk(BaseModel):
     start_time: float
     end_time: float
     audio: np.ndarray
+    text: str | None
     speaker: str | None
+
+    def model_post_init(self, _context: dict) -> None:
+        """Post-initialisation hook for the model."""
+        if self.end_time - self.start_time < 0.05:
+            raise ValueError("Duration of chunk must be at least 50ms")
 
 
 class File(BaseModel):
@@ -139,20 +73,3 @@ class DownloadProgress(BaseModel):
     status: str
     current_file: str | None = None
     percentage: float
-
-
-class TranscribedSegmentsResponse(BaseModel):
-    """Response containing a list of formatted segments.
-
-    Attributes:
-        segments:
-            List of formatted subtitle segments.
-    """
-
-    segments: list[Transcription]
-
-
-class TranslatedText(BaseModel):
-    """A model representing translated text."""
-
-    text: str = ""
