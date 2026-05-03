@@ -1,6 +1,5 @@
 """Subtitle generation module for creating WebVTT files."""
 
-import collections.abc as c
 import pathlib as pl
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from .logging_config import logger
 
 def generate_subtitles(
     transcriptions: list[Transcription], audio_path: str | pl.Path
-) -> c.Generator[tuple[int, int], None, Path]:
+) -> Path:
     """Generate a WebVTT subtitle file from word-level transcriptions.
 
     Yields ``(current_index, total)`` progress tuples as each group is
@@ -25,10 +24,6 @@ def generate_subtitles(
 
     Returns:
         The ``Path`` to the generated ``.vtt`` file.
-
-    Yields:
-        A tuple of ``(current_index, total)`` progress markers for each
-        group processed, where ``current_index`` is 1-based.
 
     Raises:
         ValueError:
@@ -51,15 +46,15 @@ def generate_subtitles(
         f"Generating subtitles for {len(transcriptions)} segments -> {output_path}"
     )
 
-    total = len(transcriptions)
-
     with output_path.open(mode="a", encoding="utf-8") as f:
         for index, transcription in enumerate(transcriptions, start=1):
             start_ts = _format_vtt_timestamp(seconds=transcription.start_time)
             end_ts = _format_vtt_timestamp(seconds=transcription.end_time)
-            text = _escape_vtt_text(text=transcription.text)
-            f.writelines([str(index), f"{start_ts} --> {end_ts}", text, ""])
-            yield (index, total)
+            escaped_text = _escape_vtt_text(text=transcription.text)
+            f.write(f"{str(index)}\n")
+            f.write(f"{start_ts} --> {end_ts}\n")
+            f.write(f"{escaped_text}\n")
+            f.write("\n")
 
     logger.info(f"Subtitles written to {output_path}")
     return output_path
