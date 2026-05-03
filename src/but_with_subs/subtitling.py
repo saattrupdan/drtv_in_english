@@ -72,11 +72,11 @@ def generate_subtitles(
         max_words_per_group (optional):
             Maximum number of words allowed in a single group. Defaults to 8.
 
-    Yields:
-        Progress tuples ``(current_index, total)``.
-
     Returns:
         The ``Path`` to the generated ``.vtt`` file.
+
+    Yields:
+        Progress tuples ``(current_index, total)``.
 
     Raises:
         ValueError:
