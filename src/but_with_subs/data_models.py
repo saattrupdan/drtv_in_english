@@ -85,7 +85,7 @@ class Transcription(BaseModel):
     text: str
 
 
-class Chunk(BaseModel):
+class AudioChunk(BaseModel):
     """A chunk of audio data.
 
     Attributes:
