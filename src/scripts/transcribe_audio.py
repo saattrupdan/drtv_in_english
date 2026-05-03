@@ -42,19 +42,21 @@ MODEL_ID = (
     "--language",
     type=str,
     default=None,
+    show_default=True,
     help="Target language for translation (e.g. 'French', 'Spanish').",
 )
 @click.option(
     "--batch-size",
     type=int,
-    default=20,
-    help="Maximum number of chunks per batch. Default: 20 (optimised for M4 Max with 64GB RAM). "
-    "Higher values increase throughput but require more GPU memory.",
+    default=32,
+    show_default=True,
+    help="Maximum number of chunks per batch. Higher values increase throughput but require more GPU memory.",
 )
 @click.option(
     "--max-duration",
     type=float,
     default=60.0,
+    show_default=True,
     help="Maximum total audio duration (seconds) per batch. Default: 60.0. "
     "Lower values reduce padding waste for varied-length chunks but increase batch count.",
 )
@@ -77,7 +79,7 @@ def main(
             Target language for translation. If not provided, no translation
             is performed.
         batch_size:
-            Maximum number of chunks per batch. Optimised for M4 Max with 64GB RAM.
+            Maximum number of chunks per batch.
         max_duration:
             Maximum total audio duration per batch in seconds.
     """
