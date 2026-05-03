@@ -145,46 +145,17 @@ def transcribe_chunks_dynamic(
 ) -> list[list[Chunk]]:
     """Transcribe audio chunks using dynamic batching with progress tracking.
 
-    This function processes audio chunks in optimised batches, intelligently
-    grouping them to minimise padding waste while maintaining high throughput.
-    It combines the benefits of batch processing with smart resource management.
-
-    The batching strategy:
-    1. Sorts chunks by duration to group similar-length audio together
-    2. Creates batches respecting both size and duration limits
-    3. Processes each batch sequentially with optional progress display
-    4. Aggregates all results into a single dictionary
+    Groups chunks by duration to minimise padding waste during batch transcription.
 
     Args:
-        chunks:
-            List of audio chunks to transcribe. Can be any size - the function
-            will automatically determine optimal batch sizes.
-        model:
-            The ASR pipeline to use for transcription.
-        batch_size:
-            Maximum number of chunks per batch. Defaults to 20 for M4 Max
-            with 64GB unified memory. Adjust based on available GPU memory.
-        max_duration:
-            Maximum total audio duration (in seconds) per batch. Defaults to 60
-            seconds. Lower values reduce padding waste for varied-length chunks.
-        show_progress:
-            Whether to display a progress bar during processing. Defaults to True.
+        chunks: List of audio chunks to transcribe.
+        model: The ASR pipeline to use for transcription.
+        batch_size: Maximum chunks per batch. Defaults to 20.
+        max_duration: Maximum total duration (seconds) per batch. Defaults to 60.
+        show_progress: Whether to display a progress bar. Defaults to True.
 
     Returns:
-        A dictionary mapping each input chunk to its list of word-level
-        transcribed chunks. Same format as transcribe_chunks_batch.
-
-    Example:
-        >>> from but_with_subs.transcribing import transcribe_chunks_dynamic
-        >>> all_results = transcribe_chunks_dynamic(
-        ...     chunks=all_chunks, model=model, batch_size=20, max_duration=60.0
-        ... )
-
-    Performance Notes:
-        - For M4 Max with 64GB RAM: batch_size=20, max_duration=60s works well
-        - Larger batch sizes increase throughput but also memory usage
-        - Smaller max_duration reduces padding waste but increases batch count
-        - Progress tracking helps monitor long-running transcriptions
+        List of lists containing word-level transcribed chunks for each input.
     """
     if not chunks:
         return list()

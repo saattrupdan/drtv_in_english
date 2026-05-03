@@ -12,20 +12,7 @@ from pydantic import BaseModel
 
 
 class Chunk(BaseModel):
-    """A chunk of data.
-
-    Attributes:
-        start_time:
-            Start time of the chunk in seconds.
-        end_time:
-            End time of the chunk in seconds.
-        audio:
-            Numpy array containing the audio data for the chunk.
-        text:
-            The transcribed text for this segment, or None if not available yet.
-        speaker:
-            The speaker name for this chunk, or None if not available.
-    """
+    """A chunk of audio data with transcription metadata."""
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -37,16 +24,7 @@ class Chunk(BaseModel):
 
 
 class File(BaseModel):
-    """Model representing downloaded media files.
-
-    Attributes:
-        url:
-            The original URL that was downloaded.
-        video_path:
-            Path to the downloaded video file, or None if not found.
-        audio_path:
-            Path to the downloaded audio file, or None if not found.
-    """
+    """Model representing downloaded media files."""
 
     url: str
     video_path: Path | None

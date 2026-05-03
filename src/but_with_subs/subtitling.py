@@ -11,21 +11,16 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
     """Generate a WebVTT subtitle file from word-level transcriptions.
 
     Args:
-        chunks:
-            The list of chunks to generate subtitles from. Each chunk corresponds to one
-            piece of subtitle.
-        audio_path:
-            Path to the source audio file. The output ``.vtt`` file will be
-            written to the same directory with the same base name.
+        chunks: List of chunks to generate subtitles from.
+        audio_path: Path to the source audio file. Output `.vtt` file
+            will be in the same directory with the same base name.
 
     Returns:
-        The path to the generated subtitle file.
+        Path to the generated subtitle file.
 
     Raises:
-        ValueError:
-            If there are no chunks.
-        FileNotFoundError:
-            If the audio path does not exist.
+        ValueError: If there are no chunks.
+        FileNotFoundError: If the audio path does not exist.
     """
     audio_path = Path(audio_path)
 
@@ -62,18 +57,7 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
 
 
 def _format_vtt_timestamp(seconds: float) -> str:
-    """Format a float number of seconds into a WebVTT timestamp.
-
-    Converts seconds into the ``HH:MM:SS.mmm`` format required by the
-    WebVTT specification, rounding milliseconds to the nearest integer.
-
-    Args:
-        seconds:
-            Time in seconds, which may include fractional milliseconds.
-
-    Returns:
-        A string in ``HH:MM:SS.mmm`` format, e.g. ``01:23:45.678``.
-    """
+    """Format seconds into WebVTT ``HH:MM:SS.mmm`` timestamp."""
     total_ms = round(seconds * 1000)
     hours = total_ms // 3_600_000
     remainder = total_ms % 3_600_000
@@ -85,19 +69,7 @@ def _format_vtt_timestamp(seconds: float) -> str:
 
 
 def _escape_vtt_text(text: str) -> str:
-    """Escape special characters for WebVTT cue text.
-
-    Replaces ``<``, ``>``, and ``&`` with their HTML entity equivalents
-    to prevent them from being interpreted as markup in the VTT file.
-
-    Args:
-        text:
-            The raw transcribed text to escape.
-
-    Returns:
-        The text with ``<``, ``>``, and ``&`` replaced by ``&lt;``,
-        ``&gt;``, and ``&amp;`` respectively.
-    """
+    """Escape ``<``, ``>``, and ``&`` for WebVTT cue text."""
     text = text.replace("&", "&amp;")
     text = text.replace("<", "&lt;")
     text = text.replace(">", "&gt;")

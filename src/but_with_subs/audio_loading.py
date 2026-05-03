@@ -11,21 +11,18 @@ logger = logging.getLogger(__package__)
 
 
 def load_audio(path: Path) -> np.ndarray:
-    """Load a WAV audio file using scipy.io.wavfile.
+    """Load a WAV file and return normalized mono audio at 16kHz.
 
-    Reads the specified WAV file and returns the sample rate and audio
-    data array.
+    Resamples to 16kHz if needed and converts multi-channel to mono.
 
     Args:
-        path:
-            Path to the WAV file to load.
+        path: Path to the WAV file.
 
     Returns:
-        Tuple of (sample_rate, audio_data).
+        Float numpy array of mono audio data.
 
     Raises:
-        ValueError:
-            If the file cannot be read or contains no audio data.
+        ValueError: If file cannot be read or contains no audio data.
     """
     try:
         sample_rate, audio_data = scipy.io.wavfile.read(filename=path)

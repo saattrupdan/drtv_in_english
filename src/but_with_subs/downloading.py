@@ -18,14 +18,7 @@ from .logging_config import logger
 def _parse_progress_info(
     info: dict, progress_hook: c.Callable[[DownloadProgress], None]
 ) -> None:
-    """Parse yt-dlp progress info into a DownloadProgress model.
-
-    Args:
-        info:
-            Progress dictionary from yt-dlp hook.
-        progress_hook:
-            A function to be called with progress updates.
-    """
+    """Parse yt-dlp progress info into a DownloadProgress model."""
     fragment_index = info.get("fragment_index")
     fragment_count = info.get("fragment_count")
     if fragment_index is not None and fragment_count is not None:
@@ -49,14 +42,8 @@ def download(
 ) -> File:
     """Download video and audio from a URL using yt-dlp.
 
-    Args:
-        url:
-            The URL to download from.
-        progress_hook:
-            A function to be called with progress updates.
-
     Returns:
-        A File model with the URLs and paths of the downloaded files.
+        File model with URLs and paths of downloaded files.
     """
     data_dir = Path("data")
     data_dir.mkdir(parents=True, exist_ok=True)
