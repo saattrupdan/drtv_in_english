@@ -5,12 +5,12 @@ import os
 from typing import cast
 
 import numpy as np
-import torch
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 
 from .constants import MIN_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
+from .device import get_device
 
 logger = logging.getLogger(__package__)
 
@@ -31,13 +31,7 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
             "pyannote/speaker-diarization-community-1", token=os.getenv("HF_TOKEN")
         ),
     )
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
-    pipeline.to(device)
+    pipeline.to(get_device())
 
     with ProgressHook() as hook:
         speech_timestamps = pipeline(

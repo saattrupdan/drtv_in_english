@@ -13,6 +13,8 @@ from .logging_config import logger
 
 nltk.download("punkt", quiet=True)
 
+PUNCTUATION_PATTERN = rf"[{string.punctuation}]"
+
 
 def group_word_chunks(
     word_chunks: list[Chunk], punctuation_model: PunctFixer, max_words: int
@@ -35,7 +37,7 @@ def group_word_chunks(
     # punctuation
     text = " ".join(
         [
-            re.sub(rf"[{string.punctuation}]", "", word_chunk.text.lower())
+            re.sub(PUNCTUATION_PATTERN, "", word_chunk.text.lower())
             for word_chunk in word_chunks
             if word_chunk.text
         ]
@@ -47,7 +49,7 @@ def group_word_chunks(
         # Strip the punctuation from the segment, only to be able to locate it amongst
         # the word chunks
         segment_without_punctuation = re.sub(
-            rf"[{string.punctuation}]", "", segment
+            PUNCTUATION_PATTERN, "", segment
         ).strip()
         if segment_without_punctuation == "":
             continue
@@ -58,7 +60,7 @@ def group_word_chunks(
             word_chunk
             for word_chunk in word_chunks
             if word_chunk.text is not None
-            and re.sub(rf"[{string.punctuation}]", "", word_chunk.text).strip().lower()
+            and re.sub(PUNCTUATION_PATTERN, "", word_chunk.text).strip().lower()
             == first_word.strip()
         ]
         if not first_word_candidates:
@@ -74,7 +76,7 @@ def group_word_chunks(
             word_chunk
             for word_chunk in word_chunks
             if word_chunk.text is not None
-            and re.sub(rf"[{string.punctuation}]", "", word_chunk.text).strip().lower()
+            and re.sub(PUNCTUATION_PATTERN, "", word_chunk.text).strip().lower()
             == last_word.strip()
             and word_chunk.end_time > segment_start
         ]
@@ -113,16 +115,10 @@ def group_word_chunks(
 
 
 def _split_text(*, text: str, max_words: int) -> list[str]:
-    """Split text into smaller segments if they exceed max_words.
+    """Split text into segments of at most max_words words.
 
-    Args:
-        text:
-            The text to split.
-        max_words:
-            The maximum number of words per segment.
-
-    Returns:
-        A list of text segments, each with at most max_words words.
+    Uses sentence segmentation, punctuation splitting, and word splitting
+    as fallback strategies.
     """
     segments: list[str] = [text]
 

@@ -35,5 +35,5 @@ def extract_audio(video_path: Path) -> Path:
         "error",
         str(output_path),
     ]
-    subprocess.run(args=command, check=True)
+    subprocess.run(args=command, check=True, timeout=3600)
     return output_path

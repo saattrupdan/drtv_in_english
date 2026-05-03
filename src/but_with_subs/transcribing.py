@@ -4,9 +4,9 @@ This module provides functions to transcribe audio chunks into text segments
 using a pretrained ASR pipeline from the Hugging Face transformers library.
 """
 
-import collections.abc as c
 import logging
 import typing as t
+from typing import Generator
 
 import bits_and_bobs as bnb
 import numpy as np
@@ -19,73 +19,15 @@ from .data_models import Chunk
 logger = logging.getLogger(__package__)
 
 
-def transcribe_chunk(
-    chunk: Chunk, model: AutomaticSpeechRecognitionPipeline
-) -> list[Chunk]:
-    """Transcribe an audio chunk using an ASR pipeline.
-
-    Args:
-        chunk:
-            A chunk of audio data.
-        model:
-            The transcription model.
-
-    Returns:
-        The chunk split into words with transcriptions.
-    """
-    with bnb.no_terminal_output(disable=True):
-        result = t.cast(dict, model(chunk.audio, return_timestamps="word"))
-
-    word_chunks: list[Chunk] = list()
-    for transcription_dct in result["chunks"]:
-        start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
-        end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
-        if end_time - start_time < MIN_CHUNK_LENGTH_SECONDS:
-            continue
-        audio = chunk.audio[int(16_000 * start_time) : int(16_000 * end_time)]
-        word_chunks.append(
-            Chunk(
-                start_time=start_time,
-                end_time=end_time,
-                audio=audio,
-                text=transcription_dct["text"],
-                speaker=chunk.speaker,
-            )
-        )
-
-    return word_chunks
-
-
-def transcribe_chunks_batch(
+def _transcribe_chunks_batch(
     chunks: list[Chunk], model: AutomaticSpeechRecognitionPipeline
 ) -> list[list[Chunk]]:
     """Transcribe multiple audio chunks in a single batch.
 
-    This function processes multiple chunks simultaneously by:
-    1. Padding shorter chunks to match the longest chunk's length
-    2. Passing all chunks through the ASR pipeline in one call
-    3. Mapping results back to their original input chunks
-
-    Args:
-        chunks:
-            List of audio chunks to transcribe. Each chunk should have
-            consistent sampling rate (16kHz expected).
-        model:
-            The ASR pipeline to use for transcription.
-
     Returns:
-        A dictionary mapping each input chunk to its list of word-level
-        transcribed chunks. Empty lists indicate no valid transcriptions
-        were produced for that chunk.
-
-    Notes:
-        - Audio chunks of different lengths are padded with zeros to the
-          length of the longest chunk.
-        - Timestamps in the results are adjusted to account for the original
-          chunk's start time.
-        - Chunks shorter than MIN_CHUNK_LENGTH_SECONDS are skipped.
-        - The batch processing is more efficient than processing chunks
-          individually, especially for large numbers of chunks.
+        List of lists where each inner list contains word-level Chunk
+        transcriptions for the corresponding input chunk. Empty lists
+        indicate no valid transcriptions were produced.
     """
     if not chunks:
         return list()
@@ -105,8 +47,12 @@ def transcribe_chunks_batch(
         padded_audio_list.append(padded_audio)
 
     # Run batch inference
-    with bnb.no_terminal_output():
-        results = t.cast(list[dict], model(padded_audio_list, return_timestamps="word"))
+    try:
+        with bnb.no_terminal_output():
+            results = t.cast(list[dict], model(padded_audio_list, return_timestamps="word"))
+    except Exception as e:
+        logger.error(f"Batch transcription failed: {e}")
+        raise
 
     chunk_transcriptions: list[list[Chunk]] = list()
     for chunk, result in zip(chunks, results):
@@ -142,49 +88,19 @@ def transcribe_chunks_batch(
 
 def create_dynamic_batches(
     chunks: list[Chunk], batch_size: int = 20, max_duration: float = 60.0
-) -> c.Iterator[list[Chunk]]:
+) -> Generator[list[Chunk], None, None]:
     """Create dynamic batches from audio chunks for efficient transcription.
 
-    This function implements an intelligent batching strategy that minimises
-    padding waste by grouping chunks of similar duration together. The algorithm:
-
-    1. Sorts chunks by duration (ascending) to group similar-length chunks
-    2. Creates batches respecting both the maximum size and duration limits
-    3. Yields batches one at a time for memory efficiency and progress tracking
-
-    This approach is particularly beneficial for:
-    - Reducing padding overhead when chunks have varying durations
-    - Managing GPU memory more efficiently
-    - Providing better progress tracking during transcription
-    - Handling edge cases like very long individual chunks
+    Groups chunks of similar duration to minimize padding waste during batch
+    transcription. Yields batches respecting both size and duration limits.
 
     Args:
-        chunks:
-            List of audio chunks to batch for transcription.
-        batch_size:
-            Maximum number of chunks per batch. Defaults to 20, which is
-            optimal for M4 Max with 64GB unified memory. Higher values
-            may improve throughput but increase memory usage.
-        max_duration:
-            Maximum total audio duration (in seconds) per batch. Defaults to 60
-            seconds, balancing processing speed with memory constraints.
-            Lower values reduce padding waste but increase batch count.
+        chunks: List of audio chunks to batch.
+        batch_size: Maximum chunks per batch. Defaults to 20.
+        max_duration: Maximum total duration (seconds) per batch. Defaults to 60.
 
     Yields:
-        Lists of chunks ready for batch transcription. Each batch respects
-        both the size limit (batch_size) and duration limit (max_duration).
-
-    Example:
-        >>> chunks = [...]  # List of Chunk objects
-        >>> for i, batch in enumerate(create_dynamic_batches(chunks)):
-        ...     results = transcribe_chunks_batch(batch, model)
-        ...     logger.info(f"Processed batch {i + 1} with {len(batch)} chunks")
-
-    Notes:
-        - Very long chunks (> max_duration) will be placed in their own batch
-        - Empty chunk lists produce no batches
-        - Single chunks are always valid regardless of duration
-        - Duration is calculated as (end_time - start_time) for each chunk
+        Lists of chunks ready for batch transcription.
     """
     if not chunks:
         return
@@ -298,7 +214,11 @@ def transcribe_chunks_dynamic(
             )
 
             # Transcribe this batch
-            batch_results = transcribe_chunks_batch(chunks=batch, model=model)
+            try:
+                batch_results = _transcribe_chunks_batch(chunks=batch, model=model)
+            except Exception as e:
+                logger.error(f"Transcription failed for batch {batch_idx + 1}: {e}")
+                raise
             all_transcriptions.extend(batch_results)
 
     logger.info(f"Completed transcription of {len(all_transcriptions)} chunks")

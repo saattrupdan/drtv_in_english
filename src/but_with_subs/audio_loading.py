@@ -27,7 +27,15 @@ def load_audio(path: Path) -> np.ndarray:
         ValueError:
             If the file cannot be read or contains no audio data.
     """
-    sample_rate, audio_data = scipy.io.wavfile.read(filename=path)
+    try:
+        sample_rate, audio_data = scipy.io.wavfile.read(filename=path)
+    except FileNotFoundError:
+        raise ValueError(f"Audio file not found: {path}") from None
+    except OSError as e:
+        raise ValueError(f"Failed to read audio file {path}: {e}") from e
+    except Exception as e:
+        raise ValueError(f"Error reading audio file {path}: {e}") from e
+
     if audio_data.size == 0:
         raise ValueError(f"Audio file {path} contains no data")
 
