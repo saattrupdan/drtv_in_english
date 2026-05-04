@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
+import scipy.io.wavfile
 
 from but_with_subs.audio_loading import load_audio, validate_audio
 from but_with_subs.data_models import Chunk
@@ -33,8 +34,6 @@ from but_with_subs.translation import translate_subtitles
 @pytest.fixture
 def sample_audio_file(tmp_path: Path) -> Path:
     """Create a sample audio file for end-to-end testing."""
-    import scipy.io.wavfile
-
     sample_rate = 16_000
     duration_seconds = 5.0
     n_samples = int(sample_rate * duration_seconds)
