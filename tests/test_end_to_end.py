@@ -24,6 +24,7 @@ from but_with_subs.audio_loading import load_audio, validate_audio
 from but_with_subs.data_models import Chunk
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
+
 import but_with_subs.transcribing as transcribing
 
 # =============================================================================
