@@ -74,14 +74,12 @@ class Translator:
         generated = self._model.generate(**encoded)  # ty: ignore[invalid-argument-type]
         return self._tokenizer.batch_decode(generated, skip_special_tokens=True)
 
-    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+    def translate_text(self, text: str, target_lang: str) -> str:
         """Translate a single text segment.
 
         Args:
             text:
                 Text to translate.
-            source_lang:
-                Source language code (e.g., "dan" for Danish).
             target_lang:
                 Target language code (e.g., "eng" for English).
 
@@ -95,11 +93,7 @@ class Translator:
             raise
 
     def translate_chunks(
-        self,
-        chunks: list[Chunk],
-        source_lang: str,
-        target_lang: str,
-        batch_size: int = 16,
+        self, chunks: list[Chunk], target_lang: str, batch_size: int = 16
     ) -> list[Chunk]:
         """Translate multiple chunks with batch processing for quality.
 
@@ -109,8 +103,6 @@ class Translator:
         Args:
             chunks:
                 List of chunks with text to translate.
-            source_lang:
-                Source language code.
             target_lang:
                 Target language code.
             batch_size (optional):
@@ -127,10 +119,7 @@ class Translator:
             logger.warning("No chunks with text to translate")
             return chunks
 
-        logger.info(
-            f"Translating {len(chunks_with_text)} chunks "
-            f"from {source_lang} to {target_lang}"
-        )
+        logger.info(f"Translating {len(chunks_with_text)} chunks to {target_lang}")
 
         texts: list[str] = [c.text or "" for c in chunks_with_text]
         translated_texts: list[str] = []
@@ -173,7 +162,6 @@ class Translator:
 def translate_subtitles(
     input_path: Path | str,
     output_path: Path | str | None = None,
-    source_lang: str = "dan",
     target_lang: str = "eng",
     model_id: str = DEFAULT_TRANSLATION_MODEL,
 ) -> Path:
@@ -185,8 +173,6 @@ def translate_subtitles(
         output_path (optional):
             Path for output .vtt file. If None, uses input path
             with "_translated" suffix before extension.
-        source_lang (optional):
-            Source language code. Defaults to "dan".
         target_lang (optional):
             Target language code. Defaults to "eng".
         model_id (optional):
@@ -211,7 +197,7 @@ def translate_subtitles(
 
     translator = Translator(model_id=model_id)
     translated_chunks = translator.translate_chunks(
-        chunks=chunks, source_lang=source_lang, target_lang=target_lang
+        chunks=chunks, target_lang=target_lang
     )
 
     _write_vtt_file(translated_chunks, output_path)
