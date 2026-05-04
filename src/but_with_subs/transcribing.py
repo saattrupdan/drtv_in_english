@@ -50,7 +50,8 @@ def _transcribe_chunks_batch(
     try:
         with bnb.no_terminal_output():
             results = t.cast(
-                list[dict], model(padded_audio_list, return_timestamps="word")  # type: ignore[invalid-argument-type]
+                list[dict],
+                model(padded_audio_list, return_timestamps="word"),  # type: ignore[invalid-argument-type]
             )
     except Exception as e:
         logger.error(f"Batch transcription failed: {e}")

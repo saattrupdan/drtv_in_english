@@ -11,11 +11,7 @@ import unittest.mock as um
 import pytest
 
 from but_with_subs.data_models import DownloadProgress, File
-from but_with_subs.downloading import (
-    _noop_progress,
-    _parse_progress_info,
-    download,
-)
+from but_with_subs.downloading import _noop_progress, _parse_progress_info, download
 
 # ---------------------------------------------------------------------------
 # Helpers
