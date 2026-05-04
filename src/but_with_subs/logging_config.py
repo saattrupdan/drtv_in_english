@@ -14,8 +14,14 @@ logger = logging.getLogger(__package__)
 
 def configure_logging() -> None:
     """Configure logging for the but_with_subs package."""
-    # Set up the root logger
     root_logger = logging.getLogger()
+
+    # Remove any existing custom handlers to ensure idempotency
+    for handler in root_logger.handlers[:]:
+        if isinstance(handler, logging.StreamHandler):
+            root_logger.removeHandler(handler)
+            handler.close()
+
     root_logger.setLevel(logging.INFO)
     formatter = logging.Formatter(
         fmt="%(asctime)s • %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
