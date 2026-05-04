@@ -24,7 +24,7 @@ def translate_chunks(
     target_lang: str,
     batch_size: int,
     model_id: str = TRANSLATION_MODEL,
-) -> c.Generator[tuple[int, int], None, list[Chunk]]:
+) -> c.Generator[Chunk, None, None]:
     """Translate multiple chunks with batch processing for quality.
 
     Batch processing improves translation quality by providing more
@@ -42,13 +42,10 @@ def translate_chunks(
             ``DEFAULT_TRANSLATION_MODEL``.
 
     Yields:
-        Progress tuples ``(current, total)`` after each batch completes.
-
-    Returns:
-        List of translated chunks.
+        Translated chunks.
     """
     if not chunks:
-        return list()
+        return
 
     logger.info(f"Loading translation model: {model_id}")
     device = get_device()
@@ -62,52 +59,22 @@ def translate_chunks(
     chunks_with_text: list[Chunk] = [c for c in chunks if c.text is not None]
     if not chunks_with_text:
         logger.warning("No chunks with text to translate")
-        return list()
+        return
 
     logger.info(f"Translating {len(chunks_with_text)} chunks to {target_lang}")
 
-    texts: list[str] = [c.text or "" for c in chunks_with_text]
-    translated_texts: list[str] = []
-
-    num_batches = len(texts) // batch_size
-    if len(texts) % batch_size != 0:
+    num_batches = len(chunks_with_text) // batch_size
+    if len(chunks_with_text) % batch_size != 0:
         num_batches += 1
 
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i : i + batch_size]
-        try:
-            translated_texts.extend(_translate_batch(model, tokenizer, batch))
-        except Exception as e:
-            logger.error(f"Batch translation failed: {e}")
-            for segment_text in batch:
-                try:
-                    translated_texts.append(
-                        translate_single(model, tokenizer, segment_text)
-                    )
-                except Exception as e2:
-                    logger.error(f"Individual translation failed: {e2}")
-                    translated_texts.append(segment_text)
-
-        yield (i + len(batch), num_batches)
-
-    translated_chunks: list[Chunk] = []
-    text_idx = 0
-    for chunk in chunks:
-        if chunk.text:
-            translated_chunks.append(
-                Chunk(
-                    start_time=chunk.start_time,
-                    end_time=chunk.end_time,
-                    audio=chunk.audio,
-                    text=translated_texts[text_idx],
-                    speaker=chunk.speaker,
-                )
-            )
-            text_idx += 1
-        else:
-            translated_chunks.append(chunk)
-
-    return translated_chunks
+    for i in range(0, len(chunks_with_text), batch_size):
+        batch = chunks_with_text[i : i + batch_size]
+        translated_texts = _translate_batch(
+            model, tokenizer, [chunk.text or "" for chunk in batch]
+        )
+        for chunk, translated_text in zip(batch, translated_texts):
+            chunk.text = translated_text
+            yield chunk
 
 
 def _translate_batch(
