@@ -2,22 +2,34 @@
 
 ## Executive Summary
 
-The current "But With Subs" transcription pipeline uses a reasonably configured wav2vec2-based ASR model, but several structural weaknesses degrade output quality. Key findings:
+The current "But With Subs" transcription pipeline uses a reasonably
+configured wav2vec2-based ASR model, but several structural weaknesses
+degrade output quality. Key findings:
 
-- **Audio preprocessing is minimal**: no silence trimming, no RMS normalization, no high-pass filtering, and suboptimal resampling.
-- **Full-audio transcription** is performed in a single pass without VAD pre-segmentation, causing degradation on long audio where context windows drift.
-- **A punctuation-splitting bug** (`segment.split(",;:-")` on line 142 of `text_chunking.py`) splits on each character individually rather than as delimiter strings, corrupting segment boundaries.
-- **Word matching is exact-string only**, making it fragile to ASR output variations (case, punctuation, minor misspellings).
-- **Unused dependencies** (`kenlm`, `pyctcdecode`) indicate an opportunity to integrate CTC decoding with a language model.
-- **No confidence scoring** means there is no visibility into transcription reliability.
+- **Audio preprocessing is minimal**: no silence trimming, no RMS
+  normalization, no high-pass filtering, and suboptimal resampling.
+- **Full-audio transcription** is performed in a single pass without
+  VAD pre-segmentation, causing degradation on long audio where context
+  windows drift.
+- **A punctuation-splitting bug** (`segment.split(",;:-")` on line 142
+  of `text_chunking.py`) splits on each character individually rather
+  than as delimiter strings, corrupting segment boundaries.
+- **Word matching is exact-string only**, making it fragile to ASR
+  output variations (case, punctuation, minor misspellings).
+- **Unused dependencies** (`kenlm`, `pyctcdecode`) indicate an
+  opportunity to integrate CTC decoding with a language model.
+- **No confidence scoring** means there is no visibility into
+  transcription reliability.
 
-All improvements below avoid switching to a larger model or introducing LLM-based post-processing. They rely on the existing stack (`transformers`, `scipy`, `torchaudio`, `pyannote`, `nltk`, `punctfix`).
+All improvements below avoid switching to a larger model or introducing
+LLM-based post-processing. They rely on the existing stack
+(`transformers`, `scipy`, `torchaudio`, `pyannote`, `nltk`, `punctfix`).
 
 ---
 
 ## Current Pipeline Architecture
 
-```
+```text
 ┌─────────────────────────┐
 │  Video (YouTube URL)     │
 └───────────┬─────────────┘
@@ -75,10 +87,14 @@ All improvements below avoid switching to a larger model or introducing LLM-base
 
 **Problems identified:**
 
-- Only peak normalization (`/ np.iinfo(audio_data.dtype).max`) is applied. RMS loudness can vary wildly between sources, and wav2vec2 performs best on consistently-louder audio.
-- No high-pass filter removes rumble/hum (50–60 Hz mains hum, room resonance).
+- Only peak normalization (`/ np.iinfo(audio_data.dtype).max`) is
+  applied. RMS loudness can vary wildly between sources, and wav2vec2
+  performs best on consistently-louder audio.
+- No high-pass filter removes rumble/hum (50–60 Hz mains hum, room
+  resonance).
 - Leading/trailing silence wastes compute and can confuse VAD/diarization.
-- `scipy.signal.resample` uses FFT-based resampling which can introduce phase artifacts.
+- `scipy.signal.resample` uses FFT-based resampling which can introduce
+  phase artifacts.
 
 **Proposed changes:**
 
@@ -202,9 +218,14 @@ def load_audio(path: Path) -> np.ndarray:
 
 **File:** `src/but_with_subs/transcribing.py`
 
-**Problem:** The ASR pipeline is called once on the entire audio. For long audio (> 30 s per chunk), the transformer's self-attention over the full sequence causes context drift and degraded word-level timestamp accuracy.
+**Problem:** The ASR pipeline is called once on the entire audio. For
+long audio (> 30 s per chunk), the transformer's self-attention over
+the full sequence causes context drift and degraded word-level timestamp
+accuracy.
 
-**Solution:** Use `pyannote.audio.pipelines.VoiceActivityDetection` to split each speaker chunk into 10-second VAD-segmented pieces before passing to the ASR pipeline.
+**Solution:** Use `pyannote.audio.pipelines.VoiceActivityDetection` to
+split each speaker chunk into 10-second VAD-segmented pieces before
+passing to the ASR pipeline.
 
 ```python
 from pyannote.audio.pipelines import VoiceActivityDetection
@@ -328,9 +349,15 @@ def transcribe_audio(
 punctuation_segments.extend(segment.split(",;:-"))
 ```
 
-**Bug:** `str.split()` with a string argument splits on each *character* in the string, not on the substring. So `segment.split(",;:-")` splits on `,`, `;`, `:`, `-` individually — which happens to produce the same result for single-character delimiters. However, this is misleading and fragile. If someone later adds a multi-character delimiter (e.g., `"..."`), it will silently break.
+**Bug:** `str.split()` with a string argument splits on each
+*character* in the string, not on the substring. So
+`segment.split(",;:-")` splits on `,`, `;`, `:`, `-` individually —
+which happens to produce the same result for single-character delimiters.
+However, this is misleading and fragile. If someone later adds a
+multi-character delimiter (e.g., `"..."`), it will silently break.
 
-More importantly, the intent is to split on any of these punctuation marks, which should use `re.split()`:
+More importantly, the intent is to split on any of these punctuation
+marks, which should use `re.split()`:
 
 ```python
 # FIXED: Use regex to split on any of the punctuation characters
@@ -339,7 +366,8 @@ punctuation_segments.extend(
 )
 ```
 
-This also handles Unicode en-dash (`\u2013`) and em-dash (`\u2014`) which commonly appear in Danish text.
+This also handles Unicode en-dash (`\u2013`) and em-dash (`\u2014`)
+which commonly appear in Danish text.
 
 ---
 
@@ -359,7 +387,8 @@ first_word_candidates = [
 ]
 ```
 
-This fails when the ASR produces a slightly different token (e.g., "den" vs "den ", or hyphenated compounds split differently).
+This fails when the ASR produces a slightly different token (e.g.,
+"den" vs "den ", or hyphenated compounds split differently).
 
 **Fix:** Use `difflib.get_close_matches` or Levenshtein distance for fuzzy matching:
 
@@ -426,11 +455,15 @@ segment_end = last_word_candidates[0].end_time
 
 ### 5. CTC Decoding with KenLM
 
-**Dependencies already present:** `kenlm`, `pyctcdecode` (in `pyproject.toml` lines 17, 21)
+**Dependencies already present:** `kenlm`, `pyctcdecode` (in
+`pyproject.toml` lines 17, 21)
 
-**Current approach:** Default greedy/top-k decoding via `AutomaticSpeechRecognitionPipeline`. No language model is used during decoding.
+**Current approach:** Default greedy/top-k decoding via
+`AutomaticSpeechRecognitionPipeline`. No language model is used during
+decoding.
 
-**Proposed integration:** Use `pyctcdecode` to load a Danish KenLM language model and pass it to the ASR pipeline:
+**Proposed integration:** Use `pyctcdecode` to load a Danish KenLM
+language model and pass it to the ASR pipeline:
 
 ```python
 from transformers import AutoProcessor
@@ -470,8 +503,11 @@ def build_asr_pipeline_with_lm(
 ```
 
 **Danish LM availability:**
-- The RoEST project provides a Danish KenLM at `https://github.com/roest-asr/roest-lm` — download the `.bin` file.
-- Alternatively, train a custom trigram model on Danish text (e.g., DKT corpus) using `kenlm.build_binary`.
+
+- The RoEST project provides a Danish KenLM at
+  `https://github.com/roest-asr/roest-lm` — download the `.bin` file.
+- Alternatively, train a custom trigram model on Danish text (e.g., DKT
+  corpus) using `kenlm.build_binary`.
 
 ---
 
@@ -479,9 +515,12 @@ def build_asr_pipeline_with_lm(
 
 **File:** `src/but_with_subs/transcribing.py`
 
-**Problem:** No per-word confidence is tracked. wav2vec2 models can produce confident but wrong predictions, especially for out-of-vocabulary words.
+**Problem:** No per-word confidence is tracked. wav2vec2 models can
+produce confident but wrong predictions, especially for out-of-vocabulary
+words.
 
-**Approach:** Extract per-token logprobs and convert to confidence scores using the logits from the model forward pass.
+**Approach:** Extract per-token logprobs and convert to confidence scores
+using the logits from the model forward pass.
 
 ```python
 import torch
@@ -607,7 +646,9 @@ text = punctuation_model.punctuate(text=text)
 
 where `punctuation_model` is always initialized as `PunctFixer(language="da")`.
 
-**Problem:** If the audio is in a language other than Danish (e.g., English, German), `PunctFixer("da")` will still try to insert Danish punctuation rules, producing incorrect output.
+**Problem:** If the audio is in a language other than Danish (e.g.,
+English, German), `PunctFixer("da")` will still try to insert Danish
+punctuation rules, producing incorrect output.
 
 **Fix:** Make the language configurable and detect it from the audio source:
 
@@ -652,7 +693,9 @@ def group_word_chunks(
     # ... rest of function unchanged ...
 ```
 
-Language detection can be driven by the video URL metadata (YouTube provides language info) or a separate language detection step using `fasttext` or `langdetect`.
+Language detection can be driven by the video URL metadata (YouTube
+provides language info) or a separate language detection step using
+`fasttext` or `langdetect`.
 
 ---
 
@@ -668,9 +711,13 @@ Language detection can be driven by the video URL metadata (YouTube provides lan
 sentences = nltk.sent_tokenize(text=text, language="danish")
 ```
 
-**Limitations:** NLTK's `punkt_tab` Danish tokenizer is rule-based and may mis-segment abbreviations, ellipses, and non-standard punctuation. It also doesn't handle multi-language text well.
+**Limitations:** NLTK's `punkt_tab` Danish tokenizer is rule-based and
+may mis-segment abbreviations, ellipses, and non-standard punctuation.
+It also doesn't handle multi-language text well.
 
-**Alternative: spaCy with Danish model**
+#### Alternative: spaCy with Danish model
+
+##### spaCy-based sentence segmentation
 
 ```python
 import spacy
@@ -816,7 +863,7 @@ logger.info(f"Transcription quality: {metrics.summary()}")
 ## Implementation Roadmap
 
 | # | Improvement | Priority | Impact | Complexity | Effort | Files Changed |
-|---|-------------|----------|--------|------------|--------|---------------|
+| --- | ----------- | -------- | ------ | ---------- | ------ | --------------- |
 | 1 | Audio preprocessing (silence trim, RMS norm, HPF, torchaudio resample) | **P0** | High | Low | 2-3 hours | `audio_loading.py` |
 | 2 | VAD-based pre-segmentation | **P0** | High | Medium | 4-5 hours | `transcribing.py` (+ new `vad_segment_audio`) |
 | 3 | Fix punctuation splitting bug (`split(",;:-")`) | **P0** | Medium | Low | 15 minutes | `text_chunking.py:142` |
@@ -841,4 +888,5 @@ logger.info(f"Transcription quality: {metrics.summary()}")
 
 ### Total Estimated Effort: ~18-22 hours
 
-No model changes or LLM integrations required. All improvements use existing or easily-addable dependencies.
+No model changes or LLM integrations required. All improvements use
+existing or easily-addable dependencies.
