@@ -9,7 +9,8 @@ from pathlib import Path
 
 import click
 
-from but_with_subs.audio_chunking import chunk_by_audio as chunk_audio
+from but_with_subs.audio_chunking import chunk_by_audio
+from but_with_subs.audio_loading import load_audio
 from but_with_subs.logging_config import logger
 
 
@@ -31,7 +32,8 @@ def main(audio_path: str) -> None:
         sys.exit(1)
 
     logger.info(f"Chunking audio from {audio_path}...")
-    chunks = list(chunk_audio(audio_path=path))
+    audio = load_audio(path)
+    chunks = list(chunk_by_audio(audio=audio))
 
     logger.info(f"Total chunks: {len(chunks)}")
 
