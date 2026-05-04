@@ -25,8 +25,12 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def mock_punctuation_model():
-    """Create a mock punctuation model (PunctFixer)."""
+def mock_punctuation_model() -> MagicMock:
+    """Create a mock punctuation model (PunctFixer).
+
+    Returns:
+        A MagicMock representing a PunctFixer instance.
+    """
     mock = MagicMock()
     # Default behavior: just return text with some basic punctuation added
 
@@ -41,8 +45,12 @@ def mock_punctuation_model():
 
 
 @pytest.fixture
-def mock_punctuation_model_with_fixes():
-    """Create a mock punctuation model that returns pre-formatted text."""
+def mock_punctuation_model_with_fixes() -> MagicMock:
+    """Create a mock punctuation model that returns pre-formatted text.
+
+    Returns:
+        A MagicMock representing a PunctFixer instance.
+    """
     mock = MagicMock()
 
     def mock_punctuate(text: str) -> str:
@@ -54,8 +62,12 @@ def mock_punctuation_model_with_fixes():
 
 
 @pytest.fixture
-def simple_word_chunks():
-    """Create simple word chunks for testing."""
+def simple_word_chunks() -> list[Chunk]:
+    """Create simple word chunks for testing.
+
+    Returns:
+        A list of Chunk objects for testing.
+    """
     chunks = [
         Chunk(
             start_time=0.0,
@@ -104,8 +116,12 @@ def simple_word_chunks():
 
 
 @pytest.fixture
-def word_chunks_with_multiple_speakers():
-    """Create word chunks with multiple speakers."""
+def word_chunks_with_multiple_speakers() -> list[Chunk]:
+    """Create word chunks with multiple speakers.
+
+    Returns:
+        A list of Chunk objects with different speakers.
+    """
     chunks = [
         Chunk(
             start_time=0.0,
@@ -147,8 +163,12 @@ def word_chunks_with_multiple_speakers():
 
 
 @pytest.fixture
-def word_chunks_with_punctuation():
-    """Create word chunks with punctuation in text."""
+def word_chunks_with_punctuation() -> list[Chunk]:
+    """Create word chunks with punctuation in text.
+
+    Returns:
+        A list of Chunk objects with punctuation in their text.
+    """
     chunks = [
         Chunk(
             start_time=0.0,
@@ -176,8 +196,12 @@ def word_chunks_with_punctuation():
 
 
 @pytest.fixture
-def word_chunks_with_none_text():
-    """Create word chunks with some None text values."""
+def word_chunks_with_none_text() -> list[Chunk]:
+    """Create word chunks with some None text values.
+
+    Returns:
+        A list of Chunk objects with some None text values.
+    """
     chunks = [
         Chunk(
             start_time=0.0,
@@ -205,8 +229,12 @@ def word_chunks_with_none_text():
 
 
 @pytest.fixture
-def word_chunks_short_duration():
-    """Create word chunks with short duration (below minimum)."""
+def word_chunks_short_duration() -> list[Chunk]:
+    """Create word chunks with short duration (below minimum).
+
+    Returns:
+        A list of Chunk objects with durations below the minimum threshold.
+    """
     chunks = [
         Chunk(
             start_time=0.0,
@@ -968,8 +996,8 @@ class TestGroupWordChunksErrorHandling:
                 text="hello",
                 speaker="SPEAKER_00",
             ),
-            # A chunk that starts before segment_start (not possible since segment_start=0)
-            # or ends after segment_end
+            # A chunk that starts before segment_start (not possible since
+            # segment_start=0) or ends after segment_end
             Chunk(
                 start_time=1.5,
                 end_time=3.0,  # This extends beyond a 2-second segment
@@ -1114,7 +1142,8 @@ class TestPunctuationPattern:
 
     def test_pattern_matches_common_punctuation(self) -> None:
         """Test that the pattern matches common punctuation characters."""
-        # Test common punctuation characters (excluding backslash which needs special handling)
+        # Test common punctuation characters (excluding backslash which
+        # needs special handling)
         test_chars = ".,!?;:()[]{}\"'-_@#$%^&*/=<>"
         for char in test_chars:
             assert re.search(PUNCTUATION_PATTERN, char) is not None
