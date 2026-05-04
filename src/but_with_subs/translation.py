@@ -75,7 +75,7 @@ def translate_chunks(
             for segment_text in batch:
                 try:
                     translated_texts.append(
-                        _translate_single(model, tokenizer, segment_text, target_lang)
+                        translate_single(model, tokenizer, segment_text, target_lang)
                     )
                 except Exception as e2:
                     logger.error(f"Individual translation failed: {e2}")
@@ -133,7 +133,7 @@ def _translate_batch(
     return tokenizer.batch_decode(generated, skip_special_tokens=True)
 
 
-def _translate_single(
+def translate_single(
     model: M2M100ForConditionalGeneration,
     tokenizer: SMALL100Tokenizer,
     text: str,
