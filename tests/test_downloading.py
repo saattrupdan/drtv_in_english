@@ -291,10 +291,7 @@ def test_parse_progress_info_without_fragments() -> None:
     def _capture_progress(progress: DownloadProgress) -> None:
         progress_updates.append(progress)
 
-    info = {
-        "status": "downloading",
-        "filename": "video.mp4",
-    }
+    info = {"status": "downloading", "filename": "video.mp4"}
 
     _parse_progress_info(info=info, progress_hook=_capture_progress)
 
@@ -339,11 +336,7 @@ def test_parse_progress_info_missing_status() -> None:
     def _capture_progress(progress: DownloadProgress) -> None:
         progress_updates.append(progress)
 
-    info = {
-        "fragment_index": 3,
-        "fragment_count": 6,
-        "filename": "video.mp4",
-    }
+    info = {"fragment_index": 3, "fragment_count": 6, "filename": "video.mp4"}
 
     _parse_progress_info(info=info, progress_hook=_capture_progress)
 
@@ -363,11 +356,7 @@ def test_parse_progress_info_missing_filename() -> None:
     def _capture_progress(progress: DownloadProgress) -> None:
         progress_updates.append(progress)
 
-    info = {
-        "fragment_index": 2,
-        "fragment_count": 4,
-        "status": "downloading",
-    }
+    info = {"fragment_index": 2, "fragment_count": 4, "status": "downloading"}
 
     _parse_progress_info(info=info, progress_hook=_capture_progress)
 
@@ -483,7 +472,6 @@ def test_download_with_retry_on_transient_error() -> None:
     the download function. The actual retry implementation would be in
     a higher-level function.
     """
-    max_attempts = 3
     attempt_count = 0
 
     def _download_with_retry(url: str, max_retries: int = 3) -> File:
@@ -524,9 +512,7 @@ def test_download_with_retry_on_transient_error() -> None:
         ),
         um.patch("builtins.sorted", side_effect=lambda x: list(x)),
     ):
-        result = _download_with_retry(
-            url="https://example.com/video", max_retries=3
-        )
+        result = _download_with_retry(url="https://example.com/video", max_retries=3)
 
     assert attempt_count == 3
     assert isinstance(result, File)
@@ -537,8 +523,6 @@ def test_retry_exponential_backoff_simulation() -> None:
 
     Verifies that retry attempts follow exponential backoff pattern.
     """
-    import time
-
     backoff_delays: list[float] = []
     max_retries = 4
 
@@ -591,7 +575,8 @@ def test_download_multiple_files_sequential() -> None:
         ),
         um.patch("but_with_subs.downloading.Path.mkdir"),
         um.patch(
-            "but_with_subs.downloading.Path.iterdir", return_value=iter([fake_video, fake_audio])
+            "but_with_subs.downloading.Path.iterdir",
+            return_value=iter([fake_video, fake_audio]),
         ),
         um.patch("builtins.sorted", side_effect=lambda x: list(x)),
     ):
@@ -679,10 +664,7 @@ def test_progress_callback_with_different_statuses() -> None:
     statuses = ["downloading", "finished", "error", "waiting"]
 
     for status in statuses:
-        info = {
-            "status": status,
-            "filename": "test.mp4",
-        }
+        info = {"status": status, "filename": "test.mp4"}
         _parse_progress_info(info=info, progress_hook=_progress_callback)
 
     assert len(received_progress) == 4
@@ -772,13 +754,7 @@ def test_progress_percentage_bounds() -> None:
     def _progress_callback(progress: DownloadProgress) -> None:
         received_progress.append(progress)
 
-    test_cases = [
-        (0, 10, 0.0),
-        (1, 10, 0.1),
-        (5, 10, 0.5),
-        (9, 10, 0.9),
-        (10, 10, 1.0),
-    ]
+    test_cases = [(0, 10, 0.0), (1, 10, 0.1), (5, 10, 0.5), (9, 10, 0.9), (10, 10, 1.0)]
 
     for fragment_index, fragment_count, expected_percentage in test_cases:
         info = {

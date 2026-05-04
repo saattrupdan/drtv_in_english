@@ -49,7 +49,9 @@ def _transcribe_chunks_batch(
     # Run batch inference
     try:
         with bnb.no_terminal_output():
-            results = t.cast(list[dict], model(padded_audio_list, return_timestamps="word"))
+            results = t.cast(
+                list[dict], model(padded_audio_list, return_timestamps="word")
+            )
     except Exception as e:
         logger.error(f"Batch transcription failed: {e}")
         raise

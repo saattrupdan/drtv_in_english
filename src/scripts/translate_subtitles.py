@@ -58,7 +58,7 @@ def main(
     if not path.is_file():
         logger.error(f"File not found: {subtitle_path}")
         sys.exit(1)
-    
+
     result = translate_subtitles(
         input_path=path,
         output_path=output_path,
@@ -66,7 +66,7 @@ def main(
         target_lang=target_lang,
         model_id=model,
     )
-    
+
     logger.info(f"Translation complete: {result}")
 
 

@@ -1,8 +1,7 @@
 """Tests for the audio_chunking module."""
 
 import logging
-from typing import cast
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -11,7 +10,6 @@ import torch
 from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.constants import MIN_CHUNK_LENGTH_SECONDS
 from but_with_subs.data_models import Chunk
-
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +76,11 @@ def mock_speech_timestamps_short_segments():
     mock_turn3.start = 0.5
     mock_turn3.end = 1.0  # Above minimum
 
-    return [(mock_turn1, "SPEAKER_00"), (mock_turn2, "SPEAKER_00"), (mock_turn3, "SPEAKER_00")]
+    return [
+        (mock_turn1, "SPEAKER_00"),
+        (mock_turn2, "SPEAKER_00"),
+        (mock_turn3, "SPEAKER_00"),
+    ]
 
 
 @pytest.fixture
@@ -129,7 +131,9 @@ class TestChunkByAudioBasicFunctionality:
     """Tests for basic chunking functionality."""
 
     def test_chunks_returned_as_list_of_chunk_objects(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_single_speaker: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_single_speaker: list,
     ) -> None:
         """Test that chunk_by_audio returns a list of Chunk objects."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -146,7 +150,9 @@ class TestChunkByAudioBasicFunctionality:
             assert all(isinstance(chunk, Chunk) for chunk in chunks)
 
     def test_chunk_count_matches_valid_speech_segments(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_single_speaker: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_single_speaker: list,
     ) -> None:
         """Test that chunk count matches the number of valid speech segments."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -163,7 +169,9 @@ class TestChunkByAudioBasicFunctionality:
             assert len(chunks) == 2
 
     def test_chunk_start_and_end_times_match_speech_timestamps(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_single_speaker: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_single_speaker: list,
     ) -> None:
         """Test that chunk times match the speech timestamps from pipeline."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -182,7 +190,9 @@ class TestChunkByAudioBasicFunctionality:
             assert chunks[1].end_time == 5.0
 
     def test_pipeline_called_with_correct_waveform_and_sample_rate(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_single_speaker: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_single_speaker: list,
     ) -> None:
         """Test that pipeline is called with correct waveform and sample rate."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -218,7 +228,9 @@ class TestChunkByAudioMultipleSpeakers:
     """Tests for handling multiple speakers."""
 
     def test_speaker_assignment_from_pipeline(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_multiple_speakers: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_multiple_speakers: list,
     ) -> None:
         """Test that speakers are correctly assigned from pipeline output."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -237,7 +249,9 @@ class TestChunkByAudioMultipleSpeakers:
             assert chunks[3].speaker == "SPEAKER_01"
 
     def test_multiple_speakers_create_separate_chunks(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_multiple_speakers: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_multiple_speakers: list,
     ) -> None:
         """Test that different speakers create separate chunks even if adjacent."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -254,7 +268,9 @@ class TestChunkByAudioMultipleSpeakers:
             assert len(chunks) == 4
 
     def test_overlapping_speakers_handled_sequentially(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_multiple_speakers: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_multiple_speakers: list,
     ) -> None:
         """Test handling of speakers with overlapping/adjacent speech."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -286,7 +302,9 @@ class TestChunkByAudioMinimumDuration:
     """Tests for minimum duration filtering."""
 
     def test_segments_below_minimum_duration_filtered_out(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_short_segments: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_short_segments: list,
     ) -> None:
         """Test that segments below minimum duration are filtered out."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -374,7 +392,9 @@ class TestChunkByAudioMinimumDuration:
 class TestChunkByAudioExtractionAccuracy:
     """Tests for audio extraction accuracy."""
 
-    def test_chunk_audio_correctly_extracted(self, mock_audio_5_seconds: np.ndarray) -> None:
+    def test_chunk_audio_correctly_extracted(
+        self, mock_audio_5_seconds: np.ndarray
+    ) -> None:
         """Test that audio is correctly extracted for each chunk."""
         mock_turn = MagicMock()
         mock_turn.start = 1.0
@@ -398,7 +418,9 @@ class TestChunkByAudioExtractionAccuracy:
             assert len(chunks) == 1
             np.testing.assert_array_equal(chunks[0].audio, expected_audio)
 
-    def test_chunk_audio_length_matches_duration(self, mock_audio_10_seconds: np.ndarray) -> None:
+    def test_chunk_audio_length_matches_duration(
+        self, mock_audio_10_seconds: np.ndarray
+    ) -> None:
         """Test that extracted audio length matches the chunk duration."""
         mock_turn = MagicMock()
         mock_turn.start = 2.0
@@ -419,7 +441,9 @@ class TestChunkByAudioExtractionAccuracy:
 
             assert len(chunks[0].audio) == expected_length
 
-    def test_chunk_audio_dtype_preserved(self, mock_audio_5_seconds: np.ndarray) -> None:
+    def test_chunk_audio_dtype_preserved(
+        self, mock_audio_5_seconds: np.ndarray
+    ) -> None:
         """Test that audio dtype is preserved in chunks."""
         mock_turn = MagicMock()
         mock_turn.start = 0.0
@@ -576,9 +600,7 @@ class TestChunkByAudioTimeRanges:
             actual_duration = chunks[0].end_time - chunks[0].start_time
             assert actual_duration == expected_duration
 
-    def test_non_overlapping_chunks(
-        self, mock_audio_10_seconds: np.ndarray
-    ) -> None:
+    def test_non_overlapping_chunks(self, mock_audio_10_seconds: np.ndarray) -> None:
         """Test that chunks do not overlap in time."""
         mock_turns = [
             (MagicMock(start=0.0, end=2.0), "SPEAKER_00"),
@@ -601,7 +623,9 @@ class TestChunkByAudioTimeRanges:
                 assert chunks[i].end_time <= chunks[i + 1].start_time
 
     def test_adjacent_chunks_handled_correctly(
-        self, mock_audio_10_seconds: np.ndarray, mock_speech_timestamps_multiple_speakers: list
+        self,
+        mock_audio_10_seconds: np.ndarray,
+        mock_speech_timestamps_multiple_speakers: list,
     ) -> None:
         """Test that adjacent chunks (end of one = start of next) are handled."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -688,11 +712,16 @@ class TestChunkByAudioIntegration:
 
             assert len(chunks) == 6
             speakers = [chunk.speaker for chunk in chunks]
-            assert speakers == ["SPEAKER_00", "SPEAKER_01", "SPEAKER_02", "SPEAKER_00", "SPEAKER_01", "SPEAKER_02"]
+            assert speakers == [
+                "SPEAKER_00",
+                "SPEAKER_01",
+                "SPEAKER_02",
+                "SPEAKER_00",
+                "SPEAKER_01",
+                "SPEAKER_02",
+            ]
 
-    def test_long_audio_processing(
-        self, mock_audio_10_seconds: np.ndarray
-    ) -> None:
+    def test_long_audio_processing(self, mock_audio_10_seconds: np.ndarray) -> None:
         """Test processing of longer audio with many segments."""
         # Simulate a long audio with many speech segments
         mock_turns = []
@@ -717,17 +746,15 @@ class TestChunkByAudioIntegration:
             # All segments are above minimum duration (0.4s > 0.05s)
             assert len(chunks) == 20
 
-    def test_mixed_duration_segments(
-        self, mock_audio_10_seconds: np.ndarray
-    ) -> None:
+    def test_mixed_duration_segments(self, mock_audio_10_seconds: np.ndarray) -> None:
         """Test processing with mixed duration segments (some above, some below threshold)."""
         mock_turns = [
             (MagicMock(start=0.0, end=0.03), "SPEAKER_00"),  # Below minimum
-            (MagicMock(start=0.5, end=1.5), "SPEAKER_00"),   # Above minimum
+            (MagicMock(start=0.5, end=1.5), "SPEAKER_00"),  # Above minimum
             (MagicMock(start=2.0, end=2.04), "SPEAKER_01"),  # Below minimum
-            (MagicMock(start=3.0, end=5.0), "SPEAKER_00"),   # Above minimum
+            (MagicMock(start=3.0, end=5.0), "SPEAKER_00"),  # Above minimum
             (MagicMock(start=6.0, end=6.02), "SPEAKER_01"),  # Below minimum
-            (MagicMock(start=7.0, end=9.0), "SPEAKER_00"),   # Above minimum
+            (MagicMock(start=7.0, end=9.0), "SPEAKER_00"),  # Above minimum
         ]
 
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
@@ -776,9 +803,7 @@ class TestPipelineMocking:
             assert "pyannote" in call_args[0][0]
             assert "speaker-diarization" in call_args[0][0]
 
-    def test_pipeline_to_device_called(
-        self, mock_audio_10_seconds: np.ndarray
-    ) -> None:
+    def test_pipeline_to_device_called(self, mock_audio_10_seconds: np.ndarray) -> None:
         """Test that pipeline.to() is called for device placement."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
             mock_pipeline_instance = MagicMock()
@@ -793,18 +818,20 @@ class TestPipelineMocking:
             # Verify to() was called on the pipeline
             mock_pipeline_instance.to.assert_called_once()
 
-    def test_progress_hook_used(
-        self, mock_audio_10_seconds: np.ndarray
-    ) -> None:
+    def test_progress_hook_used(self, mock_audio_10_seconds: np.ndarray) -> None:
         """Test that ProgressHook is used during pipeline execution."""
         with patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class:
-            with patch("but_with_subs.audio_chunking.ProgressHook") as mock_progress_hook:
+            with patch(
+                "but_with_subs.audio_chunking.ProgressHook"
+            ) as mock_progress_hook:
                 mock_pipeline_instance = MagicMock()
                 mock_result = MagicMock()
                 mock_result.speaker_diarization = []
                 mock_pipeline_instance.return_value = mock_result
 
-                mock_pipeline_class.from_pretrained.return_value = mock_pipeline_instance
+                mock_pipeline_class.from_pretrained.return_value = (
+                    mock_pipeline_instance
+                )
 
                 chunk_by_audio(audio=mock_audio_10_seconds)
 
@@ -840,7 +867,9 @@ class TestChunkByAudioLogging:
                 chunks = chunk_by_audio(audio=mock_audio_10_seconds)
 
             assert len(chunks) == 1
-            assert any("Split audio into" in record.message for record in caplog.records)
+            assert any(
+                "Split audio into" in record.message for record in caplog.records
+            )
 
     def test_logging_shows_chunk_count(
         self, mock_audio_10_seconds: np.ndarray, caplog: pytest.LogCaptureFixture
@@ -860,6 +889,9 @@ class TestChunkByAudioLogging:
             mock_pipeline_class.from_pretrained.return_value = mock_pipeline_instance
 
             with caplog.at_level(logging.INFO):
-                chunks = chunk_by_audio(audio=mock_audio_10_seconds)
+                chunk_by_audio(audio=mock_audio_10_seconds)
 
-            assert any("Split audio into 2 chunks" in record.message for record in caplog.records)
+            assert any(
+                "Split audio into 2 chunks" in record.message
+                for record in caplog.records
+            )

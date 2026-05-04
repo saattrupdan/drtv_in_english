@@ -1,14 +1,12 @@
 """Tests for the audio_loading module."""
 
 import logging
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 import scipy.io.wavfile
-import scipy.signal
 
 from but_with_subs.audio_loading import (
     _resample_to_16k_mono,
@@ -30,7 +28,9 @@ def temp_wav_file(tmp_path: Path) -> Path:
     sample_rate = 16_000
     duration_seconds = 1.0
     n_samples = int(sample_rate * duration_seconds)
-    audio_data = np.sin(2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)).astype(np.int16)
+    audio_data = np.sin(
+        2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)
+    ).astype(np.int16)
     file_path = tmp_path / "test_audio.wav"
     scipy.io.wavfile.write(filename=file_path, rate=sample_rate, data=audio_data)
     return file_path
@@ -44,7 +44,9 @@ def temp_mp3_file(tmp_path: Path) -> Path:
     sample_rate = 16_000
     duration_seconds = 0.5
     n_samples = int(sample_rate * duration_seconds)
-    audio_data = np.sin(2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)).astype(np.int16)
+    audio_data = np.sin(
+        2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)
+    ).astype(np.int16)
     file_path = tmp_path / "test_audio.mp3"
     scipy.io.wavfile.write(filename=file_path, rate=sample_rate, data=audio_data)
     return file_path
@@ -56,8 +58,12 @@ def stereo_audio_file(tmp_path: Path) -> Path:
     sample_rate = 44_100
     duration_seconds = 1.0
     n_samples = int(sample_rate * duration_seconds)
-    left_channel = np.sin(2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)).astype(np.int16)
-    right_channel = np.sin(2 * np.pi * 880 * np.linspace(0, duration_seconds, n_samples)).astype(np.int16)
+    left_channel = np.sin(
+        2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)
+    ).astype(np.int16)
+    right_channel = np.sin(
+        2 * np.pi * 880 * np.linspace(0, duration_seconds, n_samples)
+    ).astype(np.int16)
     stereo_data = np.column_stack((left_channel, right_channel))
     file_path = tmp_path / "stereo_audio.wav"
     scipy.io.wavfile.write(filename=file_path, rate=sample_rate, data=stereo_data)
@@ -96,7 +102,9 @@ def high_sample_rate_audio_file(tmp_path: Path) -> Path:
     sample_rate = 48_000
     duration_seconds = 0.5
     n_samples = int(sample_rate * duration_seconds)
-    audio_data = np.sin(2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)).astype(np.int16)
+    audio_data = np.sin(
+        2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)
+    ).astype(np.int16)
     file_path = tmp_path / "high_sample_rate.wav"
     scipy.io.wavfile.write(filename=file_path, rate=sample_rate, data=audio_data)
     return file_path
@@ -133,7 +141,9 @@ class TestValidateAudio:
     def test_invalid_audio_too_short(self) -> None:
         """Test validation rejects audio that is too short."""
         audio = np.array([0.5, -0.5], dtype=np.float32)
-        result = validate_audio(audio=audio, sample_rate=16_000, min_duration_seconds=1.0)
+        result = validate_audio(
+            audio=audio, sample_rate=16_000, min_duration_seconds=1.0
+        )
 
         assert result["is_valid"] is False
         assert result["duration_valid"] is False
@@ -143,7 +153,9 @@ class TestValidateAudio:
         """Test validation rejects audio that is too long."""
         # Create 2 hours of audio at 16kHz
         audio = np.zeros(16_000 * 3600 * 2, dtype=np.float32)
-        result = validate_audio(audio=audio, sample_rate=16_000, max_duration_seconds=3600.0)
+        result = validate_audio(
+            audio=audio, sample_rate=16_000, max_duration_seconds=3600.0
+        )
 
         assert result["is_valid"] is False
         assert result["duration_valid"] is False
@@ -224,7 +236,9 @@ class TestValidateAudioEdgeCases:
         """Test validation of audio at the minimum duration boundary."""
         audio = np.zeros(int(16_000 * 0.1), dtype=np.float32)
         audio[0] = 0.5  # Add signal to avoid silence error
-        result = validate_audio(audio=audio, sample_rate=16_000, min_duration_seconds=0.1)
+        result = validate_audio(
+            audio=audio, sample_rate=16_000, min_duration_seconds=0.1
+        )
 
         assert result["is_valid"] is True
 
@@ -232,7 +246,9 @@ class TestValidateAudioEdgeCases:
         """Test validation of audio at the maximum duration boundary."""
         audio = np.zeros(int(16_000 * 3600), dtype=np.float32)
         audio[0] = 0.5  # Add signal to avoid silence error
-        result = validate_audio(audio=audio, sample_rate=16_000, max_duration_seconds=3600.0)
+        result = validate_audio(
+            audio=audio, sample_rate=16_000, max_duration_seconds=3600.0
+        )
 
         assert result["is_valid"] is True
 
@@ -256,7 +272,9 @@ class TestValidateAudioEdgeCases:
         """Test validation with custom expected sample rate."""
         audio = np.zeros(44_100, dtype=np.float32)
         audio[0] = 0.5
-        result = validate_audio(audio=audio, sample_rate=44_100, expected_sample_rate=44_100)
+        result = validate_audio(
+            audio=audio, sample_rate=44_100, expected_sample_rate=44_100
+        )
 
         assert result["is_valid"] is True
 
@@ -291,7 +309,9 @@ class TestLoadAudioValidFiles:
 
         assert audio.ndim == 1, "Stereo audio should be converted to mono"
 
-    def test_load_audio_at_different_sample_rates(self, high_sample_rate_audio_file: Path) -> None:
+    def test_load_audio_at_different_sample_rates(
+        self, high_sample_rate_audio_file: Path
+    ) -> None:
         """Test loading audio with different sample rates."""
         audio = load_audio(path=high_sample_rate_audio_file)
 
@@ -331,12 +351,16 @@ class TestLoadAudioErrorHandling:
 
     def test_invalid_audio_file_raises_error(self, corrupted_wav_file: Path) -> None:
         """Test that corrupted/invalid audio files raise ValueError."""
-        with pytest.raises(ValueError, match="Failed to read audio file|Error reading audio file"):
+        with pytest.raises(
+            ValueError, match="Failed to read audio file|Error reading audio file"
+        ):
             load_audio(path=corrupted_wav_file)
 
     def test_empty_file_raises_error(self, empty_wav_file: Path) -> None:
         """Test that empty files raise ValueError."""
-        with pytest.raises(ValueError, match="Failed to read audio file|Error reading audio file"):
+        with pytest.raises(
+            ValueError, match="Failed to read audio file|Error reading audio file"
+        ):
             load_audio(path=empty_wav_file)
 
     def test_permission_error_handling(self, tmp_path: Path) -> None:
@@ -350,7 +374,9 @@ class TestLoadAudioErrorHandling:
         file_path.chmod(0o000)
 
         try:
-            with pytest.raises(ValueError, match="Failed to read audio file|Error reading audio file"):
+            with pytest.raises(
+                ValueError, match="Failed to read audio file|Error reading audio file"
+            ):
                 load_audio(path=file_path)
         finally:
             # Restore permissions for cleanup
@@ -419,7 +445,9 @@ class TestResampleTo16kMono:
 
     def test_no_resampling_when_already_16k(self) -> None:
         """Test that no resampling occurs when already at 16kHz."""
-        original_audio = np.sin(2 * np.pi * 440 * np.linspace(0, 1, 16_000)).astype(np.float32)
+        original_audio = np.sin(2 * np.pi * 440 * np.linspace(0, 1, 16_000)).astype(
+            np.float32
+        )
         result = _resample_to_16k_mono(audio=original_audio, original_sr=16_000)
 
         # When no resampling is needed, the function returns the original audio
@@ -431,7 +459,9 @@ class TestResampleTo16kMono:
         duration = 0.5
         n_samples = int(original_sr * duration)
         frequency = 440  # Hz
-        audio = np.sin(2 * np.pi * frequency * np.linspace(0, duration, n_samples)).astype(np.float32)
+        audio = np.sin(
+            2 * np.pi * frequency * np.linspace(0, duration, n_samples)
+        ).astype(np.float32)
 
         result = _resample_to_16k_mono(audio=audio, original_sr=original_sr)
 
@@ -459,7 +489,9 @@ class TestEdgeCases:
         sample_rate = 16_000
         duration_seconds = 60  # 1 minute
         n_samples = sample_rate * duration_seconds
-        audio_data = np.sin(2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)).astype(np.int16)
+        audio_data = np.sin(
+            2 * np.pi * 440 * np.linspace(0, duration_seconds, n_samples)
+        ).astype(np.int16)
         long_file = tmp_path / "long_audio.wav"
         scipy.io.wavfile.write(filename=long_file, rate=sample_rate, data=audio_data)
 
@@ -504,7 +536,9 @@ class TestEdgeCases:
         duration_seconds = 0.5
         n_samples = int(sample_rate * duration_seconds)
         # Create 6-channel audio (simulating 5.1)
-        audio_data = np.random.randint(-32768, 32767, size=(n_samples, 6), dtype=np.int16)
+        audio_data = np.random.randint(
+            -32768, 32767, size=(n_samples, 6), dtype=np.int16
+        )
         file_path = tmp_path / "multichannel_audio.wav"
         scipy.io.wavfile.write(filename=file_path, rate=sample_rate, data=audio_data)
 
@@ -513,14 +547,18 @@ class TestEdgeCases:
         assert audio is not None
         assert audio.ndim == 1  # Should be converted to mono
 
-    def test_logging_on_successful_load(self, temp_wav_file: Path, caplog: pytest.LogCaptureFixture) -> None:
+    def test_logging_on_successful_load(
+        self, temp_wav_file: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that successful audio loading is logged."""
         with caplog.at_level(logging.INFO):
             load_audio(path=temp_wav_file)
 
         assert any("Loaded audio from" in record.message for record in caplog.records)
 
-    def test_logging_on_resampling(self, high_sample_rate_audio_file: Path, caplog: pytest.LogCaptureFixture) -> None:
+    def test_logging_on_resampling(
+        self, high_sample_rate_audio_file: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that resampling is logged."""
         with caplog.at_level(logging.INFO):
             load_audio(path=high_sample_rate_audio_file)
@@ -554,7 +592,7 @@ class TestWithMocking:
 
     def test_load_audio_no_data_raises_value_error(self, temp_wav_file: Path) -> None:
         """Test that load_audio raises ValueError when file contains no data.
-        
+
         This tests line 39 in audio_loading.py where ValueError is raised
         when scipy.io.wavfile.read returns an empty array.
         """
@@ -626,4 +664,7 @@ class TestAudioLoadingIntegration:
         # For a 440Hz tone at 16kHz for 1 second, we expect approximately 880 zero-crossings
         expected_zero_crossings = int(2 * frequency * duration)
         # Allow some tolerance due to resampling
-        assert abs(zero_crossings - expected_zero_crossings) < expected_zero_crossings * 0.1
+        assert (
+            abs(zero_crossings - expected_zero_crossings)
+            < expected_zero_crossings * 0.1
+        )

@@ -1,8 +1,6 @@
 """Audio chunking functionality for splitting audio into segments."""
 
 import logging
-import os
-from typing import cast
 
 import numpy as np
 import torch

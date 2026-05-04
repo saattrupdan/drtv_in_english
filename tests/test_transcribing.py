@@ -13,10 +13,9 @@ import pytest
 
 from but_with_subs.data_models import Chunk
 from but_with_subs.transcribing import (
-    create_dynamic_batches,
-    transcribe_chunks_dynamic,
     _transcribe_chunks_batch as transcribe_chunks_batch,
 )
+from but_with_subs.transcribing import create_dynamic_batches, transcribe_chunks_dynamic
 
 # ---------------------------------------------------------------------------
 # Chunk model tests
@@ -68,7 +67,13 @@ def test_chunk_duration_matches() -> None:
     end_time=3.0, the duration (end_time - start_time) equals 3.0.
     """
     mock_audio: np.ndarray = np.zeros(shape=48000, dtype=np.float32)
-    chunk = Chunk(start_time=0.0, end_time=3.0, audio=mock_audio, text="Three second segment", speaker=None)
+    chunk = Chunk(
+        start_time=0.0,
+        end_time=3.0,
+        audio=mock_audio,
+        text="Three second segment",
+        speaker=None,
+    )
 
     assert chunk.end_time - chunk.start_time == 3.0
 
@@ -81,7 +86,11 @@ def test_chunk_duration_with_offset() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=48000, dtype=np.float32)
     chunk = Chunk(
-        start_time=1.5, end_time=4.5, audio=mock_audio, text="Three second segment with offset", speaker=None
+        start_time=1.5,
+        end_time=4.5,
+        audio=mock_audio,
+        text="Three second segment with offset",
+        speaker=None,
     )
 
     assert chunk.end_time - chunk.start_time == 3.0
@@ -99,9 +108,27 @@ def test_create_dynamic_batches_sorts_by_duration() -> None:
     before batching.
     """
     chunks = [
-        Chunk(start_time=0.0, end_time=5.0, audio=np.zeros(80000), text="Long", speaker=None),
-        Chunk(start_time=0.0, end_time=1.0, audio=np.zeros(16000), text="Short", speaker=None),
-        Chunk(start_time=0.0, end_time=2.0, audio=np.zeros(32000), text="Medium", speaker=None),
+        Chunk(
+            start_time=0.0,
+            end_time=5.0,
+            audio=np.zeros(80000),
+            text="Long",
+            speaker=None,
+        ),
+        Chunk(
+            start_time=0.0,
+            end_time=1.0,
+            audio=np.zeros(16000),
+            text="Short",
+            speaker=None,
+        ),
+        Chunk(
+            start_time=0.0,
+            end_time=2.0,
+            audio=np.zeros(32000),
+            text="Medium",
+            speaker=None,
+        ),
     ]
 
     batches = list(create_dynamic_batches(chunks, batch_size=10, max_duration=60.0))
@@ -119,8 +146,20 @@ def test_create_dynamic_batches_respects_max_duration() -> None:
     a new batch is started.
     """
     chunks = [
-        Chunk(start_time=0.0, end_time=30.0, audio=np.zeros(480000), text="30s chunk", speaker=None),
-        Chunk(start_time=0.0, end_time=35.0, audio=np.zeros(560000), text="35s chunk", speaker=None),
+        Chunk(
+            start_time=0.0,
+            end_time=30.0,
+            audio=np.zeros(480000),
+            text="30s chunk",
+            speaker=None,
+        ),
+        Chunk(
+            start_time=0.0,
+            end_time=35.0,
+            audio=np.zeros(560000),
+            text="35s chunk",
+            speaker=None,
+        ),
     ]
 
     batches = list(create_dynamic_batches(chunks, batch_size=10, max_duration=60.0))
@@ -135,7 +174,13 @@ def test_create_dynamic_batches_respects_batch_size() -> None:
     Verifies that when batch_size is reached, a new batch is started.
     """
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=np.zeros(16000), text=f"Chunk {i}", speaker=None)
+        Chunk(
+            start_time=0.0,
+            end_time=1.0,
+            audio=np.zeros(16000),
+            text=f"Chunk {i}",
+            speaker=None,
+        )
         for i in range(5)
     ]
 
@@ -162,7 +207,15 @@ def test_create_dynamic_batches_single_chunk() -> None:
 
     Verifies that edge case of one chunk is handled correctly.
     """
-    chunks = [Chunk(start_time=0.0, end_time=10.0, audio=np.zeros(160000), text="Single", speaker=None)]
+    chunks = [
+        Chunk(
+            start_time=0.0,
+            end_time=10.0,
+            audio=np.zeros(160000),
+            text="Single",
+            speaker=None,
+        )
+    ]
 
     batches = list(create_dynamic_batches(chunks, batch_size=10, max_duration=60.0))
 
@@ -196,7 +249,7 @@ def test_transcribe_chunks_batch_returns_list_of_lists() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = _make_mock_pipeline(
         [
@@ -224,7 +277,7 @@ def test_transcribe_chunks_batch_correct_time_offsets() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=5.0, end_time=6.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=5.0, end_time=6.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = _make_mock_pipeline(
         [
@@ -253,7 +306,9 @@ def test_transcribe_chunks_batch_preserves_speaker() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=2.0, audio=mock_audio, text=None, speaker="Alice"),
+        Chunk(
+            start_time=0.0, end_time=2.0, audio=mock_audio, text=None, speaker="Alice"
+        )
     ]
     mock_model = _make_mock_pipeline(
         [
@@ -279,7 +334,7 @@ def test_transcribe_chunks_batch_preserves_text() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=32000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=2.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=2.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = _make_mock_pipeline(
         [
@@ -316,7 +371,7 @@ def test_transcribe_chunks_batch_empty_chunks_from_pipeline() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = _make_mock_pipeline([{"chunks": []}])
 
@@ -364,19 +419,15 @@ def test_transcribe_chunks_dynamic_processes_all_chunks() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = _make_mock_pipeline(
-        [
-            {
-                "chunks": [
-                    {"text": "Hello world", "timestamp": (0.0, 1.0)},
-                ]
-            }
-        ]
+        [{"chunks": [{"text": "Hello world", "timestamp": (0.0, 1.0)}]}]
     )
 
-    results = transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=False)
+    results = transcribe_chunks_dynamic(
+        chunks=chunks, model=mock_model, show_progress=False
+    )
 
     # Function returns list[list[Chunk]] - one list per input chunk
     assert len(results) == 1
@@ -388,7 +439,9 @@ def test_transcribe_chunks_dynamic_empty_input() -> None:
 
     Verifies that an empty chunk list returns an empty list.
     """
-    results = transcribe_chunks_dynamic(chunks=[], model=_make_mock_pipeline([]), show_progress=False)
+    results = transcribe_chunks_dynamic(
+        chunks=[], model=_make_mock_pipeline([]), show_progress=False
+    )
 
     assert results == []
 
@@ -400,19 +453,15 @@ def test_transcribe_chunks_dynamic_preserves_speaker() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker="Bob"),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker="Bob")
     ]
     mock_model = _make_mock_pipeline(
-        [
-            {
-                "chunks": [
-                    {"text": "Test transcription", "timestamp": (0.0, 1.0)},
-                ]
-            }
-        ]
+        [{"chunks": [{"text": "Test transcription", "timestamp": (0.0, 1.0)}]}]
     )
 
-    results = transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=False)
+    results = transcribe_chunks_dynamic(
+        chunks=chunks, model=mock_model, show_progress=False
+    )
 
     # Function returns list[list[Chunk]] - one list per input chunk
     assert results[0][0].speaker == "Bob"
@@ -436,7 +485,9 @@ def test_transcribe_chunks_dynamic_with_multiple_chunks() -> None:
         ]
     )
 
-    results = transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=False)
+    results = transcribe_chunks_dynamic(
+        chunks=chunks, model=mock_model, show_progress=False
+    )
 
     # Function returns list[list[Chunk]] - one list per input chunk
     assert len(results) == 2
@@ -457,7 +508,7 @@ def test_transcribe_chunks_batch_raises_on_pipeline_error() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = um.MagicMock()
     mock_model.side_effect = RuntimeError("Pipeline failed")
@@ -474,7 +525,7 @@ def test_transcribe_chunks_dynamic_raises_on_batch_error() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = um.MagicMock()
     mock_model.side_effect = ValueError("Transcription failed")
@@ -491,7 +542,7 @@ def test_transcribe_chunks_batch_skips_short_chunks() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     # Create transcription results with very short segments (< 0.05s)
     # MIN_CHUNK_LENGTH_SECONDS = 0.05, so segments must be >= 0.05s
@@ -499,7 +550,10 @@ def test_transcribe_chunks_batch_skips_short_chunks() -> None:
         [
             {
                 "chunks": [
-                    {"text": "Hi", "timestamp": (0.0, 0.04)},  # 0.04s - too short (< 0.05)
+                    {
+                        "text": "Hi",
+                        "timestamp": (0.0, 0.04),
+                    },  # 0.04s - too short (< 0.05)
                     {"text": "Hello", "timestamp": (0.1, 0.9)},  # 0.8s - valid
                 ]
             }
@@ -585,16 +639,16 @@ def test_progress_bar_disabled_when_show_progress_false() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = _make_mock_pipeline(
-        [
-            {"chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]},
-        ]
+        [{"chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]}]
     )
 
     # Should complete without errors even with progress disabled
-    results = transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=False)
+    results = transcribe_chunks_dynamic(
+        chunks=chunks, model=mock_model, show_progress=False
+    )
 
     assert len(results) == 1
     assert results[0][0].text == "Hello"
@@ -608,12 +662,10 @@ def test_progress_bar_shows_batch_info() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     mock_model = _make_mock_pipeline(
-        [
-            {"chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]},
-        ]
+        [{"chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]}]
     )
 
     # Mock tqdm to capture the description
@@ -637,7 +689,7 @@ def test_transcribe_chunks_batch_all_short_segments() -> None:
     """
     mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
     chunks = [
-        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None)
     ]
     # All segments are very short (< 0.05s - MIN_CHUNK_LENGTH_SECONDS)
     mock_model = _make_mock_pipeline(

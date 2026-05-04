@@ -2,19 +2,19 @@
 
 import logging
 import re
-import string
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
-from but_with_subs.constants import MIN_CHUNK_LENGTH_SECONDS
 from but_with_subs.data_models import Chunk
-from but_with_subs.text_chunking import _split_text, group_word_chunks
 
 # Import the punctuation pattern used in the module
-from but_with_subs.text_chunking import PUNCTUATION_PATTERN
-
+from but_with_subs.text_chunking import (
+    PUNCTUATION_PATTERN,
+    _split_text,
+    group_word_chunks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ def mock_punctuation_model():
     """Create a mock punctuation model (PunctFixer)."""
     mock = MagicMock()
     # Default behavior: just return text with some basic punctuation added
+
     def mock_punctuate(text: str) -> str:
         # Simple mock that adds periods to sentences
         if not text.endswith("."):
@@ -233,9 +234,7 @@ def word_chunks_short_duration():
 class TestSplitTextBasicFunctionality:
     """Tests for basic text splitting functionality."""
 
-    def test_text_shorter_than_max_words_returns_single_segment(
-        self,
-    ) -> None:
+    def test_text_shorter_than_max_words_returns_single_segment(self) -> None:
         """Test that text shorter than max_words returns a single segment."""
         text = "Hello world"
         result = _split_text(text=text, max_words=10)
@@ -243,9 +242,7 @@ class TestSplitTextBasicFunctionality:
         assert len(result) == 1
         assert result[0] == "Hello world"
 
-    def test_text_exact_max_words_returns_single_segment(
-        self,
-    ) -> None:
+    def test_text_exact_max_words_returns_single_segment(self) -> None:
         """Test that text with exactly max_words returns a single segment."""
         text = "one two three four five"
         result = _split_text(text=text, max_words=5)
@@ -253,9 +250,7 @@ class TestSplitTextBasicFunctionality:
         assert len(result) == 1
         assert result[0] == "one two three four five"
 
-    def test_text_longer_than_max_words_splits_into_multiple_segments(
-        self,
-    ) -> None:
+    def test_text_longer_than_max_words_splits_into_multiple_segments(self) -> None:
         """Test that text longer than max_words is split correctly."""
         text = "one two three four five six seven eight"
         result = _split_text(text=text, max_words=4)
@@ -265,9 +260,7 @@ class TestSplitTextBasicFunctionality:
         assert result[0] == "one two three four"
         assert result[1] == "five six seven eight"
 
-    def test_single_word_text(
-        self,
-    ) -> None:
+    def test_single_word_text(self) -> None:
         """Test splitting a single word."""
         text = "hello"
         result = _split_text(text=text, max_words=5)
@@ -284,9 +277,7 @@ class TestSplitTextBasicFunctionality:
 class TestSplitTextSentenceSegmentation:
     """Tests for sentence-based text splitting."""
 
-    def test_sentences_split_at_periods(
-        self,
-    ) -> None:
+    def test_sentences_split_at_periods(self) -> None:
         """Test that text is split at sentence boundaries (periods)."""
         text = "First sentence. Second sentence. Third sentence."
         result = _split_text(text=text, max_words=10)
@@ -298,9 +289,7 @@ class TestSplitTextSentenceSegmentation:
         assert any("Second sentence" in seg for seg in result)
         assert any("Third sentence" in seg for seg in result)
 
-    def test_long_sentence_split_by_max_words(
-        self,
-    ) -> None:
+    def test_long_sentence_split_by_max_words(self) -> None:
         """Test that long sentences are split by max_words limit."""
         text = "one two three four five six seven eight nine ten eleven twelve"
         result = _split_text(text=text, max_words=4)
@@ -320,9 +309,7 @@ class TestSplitTextSentenceSegmentation:
 class TestSplitTextPunctuationSplitting:
     """Tests for punctuation-based text splitting."""
 
-    def test_split_at_comma(
-        self,
-    ) -> None:
+    def test_split_at_comma(self) -> None:
         """Test splitting at commas."""
         text = "first, second, third, fourth"
         result = _split_text(text=text, max_words=10)
@@ -332,9 +319,7 @@ class TestSplitTextPunctuationSplitting:
         assert any("first" in seg for seg in result)
         assert any("second" in seg for seg in result)
 
-    def test_split_at_semicolon(
-        self,
-    ) -> None:
+    def test_split_at_semicolon(self) -> None:
         """Test splitting at semicolons."""
         text = "first; second; third; fourth"
         result = _split_text(text=text, max_words=10)
@@ -344,9 +329,7 @@ class TestSplitTextPunctuationSplitting:
         assert any("first" in seg for seg in result)
         assert any("second" in seg for seg in result)
 
-    def test_split_at_colon(
-        self,
-    ) -> None:
+    def test_split_at_colon(self) -> None:
         """Test splitting at colons."""
         text = "first: second: third: fourth"
         result = _split_text(text=text, max_words=10)
@@ -356,9 +339,7 @@ class TestSplitTextPunctuationSplitting:
         assert any("first" in seg for seg in result)
         assert any("second" in seg for seg in result)
 
-    def test_split_at_dash(
-        self,
-    ) -> None:
+    def test_split_at_dash(self) -> None:
         """Test splitting at dashes."""
         text = "first - second - third - fourth"
         result = _split_text(text=text, max_words=10)
@@ -377,9 +358,7 @@ class TestSplitTextPunctuationSplitting:
 class TestSplitTextWordSegmentation:
     """Tests for word-based text splitting fallback."""
 
-    def test_very_long_text_split_by_words(
-        self,
-    ) -> None:
+    def test_very_long_text_split_by_words(self) -> None:
         """Test that very long text without punctuation is split by words."""
         # Create a long text without punctuation
         words = [f"word{i}" for i in range(20)]
@@ -393,9 +372,7 @@ class TestSplitTextWordSegmentation:
         assert result[2] == "word10 word11 word12 word13 word14"
         assert result[3] == "word15 word16 word17 word18 word19"
 
-    def test_text_with_irregular_word_count(
-        self,
-    ) -> None:
+    def test_text_with_irregular_word_count(self) -> None:
         """Test splitting when word count is not evenly divisible by max_words."""
         text = "one two three four five six seven"
         result = _split_text(text=text, max_words=3)
@@ -415,27 +392,21 @@ class TestSplitTextWordSegmentation:
 class TestSplitTextEdgeCases:
     """Tests for edge cases in text splitting."""
 
-    def test_empty_string(
-        self,
-    ) -> None:
+    def test_empty_string(self) -> None:
         """Test splitting an empty string."""
         result = _split_text(text="", max_words=5)
 
         assert len(result) == 1
         assert result[0] == ""
 
-    def test_whitespace_only(
-        self,
-    ) -> None:
+    def test_whitespace_only(self) -> None:
         """Test splitting whitespace-only text."""
         result = _split_text(text="   ", max_words=5)
 
         assert len(result) == 1
         assert result[0] == "   "
 
-    def test_max_words_of_one(
-        self,
-    ) -> None:
+    def test_max_words_of_one(self) -> None:
         """Test splitting with max_words=1."""
         text = "one two three"
         result = _split_text(text=text, max_words=1)
@@ -445,9 +416,7 @@ class TestSplitTextEdgeCases:
         assert result[1] == "two"
         assert result[2] == "three"
 
-    def test_very_large_max_words(
-        self,
-    ) -> None:
+    def test_very_large_max_words(self) -> None:
         """Test with a very large max_words value."""
         text = "one two three"
         result = _split_text(text=text, max_words=1000)
@@ -455,9 +424,7 @@ class TestSplitTextEdgeCases:
         assert len(result) == 1
         assert result[0] == "one two three"
 
-    def test_text_with_extra_whitespace(
-        self,
-    ) -> None:
+    def test_text_with_extra_whitespace(self) -> None:
         """Test text with multiple spaces between words."""
         text = "one    two     three"
         result = _split_text(text=text, max_words=5)
@@ -478,9 +445,7 @@ class TestGroupWordChunksBasicFunctionality:
     """Tests for basic group_word_chunks functionality."""
 
     def test_returns_list_of_chunks(
-        self,
-        simple_word_chunks: list[Chunk],
-        mock_punctuation_model: MagicMock,
+        self, simple_word_chunks: list[Chunk], mock_punctuation_model: MagicMock
     ) -> None:
         """Test that group_word_chunks returns a list of Chunk objects."""
         result = group_word_chunks(
@@ -493,9 +458,7 @@ class TestGroupWordChunksBasicFunctionality:
         assert all(isinstance(chunk, Chunk) for chunk in result)
 
     def test_preserves_speaker_information(
-        self,
-        simple_word_chunks: list[Chunk],
-        mock_punctuation_model: MagicMock,
+        self, simple_word_chunks: list[Chunk], mock_punctuation_model: MagicMock
     ) -> None:
         """Test that speaker information is preserved from word chunks."""
         result = group_word_chunks(
@@ -509,9 +472,7 @@ class TestGroupWordChunksBasicFunctionality:
             assert chunk.speaker == "SPEAKER_00"
 
     def test_chunk_times_within_word_chunk_range(
-        self,
-        simple_word_chunks: list[Chunk],
-        mock_punctuation_model: MagicMock,
+        self, simple_word_chunks: list[Chunk], mock_punctuation_model: MagicMock
     ) -> None:
         """Test that chunk times are within the range of word chunk times."""
         result = group_word_chunks(
@@ -529,9 +490,7 @@ class TestGroupWordChunksBasicFunctionality:
             assert chunk.end_time <= max_end
 
     def test_chunk_audio_is_concatenation(
-        self,
-        simple_word_chunks: list[Chunk],
-        mock_punctuation_model: MagicMock,
+        self, simple_word_chunks: list[Chunk], mock_punctuation_model: MagicMock
     ) -> None:
         """Test that chunk audio is concatenation of word chunk audio."""
         result = group_word_chunks(
@@ -625,15 +584,11 @@ class TestGroupWordChunksMinimumDuration:
     """Tests for minimum duration filtering in group_word_chunks."""
 
     def test_short_chunks_filtered_out(
-        self,
-        word_chunks_short_duration: list[Chunk],
-        mock_punctuation_model: MagicMock,
+        self, word_chunks_short_duration: list[Chunk], mock_punctuation_model: MagicMock
     ) -> None:
         """Test that chunks below minimum duration are filtered out."""
         # Configure mock to return text that would create a short segment
-        mock_punctuation_model.punctuate = MagicMock(
-            return_value="short chunk."
-        )
+        mock_punctuation_model.punctuate = MagicMock(return_value="short chunk.")
 
         result = group_word_chunks(
             word_chunks=word_chunks_short_duration,
@@ -790,22 +745,16 @@ class TestGroupWordChunksPunctuationHandling:
 class TestGroupWordChunksEdgeCases:
     """Tests for edge cases in group_word_chunks."""
 
-    def test_empty_word_chunks_list(
-        self,
-        mock_punctuation_model: MagicMock,
-    ) -> None:
+    def test_empty_word_chunks_list(self, mock_punctuation_model: MagicMock) -> None:
         """Test handling of empty word chunks list."""
         result = group_word_chunks(
-            word_chunks=[],
-            punctuation_model=mock_punctuation_model,
-            max_words=10,
+            word_chunks=[], punctuation_model=mock_punctuation_model, max_words=10
         )
 
         assert result == []
 
     def test_single_word_chunk(
-        self,
-        mock_punctuation_model_with_fixes: MagicMock,
+        self, mock_punctuation_model_with_fixes: MagicMock
     ) -> None:
         """Test handling of a single word chunk."""
         single_chunk = [
@@ -817,9 +766,7 @@ class TestGroupWordChunksEdgeCases:
                 speaker="SPEAKER_00",
             )
         ]
-        mock_punctuation_model_with_fixes.punctuate = MagicMock(
-            return_value="Hello."
-        )
+        mock_punctuation_model_with_fixes.punctuate = MagicMock(return_value="Hello.")
 
         result = group_word_chunks(
             word_chunks=single_chunk,
@@ -831,14 +778,10 @@ class TestGroupWordChunksEdgeCases:
         assert isinstance(result, list)
 
     def test_word_chunk_with_none_text(
-        self,
-        word_chunks_with_none_text: list[Chunk],
-        mock_punctuation_model: MagicMock,
+        self, word_chunks_with_none_text: list[Chunk], mock_punctuation_model: MagicMock
     ) -> None:
         """Test handling of word chunks with None text."""
-        mock_punctuation_model.punctuate = MagicMock(
-            return_value="Hello world."
-        )
+        mock_punctuation_model.punctuate = MagicMock(return_value="Hello world.")
 
         result = group_word_chunks(
             word_chunks=word_chunks_with_none_text,
@@ -961,8 +904,7 @@ class TestGroupWordChunksErrorHandling:
         assert isinstance(result, list)
 
     def test_no_word_chunks_in_segment_logs_warning(
-        self,
-        caplog: pytest.LogCaptureFixture,
+        self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test that when no word chunks fall within segment, warning is logged.
 
@@ -986,7 +928,7 @@ class TestGroupWordChunksErrorHandling:
             ),
             Chunk(
                 start_time=4.5,  # Overlaps with first chunk
-                end_time=5.0,    # Same end time - segment_end will be 5.0
+                end_time=5.0,  # Same end time - segment_end will be 5.0
                 audio=np.array([4.0, 5.0]),
                 text="world",
                 speaker="SPEAKER_00",
@@ -999,9 +941,7 @@ class TestGroupWordChunksErrorHandling:
 
         with caplog.at_level(logging.WARNING):
             result = group_word_chunks(
-                word_chunks=chunks,
-                punctuation_model=mock_punct,
-                max_words=10,
+                word_chunks=chunks, punctuation_model=mock_punct, max_words=10
             )
 
         # The first chunk has end_time=5.0 which equals segment_end,
@@ -1010,8 +950,7 @@ class TestGroupWordChunksErrorHandling:
         assert isinstance(result, list)
 
     def test_word_chunk_extends_beyond_segment_triggers_warning(
-        self,
-        caplog: pytest.LogCaptureFixture,
+        self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test warning when all matching chunks extend beyond segment boundaries.
 
@@ -1045,9 +984,7 @@ class TestGroupWordChunksErrorHandling:
 
         with caplog.at_level(logging.WARNING):
             result = group_word_chunks(
-                word_chunks=chunks,
-                punctuation_model=mock_punct,
-                max_words=10,
+                word_chunks=chunks, punctuation_model=mock_punct, max_words=10
             )
 
         assert isinstance(result, list)
@@ -1175,18 +1112,14 @@ class TestGroupWordChunksIntegration:
 class TestPunctuationPattern:
     """Tests for the punctuation pattern."""
 
-    def test_pattern_matches_common_punctuation(
-        self,
-    ) -> None:
+    def test_pattern_matches_common_punctuation(self) -> None:
         """Test that the pattern matches common punctuation characters."""
         # Test common punctuation characters (excluding backslash which needs special handling)
         test_chars = ".,!?;:()[]{}\"'-_@#$%^&*/=<>"
         for char in test_chars:
             assert re.search(PUNCTUATION_PATTERN, char) is not None
 
-    def test_pattern_removes_punctuation_from_text(
-        self,
-    ) -> None:
+    def test_pattern_removes_punctuation_from_text(self) -> None:
         """Test that the pattern removes punctuation from text."""
         text = "Hello, world! How are you?"
         cleaned = re.sub(PUNCTUATION_PATTERN, "", text)
@@ -1196,9 +1129,7 @@ class TestPunctuationPattern:
         assert "?" not in cleaned
         assert cleaned == "Hello world How are you"
 
-    def test_pattern_removes_punctuation_from_text(
-        self,
-    ) -> None:
+    def test_pattern_removes_punctuation_from_text(self) -> None:
         """Test that the pattern removes punctuation from text."""
         text = "Hello, world! How are you?"
         cleaned = re.sub(PUNCTUATION_PATTERN, "", text)
@@ -1218,8 +1149,7 @@ class TestAdditionalEdgeCases:
     """Additional edge case tests."""
 
     def test_word_chunks_with_empty_string_text(
-        self,
-        mock_punctuation_model: MagicMock,
+        self, mock_punctuation_model: MagicMock
     ) -> None:
         """Test handling of word chunks with empty string text."""
         chunks = [
@@ -1242,16 +1172,13 @@ class TestAdditionalEdgeCases:
         mock_punctuation_model.punctuate = MagicMock(return_value="world.")
 
         result = group_word_chunks(
-            word_chunks=chunks,
-            punctuation_model=mock_punctuation_model,
-            max_words=10,
+            word_chunks=chunks, punctuation_model=mock_punctuation_model, max_words=10
         )
 
         assert isinstance(result, list)
 
     def test_chunks_with_float_times(
-        self,
-        mock_punctuation_model_with_fixes: MagicMock,
+        self, mock_punctuation_model_with_fixes: MagicMock
     ) -> None:
         """Test handling of chunks with precise float timestamps."""
         chunks = [
@@ -1284,8 +1211,7 @@ class TestAdditionalEdgeCases:
         assert isinstance(result, list)
 
     def test_case_insensitive_word_matching(
-        self,
-        mock_punctuation_model_with_fixes: MagicMock,
+        self, mock_punctuation_model_with_fixes: MagicMock
     ) -> None:
         """Test that word matching is case-insensitive."""
         chunks = [
@@ -1319,9 +1245,7 @@ class TestAdditionalEdgeCases:
         # Should still match despite case differences
         assert isinstance(result, list)
 
-    def test_split_text_with_danish_language(
-        self,
-    ) -> None:
+    def test_split_text_with_danish_language(self) -> None:
         """Test sentence splitting with Danish text (nltk language parameter)."""
         text = "Dette er en test. Dette er en anden test."
         result = _split_text(text=text, max_words=10)
@@ -1329,9 +1253,7 @@ class TestAdditionalEdgeCases:
         # Should split at sentence boundaries
         assert len(result) >= 1
 
-    def test_split_text_preserves_original_spacing_after_split(
-        self,
-    ) -> None:
+    def test_split_text_preserves_original_spacing_after_split(self) -> None:
         """Test that spacing is handled correctly after splitting."""
         text = "one two three, four five six"
         result = _split_text(text=text, max_words=10)

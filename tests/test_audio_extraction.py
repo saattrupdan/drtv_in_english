@@ -67,7 +67,7 @@ def test_extract_audio_calls_ffmpeg_with_correct_command() -> None:
         "error",
         str(video_path.with_suffix(".wav")),
     ]
-    
+
     # Verify the args match exactly
     assert call_kwargs["args"] == expected_args
     # Verify check=True is set

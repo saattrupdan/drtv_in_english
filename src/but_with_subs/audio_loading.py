@@ -159,14 +159,22 @@ def validate_audio(
     # Check amplitude range
     amplitude_valid = peak_amplitude <= 1.0
     if not amplitude_valid:
-        errors.append(f"Audio amplitude {peak_amplitude:.3f} exceeds normalized range [-1, 1]")
+        errors.append(
+            f"Audio amplitude {peak_amplitude:.3f} exceeds normalized range [-1, 1]"
+        )
 
     # Check data type
     dtype_valid = audio.dtype in (np.float32, np.float64)
     if not dtype_valid:
         errors.append(f"Audio data type {audio.dtype} is not a float type")
 
-    is_valid = sample_rate_valid and duration_valid and has_signal and amplitude_valid and dtype_valid
+    is_valid = (
+        sample_rate_valid
+        and duration_valid
+        and has_signal
+        and amplitude_valid
+        and dtype_valid
+    )
 
     return {
         "is_valid": is_valid,
