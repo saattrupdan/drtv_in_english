@@ -9,6 +9,7 @@ import typing as t
 import unittest.mock as um
 
 import numpy as np
+import pytest
 
 from but_with_subs.data_models import Chunk
 from but_with_subs.transcribing import (
@@ -441,3 +442,217 @@ def test_transcribe_chunks_dynamic_with_multiple_chunks() -> None:
     assert len(results) == 2
     assert results[0][0].text == "First chunk"
     assert results[1][0].text == "Second chunk"
+
+
+# ---------------------------------------------------------------------------
+# Error handling and edge case tests
+# ---------------------------------------------------------------------------
+
+
+def test_transcribe_chunks_batch_raises_on_pipeline_error() -> None:
+    """Test that transcribe_chunks_batch raises on pipeline errors.
+
+    Verifies that exceptions from the ASR pipeline are properly propagated
+    after logging an error.
+    """
+    mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
+    chunks = [
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+    ]
+    mock_model = um.MagicMock()
+    mock_model.side_effect = RuntimeError("Pipeline failed")
+
+    with pytest.raises(RuntimeError, match="Pipeline failed"):
+        transcribe_chunks_batch(chunks=chunks, model=mock_model)
+
+
+def test_transcribe_chunks_dynamic_raises_on_batch_error() -> None:
+    """Test that transcribe_chunks_dynamic raises on batch transcription errors.
+
+    Verifies that exceptions during batch processing are properly propagated
+    with appropriate error logging.
+    """
+    mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
+    chunks = [
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+    ]
+    mock_model = um.MagicMock()
+    mock_model.side_effect = ValueError("Transcription failed")
+
+    with pytest.raises(ValueError, match="Transcription failed"):
+        transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=False)
+
+
+def test_transcribe_chunks_batch_skips_short_chunks() -> None:
+    """Test that chunks shorter than MIN_CHUNK_LENGTH_SECONDS are skipped.
+
+    Verifies that word-level segments shorter than the minimum threshold
+    are filtered out from the results.
+    """
+    mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
+    chunks = [
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+    ]
+    # Create transcription results with very short segments (< 0.05s)
+    # MIN_CHUNK_LENGTH_SECONDS = 0.05, so segments must be >= 0.05s
+    mock_model = _make_mock_pipeline(
+        [
+            {
+                "chunks": [
+                    {"text": "Hi", "timestamp": (0.0, 0.04)},  # 0.04s - too short (< 0.05)
+                    {"text": "Hello", "timestamp": (0.1, 0.9)},  # 0.8s - valid
+                ]
+            }
+        ]
+    )
+
+    results = transcribe_chunks_batch(chunks=chunks, model=mock_model)
+
+    # Only the valid chunk should be returned
+    assert len(results) == 1
+    assert len(results[0]) == 1
+    assert results[0][0].text == "Hello"
+
+
+def test_padding_with_varying_chunk_lengths() -> None:
+    """Test padding logic with chunks of different lengths.
+
+    Verifies that shorter chunks are correctly padded to match the
+    maximum length in the batch.
+    """
+    # Create chunks with different durations
+    chunk_short = Chunk(
+        start_time=0.0,
+        end_time=1.0,
+        audio=np.zeros(16000, dtype=np.float32),  # 1 second
+        text=None,
+        speaker=None,
+    )
+    chunk_long = Chunk(
+        start_time=0.0,
+        end_time=2.0,
+        audio=np.zeros(32000, dtype=np.float32),  # 2 seconds
+        text=None,
+        speaker=None,
+    )
+    chunks = [chunk_short, chunk_long]
+
+    mock_model = _make_mock_pipeline(
+        [
+            {"chunks": [{"text": "Short", "timestamp": (0.0, 1.0)}]},
+            {"chunks": [{"text": "Long", "timestamp": (0.0, 2.0)}]},
+        ]
+    )
+
+    results = transcribe_chunks_batch(chunks=chunks, model=mock_model)
+
+    # Both chunks should be transcribed
+    assert len(results) == 2
+    assert results[0][0].text == "Short"
+    assert results[1][0].text == "Long"
+
+
+def test_padding_with_all_same_length_chunks() -> None:
+    """Test padding when all chunks are the same length.
+
+    Verifies that no padding is applied when all chunks have equal length.
+    """
+    mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
+    chunks = [
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+        Chunk(start_time=1.0, end_time=2.0, audio=mock_audio, text=None, speaker=None),
+    ]
+
+    mock_model = _make_mock_pipeline(
+        [
+            {"chunks": [{"text": "First", "timestamp": (0.0, 1.0)}]},
+            {"chunks": [{"text": "Second", "timestamp": (0.0, 1.0)}]},
+        ]
+    )
+
+    results = transcribe_chunks_batch(chunks=chunks, model=mock_model)
+
+    assert len(results) == 2
+    assert results[0][0].text == "First"
+    assert results[1][0].text == "Second"
+
+
+def test_progress_bar_disabled_when_show_progress_false() -> None:
+    """Test that progress bar is disabled when show_progress=False.
+
+    Verifies that the tqdm progress bar is properly disabled when the
+    flag is set to False.
+    """
+    mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
+    chunks = [
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+    ]
+    mock_model = _make_mock_pipeline(
+        [
+            {"chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]},
+        ]
+    )
+
+    # Should complete without errors even with progress disabled
+    results = transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=False)
+
+    assert len(results) == 1
+    assert results[0][0].text == "Hello"
+
+
+def test_progress_bar_shows_batch_info() -> None:
+    """Test that progress bar displays batch information.
+
+    Verifies that the progress bar description includes batch number,
+    chunk count, and duration.
+    """
+    mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
+    chunks = [
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+    ]
+    mock_model = _make_mock_pipeline(
+        [
+            {"chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]},
+        ]
+    )
+
+    # Mock tqdm to capture the description
+    with um.patch("but_with_subs.transcribing.tqdm") as mock_tqdm:
+        mock_iterator = um.MagicMock()
+        mock_tqdm.return_value.__enter__.return_value = mock_iterator
+        mock_iterator.__iter__.return_value = iter([chunks])
+        mock_iterator.set_description = um.MagicMock()
+
+        transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=True)
+
+        # Verify set_description was called with batch info
+        assert mock_iterator.set_description.called
+
+
+def test_transcribe_chunks_batch_all_short_segments() -> None:
+    """Test handling when all segments are below minimum length.
+
+    Verifies that empty results are returned when all transcribed
+    segments are shorter than MIN_CHUNK_LENGTH_SECONDS.
+    """
+    mock_audio: np.ndarray = np.zeros(shape=16000, dtype=np.float32)
+    chunks = [
+        Chunk(start_time=0.0, end_time=1.0, audio=mock_audio, text=None, speaker=None),
+    ]
+    # All segments are very short (< 0.05s - MIN_CHUNK_LENGTH_SECONDS)
+    mock_model = _make_mock_pipeline(
+        [
+            {
+                "chunks": [
+                    {"text": "Hi", "timestamp": (0.0, 0.04)},  # 0.04s < 0.05
+                    {"text": "Bye", "timestamp": (0.1, 0.14)},  # 0.04s < 0.05
+                ]
+            }
+        ]
+    )
+
+    results = transcribe_chunks_batch(chunks=chunks, model=mock_model)
+
+    # All segments filtered out due to being too short
+    assert len(results) == 1
+    assert results[0] == []
