@@ -146,7 +146,9 @@ def mock_punctfixer() -> Mock:
     return mock
 
 
-def _mock_translate_subtitles(vtt_path: Path, source_lang: str, target_lang: str) -> Path:
+def _mock_translate_subtitles(
+    vtt_path: Path, source_lang: str, target_lang: str
+) -> Path:
     """Mock translation that reads VTT and writes translated version.
 
     This replaces the real translation module to avoid requiring ML models

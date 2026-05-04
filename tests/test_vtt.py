@@ -22,7 +22,6 @@ from but_with_subs.vtt import (
     write_vtt_file,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -248,7 +247,7 @@ class TestWriteVttFile:
                 audio=audio_data,
                 text="Alice speaking",
                 speaker="Alice",
-            ),
+            )
         ]
         output_path = tmp_path / "speaker.vtt"
         write_vtt_file(chunks=chunks, path=output_path)
@@ -266,7 +265,7 @@ class TestWriteVttFile:
                 audio=audio_data,
                 text="No speaker",
                 speaker=None,
-            ),
+            )
         ]
         output_path = tmp_path / "nospeaker.vtt"
         write_vtt_file(chunks=chunks, path=output_path)
@@ -325,12 +324,7 @@ class TestParseVttFile:
 
     def test_parse_basic_vtt(self, tmp_path: Path) -> None:
         """Test parsing a basic VTT file without speakers."""
-        vtt_content = (
-            "WEBVTT\n\n"
-            "1\n"
-            "00:00:00.000 --> 00:00:02.000\n"
-            "Hello world\n"
-        )
+        vtt_content = "WEBVTT\n\n1\n00:00:00.000 --> 00:00:02.000\nHello world\n"
         vtt_path = tmp_path / "basic.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
 
@@ -342,15 +336,10 @@ class TestParseVttFile:
         assert chunks[0].end_time == 2.0
         assert chunks[0].speaker is None
 
-    def test_parse_vtt_with_parenthesised_speaker(
-        self, tmp_path: Path
-    ) -> None:
+    def test_parse_vtt_with_parenthesised_speaker(self, tmp_path: Path) -> None:
         """Test parsing VTT with (Speaker) format on cue line."""
         vtt_content = (
-            "WEBVTT\n\n"
-            "1 (Alice)\n"
-            "00:00:00.000 --> 00:00:02.000\n"
-            "Hello world\n"
+            "WEBVTT\n\n1 (Alice)\n00:00:00.000 --> 00:00:02.000\nHello world\n"
         )
         vtt_path = tmp_path / "paren_speaker.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
@@ -363,13 +352,7 @@ class TestParseVttFile:
 
     def test_parse_vtt_with_v_tag_speaker(self, tmp_path: Path) -> None:
         """Test parsing VTT with <v Speaker> format."""
-        vtt_content = (
-            "WEBVTT\n\n"
-            "1\n"
-            "<v Bob>\n"
-            "00:00:00.000 --> 00:00:02.000\n"
-            "Hello Bob\n"
-        )
+        vtt_content = "WEBVTT\n\n1\n<v Bob>\n00:00:00.000 --> 00:00:02.000\nHello Bob\n"
         vtt_path = tmp_path / "v_tag_speaker.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
 
@@ -404,9 +387,7 @@ class TestParseVttFile:
         assert chunks[1].start_time == 2.5
         assert chunks[1].end_time == 4.5
 
-    def test_parse_vtt_with_mixed_speaker_formats(
-        self, tmp_path: Path
-    ) -> None:
+    def test_parse_vtt_with_mixed_speaker_formats(self, tmp_path: Path) -> None:
         """Test parsing VTT with mixed speaker formats."""
         vtt_content = (
             "WEBVTT\n\n"
@@ -433,15 +414,10 @@ class TestParseVttFile:
         assert chunks[1].speaker == "Bob"
         assert chunks[2].speaker is None
 
-    def test_parse_vtt_with_inline_speaker_in_text(
-        self, tmp_path: Path
-    ) -> None:
+    def test_parse_vtt_with_inline_speaker_in_text(self, tmp_path: Path) -> None:
         """Test parsing VTT when speaker is embedded in text as (Speaker)."""
         vtt_content = (
-            "WEBVTT\n\n"
-            "1\n"
-            "00:00:00.000 --> 00:00:02.000\n"
-            "(Alice) Hello world\n"
+            "WEBVTT\n\n1\n00:00:00.000 --> 00:00:02.000\n(Alice) Hello world\n"
         )
         vtt_path = tmp_path / "inline_speaker.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
@@ -452,15 +428,10 @@ class TestParseVttFile:
         assert chunks[0].speaker == "Alice"
         assert chunks[0].text == "Hello world"
 
-    def test_parse_vtt_tracks_stripped_from_text(
-        self, tmp_path: Path
-    ) -> None:
+    def test_parse_vtt_tracks_stripped_from_text(self, tmp_path: Path) -> None:
         """Test that HTML-like tags are stripped from text during parsing."""
         vtt_content = (
-            "WEBVTT\n\n"
-            "1\n"
-            "00:00:00.000 --> 00:00:02.000\n"
-            "<c.red>Hello</c> world\n"
+            "WEBVTT\n\n1\n00:00:00.000 --> 00:00:02.000\n<c.red>Hello</c> world\n"
         )
         vtt_path = tmp_path / "tags.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
@@ -492,17 +463,9 @@ class TestParseVttFile:
         assert chunks[0].speaker == "Alice"
         assert chunks[1].speaker == "Bob"
 
-    def test_parse_vtt_with_multiline_text(
-        self, tmp_path: Path
-    ) -> None:
+    def test_parse_vtt_with_multiline_text(self, tmp_path: Path) -> None:
         """Test parsing VTT with multiline cue text."""
-        vtt_content = (
-            "WEBVTT\n\n"
-            "1\n"
-            "00:00:00.000 --> 00:00:02.000\n"
-            "Line one\n"
-            "Line two\n"
-        )
+        vtt_content = "WEBVTT\n\n1\n00:00:00.000 --> 00:00:02.000\nLine one\nLine two\n"
         vtt_path = tmp_path / "multiline.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
 
@@ -599,9 +562,7 @@ class TestRoundTrip:
         assert parsed_chunks[0].start_time == 1.234
         assert parsed_chunks[0].end_time == 5.678
 
-    def test_speaker_preserved_round_trip(
-        self, tmp_path: Path
-    ) -> None:
+    def test_speaker_preserved_round_trip(self, tmp_path: Path) -> None:
         """Test that speaker info survives round-trip."""
         audio_data = np.array([0.1], dtype=np.float32)
         original_chunks = [
@@ -656,11 +617,7 @@ class TestEdgeCases:
     def test_vtt_with_extra_whitespace(self, tmp_path: Path) -> None:
         """Test parsing VTT with extra blank lines and spaces."""
         vtt_content = (
-            "WEBVTT\n\n\n\n"
-            "1\n"
-            "00:00:00.000 --> 00:00:02.000\n"
-            "  Hello world  \n"
-            "\n\n"
+            "WEBVTT\n\n\n\n1\n00:00:00.000 --> 00:00:02.000\n  Hello world  \n\n\n"
         )
         vtt_path = tmp_path / "whitespace.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
@@ -672,10 +629,7 @@ class TestEdgeCases:
     def test_unicode_text(self, tmp_path: Path) -> None:
         """Test parsing VTT with unicode text."""
         vtt_content = (
-            "WEBVTT\n\n"
-            "1\n"
-            "00:00:00.000 --> 00:00:02.000\n"
-            "Hello 世界 مرحبا שלום\n"
+            "WEBVTT\n\n1\n00:00:00.000 --> 00:00:02.000\nHello 世界 مرحبا שלום\n"
         )
         vtt_path = tmp_path / "unicode.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
@@ -712,11 +666,7 @@ class TestEdgeCases:
         audio_data = np.array([0.1], dtype=np.float32)
         chunks = [
             Chunk(
-                start_time=0.0,
-                end_time=1.0,
-                audio=audio_data,
-                text=None,
-                speaker=None,
+                start_time=0.0, end_time=1.0, audio=audio_data, text=None, speaker=None
             )
         ]
         output_path = tmp_path / "none_text.vtt"
@@ -730,11 +680,7 @@ class TestEdgeCases:
         audio_data = np.array([0.1], dtype=np.float32)
         chunks = [
             Chunk(
-                start_time=0.0,
-                end_time=1.0,
-                audio=audio_data,
-                text=None,
-                speaker=None,
+                start_time=0.0, end_time=1.0, audio=audio_data, text=None, speaker=None
             )
         ]
         vtt_path = tmp_path / "none_text_rt.vtt"
@@ -747,10 +693,7 @@ class TestEdgeCases:
     def test_vtt_with_speaker_style_region(self, tmp_path: Path) -> None:
         """Test VTT with speaker style region after timestamp."""
         vtt_content = (
-            "WEBVTT\n\n"
-            "1\n"
-            "00:00:00.000 --> 00:00:02.000 position:10%\n"
-            "Styled subtitle\n"
+            "WEBVTT\n\n1\n00:00:00.000 --> 00:00:02.000 position:10%\nStyled subtitle\n"
         )
         vtt_path = tmp_path / "style_region.vtt"
         vtt_path.write_text(vtt_content, encoding="utf-8")
@@ -759,9 +702,7 @@ class TestEdgeCases:
         assert len(chunks) == 1
         assert chunks[0].text == "Styled subtitle"
 
-    def test_vtt_with_all_speaker_formats_same_file(
-        self, tmp_path: Path
-    ) -> None:
+    def test_vtt_with_all_speaker_formats_same_file(self, tmp_path: Path) -> None:
         """Test VTT file mixing all speaker formats."""
         vtt_content = (
             "WEBVTT\n\n"

@@ -135,13 +135,23 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
     # Translate all chunks to target language
     logger.info(f"Translating transcriptions to {language}")
 
+    translated_chunks: list[Chunk] = []
     with tqdm(
-        total=progress_tuples[-1][1] if progress_tuples else len(chunks),
+        total=len(chunks),
         desc="Translating",
         unit="chunk",
     ) as pbar:
-        for current, total in translate_chunks(chunks, language, batch_size=batch_size):
-            pbar.set_description(f"Translating {current}/{total}")
+        for result in translate_chunks(chunks, language, batch_size=batch_size):
+            if isinstance(result, tuple):
+                current, total = result
+                pbar.set_description(f"Translating {current}/{total}")
+                pbar.n = current
+                pbar.refresh()
+            else:
+                translated_chunks = result
+                pbar.n = pbar.total
+                pbar.refresh()
+        pbar.close()
 
     generate_subtitles(chunks=translated_chunks, audio_path=path)
 

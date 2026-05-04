@@ -106,13 +106,9 @@ def _run_translate_chunks(
 
     with (
         um.patch(
-            "but_with_subs.translation.M2M100ForConditionalGeneration",
-            mock_model_cls,
+            "but_with_subs.translation.M2M100ForConditionalGeneration", mock_model_cls
         ),
-        um.patch(
-            "but_with_subs.translation.SMALL100Tokenizer",
-            mock_tokenizer_cls,
-        ),
+        um.patch("but_with_subs.translation.SMALL100Tokenizer", mock_tokenizer_cls),
         um.patch("but_with_subs.translation.get_device") as mock_device,
         um.patch("but_with_subs.translation.bnb.no_terminal_output") as mock_ctx,
         um.patch("but_with_subs.translation.logger"),
@@ -123,9 +119,7 @@ def _run_translate_chunks(
 
         return list(
             translate_chunks(
-                chunks=chunks,
-                target_lang=target_lang,
-                batch_size=batch_size,
+                chunks=chunks, target_lang=target_lang, batch_size=batch_size
             )
         )
 
@@ -199,11 +193,7 @@ def test_translate_chunks_batch_size_handling() -> None:
     """
     mock_model = _make_mock_model()
     mock_tokenizer = _make_mock_tokenizer()
-    decode_calls: list[list[str]] = [
-        ["T1", "T2"],
-        ["T3", "T4"],
-        ["T5"],
-    ]
+    decode_calls: list[list[str]] = [["T1", "T2"], ["T3", "T4"], ["T5"]]
     mock_tokenizer.batch_decode.side_effect = decode_calls
 
     chunks = [_make_chunk(f"Text {i}") for i in range(5)]
@@ -318,10 +308,7 @@ def test_translate_chunks_multiple_batches_yield_order() -> None:
     """
     mock_model = _make_mock_model()
     mock_tokenizer = _make_mock_tokenizer()
-    decode_calls: list[list[str]] = [
-        ["French A", "French B"],
-        ["French C", "French D"],
-    ]
+    decode_calls: list[list[str]] = [["French A", "French B"], ["French C", "French D"]]
     mock_tokenizer.batch_decode.side_effect = decode_calls
 
     chunks = [_make_chunk(f"Original {i}") for i in range(4)]
@@ -370,9 +357,7 @@ def test_translate_single_calls_model_generate() -> None:
     mock_model = _make_mock_model()
     mock_tokenizer = _make_mock_tokenizer()
 
-    translate_single(
-        model=mock_model, tokenizer=mock_tokenizer, text="Test text"
-    )
+    translate_single(model=mock_model, tokenizer=mock_tokenizer, text="Test text")
 
     assert mock_model.generate.called
 
@@ -386,9 +371,7 @@ def test_translate_single_passes_text_to_tokenizer() -> None:
     mock_model = _make_mock_model()
     mock_tokenizer = _make_mock_tokenizer()
 
-    translate_single(
-        model=mock_model, tokenizer=mock_tokenizer, text="Specific text"
-    )
+    translate_single(model=mock_model, tokenizer=mock_tokenizer, text="Specific text")
 
     mock_tokenizer.assert_called_once_with("Specific text", return_tensors="pt")
 
@@ -428,9 +411,7 @@ def test_translate_batch_multiple_texts_uses_batch_path() -> None:
     mock_tokenizer.batch_decode.return_value = ["Result A", "Result B"]
 
     result = _translate_batch(
-        model=mock_model,
-        tokenizer=mock_tokenizer,
-        texts=["Hello", "World"],
+        model=mock_model, tokenizer=mock_tokenizer, texts=["Hello", "World"]
     )
 
     assert result == ["Result A", "Result B"]
@@ -450,9 +431,7 @@ def test_translate_batch_empty_list_uses_batch_path() -> None:
     mock_tokenizer = _make_mock_tokenizer()
     mock_tokenizer.batch_decode.return_value = []
 
-    result = _translate_batch(
-        model=mock_model, tokenizer=mock_tokenizer, texts=[]
-    )
+    result = _translate_batch(model=mock_model, tokenizer=mock_tokenizer, texts=[])
 
     assert result == []
     # Empty list: len != 1, so batch path is taken
@@ -473,9 +452,7 @@ def test_translate_batch_multiple_texts_returns_correct_count() -> None:
     mock_tokenizer.batch_decode.return_value = ["A", "B", "C", "D", "E"]
 
     texts = [f"Text {i}" for i in range(5)]
-    result = _translate_batch(
-        model=mock_model, tokenizer=mock_tokenizer, texts=texts
-    )
+    result = _translate_batch(model=mock_model, tokenizer=mock_tokenizer, texts=texts)
 
     assert len(result) == 5
     assert result == ["A", "B", "C", "D", "E"]
@@ -493,9 +470,7 @@ def test_translate_batch_sends_encoded_tensor_to_device() -> None:
     mock_tokenizer.return_value = um.MagicMock()
     mock_tokenizer.return_value.to.return_value = um.MagicMock()
 
-    _translate_batch(
-        model=mock_model, tokenizer=mock_tokenizer, texts=["Hello"]
-    )
+    _translate_batch(model=mock_model, tokenizer=mock_tokenizer, texts=["Hello"])
 
     assert mock_tokenizer.return_value.to.called
 
@@ -512,8 +487,6 @@ def test_translate_batch_single_text_sends_tensor_to_device() -> None:
     mock_tokenizer.return_value = um.MagicMock()
     mock_tokenizer.return_value.to.return_value = um.MagicMock()
 
-    _translate_batch(
-        model=mock_model, tokenizer=mock_tokenizer, texts=["Single"]
-    )
+    _translate_batch(model=mock_model, tokenizer=mock_tokenizer, texts=["Single"])
 
     assert mock_tokenizer.return_value.to.called
