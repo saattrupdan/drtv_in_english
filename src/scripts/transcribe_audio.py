@@ -136,7 +136,7 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
     output_path = path.with_suffix(".vtt")
 
     generate_subtitles(
-        chunks=chunks, audio_path=path, output_path=output_path.with_suffix(".en.vtt")
+        chunks=chunks, audio_path=path, output_path=output_path.with_suffix(".da.vtt")
     )
 
     generate_subtitles(
