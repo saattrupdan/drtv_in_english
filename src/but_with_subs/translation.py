@@ -180,6 +180,10 @@ def translate_subtitles(
 
     Returns:
         Path to the translated subtitle file.
+
+    Raises:
+        FileNotFoundError:
+            If the input subtitle file does not exist.
     """
     input_path = Path(input_path)
 
