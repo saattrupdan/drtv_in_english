@@ -20,7 +20,7 @@ from transformers import pipeline
 
 from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
-from but_with_subs.constants import DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL, ASR_MODEL_ID
+from but_with_subs.constants import DEFAULT_BATCH_SIZE, DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL, ASR_MODEL_ID
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
@@ -45,7 +45,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 @click.option(
     "--batch-size",
     type=int,
-    default=32,
+    default=DEFAULT_BATCH_SIZE,
     show_default=True,
     help=(
         "Maximum number of chunks per batch. "
@@ -132,7 +132,7 @@ def main(
     # Translate all chunks to target language
     logger.info(f"Translating transcriptions to {language}")
     translator = Translator(model_id=DEFAULT_TRANSLATION_MODEL)
-    translated_chunks = translator.translate_chunks(chunks, language, batch_size=16)
+    translated_chunks = translator.translate_chunks(chunks, language, batch_size=batch_size)
 
     generate_subtitles(chunks=translated_chunks, audio_path=path)
 
