@@ -11,7 +11,7 @@ import bits_and_bobs as bnb
 import typing as t
 from transformers import M2M100ForConditionalGeneration
 
-from .constants import DEFAULT_TRANSLATION_MODEL
+from .constants import TRANSLATION_MODEL
 from .data_models import Chunk
 from .device import get_device
 from .logging_config import logger
@@ -22,7 +22,7 @@ def translate_chunks(
     chunks: list[Chunk],
     target_lang: str,
     batch_size: int,
-    model_id: str = DEFAULT_TRANSLATION_MODEL,
+    model_id: str = TRANSLATION_MODEL,
 ) -> t.Generator[list[Chunk] | tuple[int, int], None, None]:
     """Translate multiple chunks with batch processing for quality.
 
