@@ -153,6 +153,9 @@ def _mock_translate_subtitles(
 
     This replaces the real translation module to avoid requiring ML models
     and network access in tests.
+
+    Returns:
+        Path to the translated VTT file.
     """
     translated_path = vtt_path.with_stem(vtt_path.stem + "_translated")
     content = vtt_path.read_text()
@@ -818,7 +821,9 @@ class TestFullyMockedPipeline:
         mock_asr_model = MagicMock()
 
         # Mock _transcribe_chunks_batch directly to avoid ASR model complexity
-        def mock_batch_fn(chunks, model):
+        def mock_batch_fn(
+            chunks: list[Chunk], model: MagicMock
+        ) -> list[list[Chunk]]:
             # Return one list per input chunk so assertions work correctly
             return [
                 [
