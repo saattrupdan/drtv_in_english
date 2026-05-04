@@ -1,6 +1,5 @@
-"""Loading audio for automatic speech recording."""
+"""Loading audio for automatic speech recognition."""
 
-import logging
 from pathlib import Path
 
 import numpy as np
@@ -8,8 +7,7 @@ import scipy.io.wavfile
 import scipy.signal
 
 from .constants import TARGET_SAMPLE_RATE
-
-logger = logging.getLogger(__package__)
+from .logging_config import logger
 
 
 def load_audio(path: Path) -> np.ndarray:
