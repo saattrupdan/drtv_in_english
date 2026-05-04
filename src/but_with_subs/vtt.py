@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .constants import TARGET_SAMPLE_RATE
 from .data_models import Chunk
 
 
@@ -52,7 +53,7 @@ def parse_vtt_file(path: Path) -> list[Chunk]:
         text = re.sub(r"<[^>]+>", "", text)
 
         duration = end_time - start_time
-        audio = np.zeros(int(duration * 16000), dtype=np.float32)
+        audio = np.zeros(int(duration * TARGET_SAMPLE_RATE), dtype=np.float32)
 
         chunks.append(
             Chunk(
@@ -121,4 +122,3 @@ def format_vtt_timestamp(seconds: float) -> str:
     secs = remainder // 1_000
     ms = remainder % 1_000
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
-

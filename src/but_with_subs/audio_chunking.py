@@ -7,7 +7,7 @@ import torch
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 
-from .constants import MIN_CHUNK_LENGTH_SECONDS
+from .constants import MIN_CHUNK_LENGTH_SECONDS, TARGET_SAMPLE_RATE
 from .data_models import Chunk
 from .device import get_device
 from .logging_config import logger
@@ -30,7 +30,7 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
 
     with ProgressHook() as hook:
         speech_timestamps = model(
-            dict(waveform=torch.from_numpy(audio).unsqueeze(dim=0), sample_rate=16_000),
+            dict(waveform=torch.from_numpy(audio).unsqueeze(dim=0), sample_rate=TARGET_SAMPLE_RATE),
             hook=hook,
         ).speaker_diarization
 
@@ -40,7 +40,7 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
         end_s = turn.end
         if end_s - start_s < MIN_CHUNK_LENGTH_SECONDS:
             continue
-        chunk_audio = audio[int(start_s * 16_000) : int(end_s * 16_000)]
+        chunk_audio = audio[int(start_s * TARGET_SAMPLE_RATE) : int(end_s * TARGET_SAMPLE_RATE)]
         chunk = Chunk(
             start_time=start_s,
             end_time=end_s,
