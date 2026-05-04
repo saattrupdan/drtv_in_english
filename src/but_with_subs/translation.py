@@ -81,7 +81,7 @@ class Translator:
             text:
                 Text to translate.
             target_lang:
-                Target language code (e.g., "eng" for English).
+                Target language code (e.g., "en" for English).
 
         Returns:
             Translated text.
@@ -162,7 +162,7 @@ class Translator:
 def translate_subtitles(
     input_path: Path | str,
     output_path: Path | str | None = None,
-    target_lang: str = "eng",
+    target_lang: str = "en",
     model_id: str = DEFAULT_TRANSLATION_MODEL,
 ) -> Path:
     """Translate a subtitle file from one language to another.
@@ -174,7 +174,7 @@ def translate_subtitles(
             Path for output .vtt file. If None, uses input path
             with "_translated" suffix before extension.
         target_lang (optional):
-            Target language code. Defaults to "eng".
+            Target language code. Defaults to "en".
         model_id (optional):
             HuggingFace model ID for translation.
 
