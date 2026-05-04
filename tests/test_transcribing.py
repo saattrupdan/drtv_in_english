@@ -231,14 +231,14 @@ def test_create_dynamic_batches_single_chunk() -> None:
 def _make_mock_pipeline(return_value: list[dict[str, t.Any]]) -> um.MagicMock:
     """Create a mock AutomaticSpeechRecognitionPipeline.
 
-    Args:
-        return_value: The value to return when the pipeline is called.
-
-    Returns:
-        A mock pipeline object configured to return the given value.
+    The mock returns the first element of return_value when called,
+    simulating the ASR pipeline behavior.
     """
     mock = um.MagicMock()
-    mock.return_value = return_value
+    if return_value:
+        mock.return_value = return_value[0]  # Return first dict as the result
+    else:
+        mock.return_value = {"chunks": []}
     return mock
 
 
@@ -426,7 +426,7 @@ def test_transcribe_chunks_dynamic_processes_all_chunks() -> None:
     )
 
     results = transcribe_chunks_dynamic(
-        chunks=chunks, model=mock_model, show_progress=False
+        chunks=chunks, model=mock_model, batch_size=10, show_progress=False
     )
 
     # Function returns list[list[Chunk]] - one list per input chunk
@@ -440,7 +440,7 @@ def test_transcribe_chunks_dynamic_empty_input() -> None:
     Verifies that an empty chunk list returns an empty list.
     """
     results = transcribe_chunks_dynamic(
-        chunks=[], model=_make_mock_pipeline([]), show_progress=False
+        chunks=[], model=_make_mock_pipeline([]), batch_size=10, show_progress=False
     )
 
     assert results == []
@@ -460,7 +460,7 @@ def test_transcribe_chunks_dynamic_preserves_speaker() -> None:
     )
 
     results = transcribe_chunks_dynamic(
-        chunks=chunks, model=mock_model, show_progress=False
+        chunks=chunks, model=mock_model, batch_size=10, show_progress=False
     )
 
     # Function returns list[list[Chunk]] - one list per input chunk
@@ -486,7 +486,7 @@ def test_transcribe_chunks_dynamic_with_multiple_chunks() -> None:
     )
 
     results = transcribe_chunks_dynamic(
-        chunks=chunks, model=mock_model, show_progress=False
+        chunks=chunks, model=mock_model, batch_size=10, show_progress=False
     )
 
     # Function returns list[list[Chunk]] - one list per input chunk
@@ -531,7 +531,9 @@ def test_transcribe_chunks_dynamic_raises_on_batch_error() -> None:
     mock_model.side_effect = ValueError("Transcription failed")
 
     with pytest.raises(ValueError, match="Transcription failed"):
-        transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=False)
+        transcribe_chunks_dynamic(
+            chunks=chunks, model=mock_model, batch_size=10, show_progress=False
+        )
 
 
 def test_transcribe_chunks_batch_skips_short_chunks() -> None:
@@ -647,7 +649,7 @@ def test_progress_bar_disabled_when_show_progress_false() -> None:
 
     # Should complete without errors even with progress disabled
     results = transcribe_chunks_dynamic(
-        chunks=chunks, model=mock_model, show_progress=False
+        chunks=chunks, model=mock_model, batch_size=10, show_progress=False
     )
 
     assert len(results) == 1
@@ -675,7 +677,9 @@ def test_progress_bar_shows_batch_info() -> None:
         mock_iterator.__iter__.return_value = iter([chunks])
         mock_iterator.set_description = um.MagicMock()
 
-        transcribe_chunks_dynamic(chunks=chunks, model=mock_model, show_progress=True)
+        transcribe_chunks_dynamic(
+            chunks=chunks, model=mock_model, batch_size=10, show_progress=True
+        )
 
         # Verify set_description was called with batch info
         assert mock_iterator.set_description.called
