@@ -23,11 +23,9 @@ from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
 from but_with_subs.constants import (
     ASR_MODEL_ID,
-    DEFAULT_BATCH_SIZE,
-    DEFAULT_TARGET_LANGUAGE,
-    DEFAULT_TRANSLATION_MODEL,
     MAX_DURATION,
     MAX_WORDS,
+    TRANSLATION_MODEL,
 )
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
@@ -48,14 +46,14 @@ configure_logging()
 @click.option(
     "--language",
     type=str,
-    default=DEFAULT_TARGET_LANGUAGE,
+    default="en",
     show_default=True,
     help="Target language for translation (e.g. 'en' for English).",
 )
 @click.option(
     "--batch-size",
     type=int,
-    default=DEFAULT_BATCH_SIZE,
+    default=16,
     show_default=True,
     help=(
         "Maximum number of chunks per batch. "
