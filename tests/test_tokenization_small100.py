@@ -147,9 +147,7 @@ class TestLoadSpm(unittest.TestCase):
     """Tests for the load_spm helper function."""
 
     @um.patch("sentencepiece.SentencePieceProcessor")
-    def test_load_spm_creates_processor_and_calls_load(
-        self, MockSpmm: object
-    ) -> None:
+    def test_load_spm_creates_processor_and_calls_load(self, MockSpmm: object) -> None:
         """Test that load_spm creates a SentencePieceProcessor and calls Load."""
         mock_instance = um.MagicMock()
         MockSpmm.return_value = mock_instance

@@ -821,9 +821,7 @@ class TestFullyMockedPipeline:
         mock_asr_model = MagicMock()
 
         # Mock _transcribe_chunks_batch directly to avoid ASR model complexity
-        def mock_batch_fn(
-            chunks: list[Chunk], model: MagicMock
-        ) -> list[list[Chunk]]:
+        def mock_batch_fn(chunks: list[Chunk], model: MagicMock) -> list[list[Chunk]]:
             # Return one list per input chunk so assertions work correctly
             return [
                 [
