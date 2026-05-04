@@ -1129,16 +1129,6 @@ class TestPunctuationPattern:
         assert "?" not in cleaned
         assert cleaned == "Hello world How are you"
 
-    def test_pattern_removes_punctuation_from_text(self) -> None:
-        """Test that the pattern removes punctuation from text."""
-        text = "Hello, world! How are you?"
-        cleaned = re.sub(PUNCTUATION_PATTERN, "", text)
-
-        assert "," not in cleaned
-        assert "!" not in cleaned
-        assert "?" not in cleaned
-        assert cleaned == "Hello world How are you"
-
 
 # =============================================================================
 # Additional Edge Case Tests
