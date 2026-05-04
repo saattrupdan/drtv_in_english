@@ -11,7 +11,6 @@ from .constants import DA, MIN_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 from .logging_config import logger
 
-nltk.download("punkt", quiet=True)
 nltk.download("punkt_tab", quiet=True)
 
 PUNCTUATION_PATTERN = rf"[{string.punctuation}]"
