@@ -26,27 +26,21 @@ DEFAULT_TRANSLATION_MODEL = "alirezamsh/small100"
 class Translator:
     """High-quality translator using transformer models."""
 
-    def __init__(
-        self, model_id: str = DEFAULT_TRANSLATION_MODEL, device: int | None = None
-    ) -> None:
+    def __init__(self, model_id: str = DEFAULT_TRANSLATION_MODEL) -> None:
         """Initialize the translator.
 
         Args:
             model_id:
                 HuggingFace model ID for translation.
-            device (optional):
-                Device to run model on (-1 for CPU, 0+ for GPU).
-                If None, automatically selects best available device.
         """
         logger.info(f"Loading translation model: {model_id}")
-
-        device_idx = device if device is not None else get_device()
-        device_name = "cpu" if device_idx == -1 else f"cuda:{device_idx}"
-
+        self.device = get_device()
         with bnb.no_terminal_output():
             self._model = M2M100ForConditionalGeneration.from_pretrained(model_id)
             self._tokenizer = SMALL100Tokenizer.from_pretrained(model_id)
-            self._model = self._model.to(device_name)
+            self._model = self._model.to(
+                self.device  # ty: ignore[invalid-argument-type]
+            )
 
         logger.info(f"Translation model loaded: {model_id}")
 
@@ -67,7 +61,9 @@ class Translator:
             encoded = self._tokenizer(texts[0], return_tensors="pt").to(
                 self._model.device
             )
-            generated = self._model.generate(**encoded)
+            generated = self._model.generate(  # ty: ignore[invalid-argument-type]
+                **encoded
+            )
             return [
                 self._tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
             ]
@@ -75,7 +71,7 @@ class Translator:
         encoded = self._tokenizer(
             texts, return_tensors="pt", padding=True, truncation=True
         ).to(self._model.device)
-        generated = self._model.generate(**encoded)
+        generated = self._model.generate(**encoded)  # ty: ignore[invalid-argument-type]
         return self._tokenizer.batch_decode(generated, skip_special_tokens=True)
 
     def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
@@ -136,7 +132,7 @@ class Translator:
             f"from {source_lang} to {target_lang}"
         )
 
-        texts: list[str] = [c.text for c in chunks_with_text]
+        texts: list[str] = [c.text or "" for c in chunks_with_text]
         translated_texts: list[str] = []
 
         for i in range(0, len(texts), batch_size):
@@ -239,7 +235,8 @@ def _parse_vtt_file(path: Path) -> list[Chunk]:
     with path.open(encoding="utf-8") as f:
         content = f.read()
 
-    # Pattern to match VTT cues with optional speaker in <v Speaker> format or (Speaker) format
+    # Pattern to match VTT cues with optional speaker in <v Speaker> format or (Speaker)
+    # format
     cue_pattern = re.compile(
         r"(\d+)\s*(?:\(([^)]+)\))?\s*\n"  # Cue number and optional (Speaker) format
         r"(?:<v ([^>]+)>\n)?"  # Optional speaker line in <v Speaker> format
@@ -253,7 +250,8 @@ def _parse_vtt_file(path: Path) -> list[Chunk]:
         end_time = _parse_vtt_timestamp(match.group(5))
         text = match.group(6).strip()
 
-        # Extract speaker from (Speaker) format (group 2) or <v Speaker> format (group 3)
+        # Extract speaker from (Speaker) format (group 2) or <v Speaker> format (group
+        # 3)
         speaker = match.group(2)  # (Speaker) format
         if speaker is None:
             speaker = match.group(3)  # <v Speaker> format
