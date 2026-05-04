@@ -9,7 +9,7 @@ from pathlib import Path
 
 import click
 
-from but_with_subs.audio_chunking import chunk_audio
+from but_with_subs.audio_chunking import chunk_by_audio as chunk_audio
 from but_with_subs.logging_config import logger
 
 
