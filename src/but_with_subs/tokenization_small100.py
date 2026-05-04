@@ -27,7 +27,7 @@ import sentencepiece
 from transformers import BatchEncoding, PreTrainedTokenizer
 from transformers.utils import logging
 
-from .constants import TRANSLATION_MODEL, FAIRSEQ_LANGUAGE_CODES
+from .constants import FAIRSEQ_LANGUAGE_CODES, TRANSLATION_MODEL
 
 logger = logging.get_logger(__name__)
 
@@ -173,7 +173,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
 
         self.lang_token_to_id = {
             self.get_lang_token(lang_code): self.encoder_size + i
-            for i, lang_code in enumerate(fairseq_language_code)
+            for i, lang_code in enumerate(fairseq_language_code, start=1)
         }
         self.lang_code_to_id = {
             lang_code: self.encoder_size + i

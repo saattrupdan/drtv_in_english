@@ -7,8 +7,9 @@ Prioritises translation quality by processing chunks in batches rather
 than one at a time, as batch processing provides more context to the model.
 """
 
-import bits_and_bobs as bnb
 import typing as t
+
+import bits_and_bobs as bnb
 from transformers import M2M100ForConditionalGeneration
 
 from .constants import TRANSLATION_MODEL
@@ -51,7 +52,7 @@ def translate_chunks(
     device = get_device()
     with bnb.no_terminal_output():
         model = M2M100ForConditionalGeneration.from_pretrained(model_id)
-        tokenizer = SMALL100Tokenizer.from_pretrained(model_id)
+        tokenizer = SMALL100Tokenizer.from_pretrained(model_id, tgt_lang=target_lang)
         model = model.to(device)  # ty: ignore[invalid-argument-type]
 
     logger.info(f"Translation model loaded: {model_id}")
@@ -69,7 +70,7 @@ def translate_chunks(
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
         try:
-            translated_texts.extend(_translate_batch(model, tokenizer, batch, target_lang))
+            translated_texts.extend(_translate_batch(model, tokenizer, batch))
         except Exception as e:
             logger.error(f"Batch translation failed: {e}")
             for segment_text in batch:
@@ -107,7 +108,6 @@ def _translate_batch(
     model: M2M100ForConditionalGeneration,
     tokenizer: SMALL100Tokenizer,
     texts: list[str],
-    tgt_lang: str,
 ) -> list[str]:
     """Translate a batch of texts.
 
@@ -115,29 +115,24 @@ def _translate_batch(
         model: The translation model.
         tokenizer: The tokenizer.
         texts: List of source texts to translate.
-        tgt_lang: Target language code.
 
     Returns:
         List of translated texts.
     """
-    tokenizer.tgt_lang = tgt_lang
     if len(texts) == 1:
         encoded = tokenizer(texts[0], return_tensors="pt").to(model.device)
         generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
         return [tokenizer.batch_decode(generated, skip_special_tokens=True)[0]]
 
-    encoded = tokenizer(
-        texts, return_tensors="pt", padding=True, truncation=True
-    ).to(model.device)
+    encoded = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(
+        model.device
+    )
     generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
     return tokenizer.batch_decode(generated, skip_special_tokens=True)
 
 
 def translate_single(
-    model: M2M100ForConditionalGeneration,
-    tokenizer: SMALL100Tokenizer,
-    text: str,
-    tgt_lang: str,
+    model: M2M100ForConditionalGeneration, tokenizer: SMALL100Tokenizer, text: str
 ) -> str:
     """Translate a single text segment.
 
@@ -145,12 +140,10 @@ def translate_single(
         model: The translation model.
         tokenizer: The tokenizer.
         text: Text to translate.
-        tgt_lang: Target language code.
 
     Returns:
         Translated text.
     """
-    tokenizer.tgt_lang = tgt_lang
     encoded = tokenizer(text, return_tensors="pt").to(model.device)
     generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
     return tokenizer.batch_decode(generated, skip_special_tokens=True)[0]

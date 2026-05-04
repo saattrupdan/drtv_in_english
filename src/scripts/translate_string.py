@@ -4,16 +4,16 @@ Usage:
     uv run src/scripts/translate_string.py [TEXT] [TARGET_LANG]
 """
 
+import bits_and_bobs as bnb
 import click
 from transformers import M2M100ForConditionalGeneration
 
 from but_with_subs import configure_logging
 from but_with_subs.constants import TRANSLATION_MODEL
 from but_with_subs.device import get_device
+from but_with_subs.logging_config import logger
 from but_with_subs.tokenization_small100 import SMALL100Tokenizer
 from but_with_subs.translation import translate_single
-
-import bits_and_bobs as bnb
 
 configure_logging()
 
@@ -35,15 +35,16 @@ def translate_string(text: str, target_lang: str) -> None:
     """
     device = get_device()
 
-    logger = bnb.get_logger("but_with_subs")
     logger.info(f"Loading translation model: {TRANSLATION_MODEL}")
     with bnb.no_terminal_output():
         model = M2M100ForConditionalGeneration.from_pretrained(TRANSLATION_MODEL)
-        tokenizer = SMALL100Tokenizer.from_pretrained(TRANSLATION_MODEL)
+        tokenizer = SMALL100Tokenizer.from_pretrained(
+            TRANSLATION_MODEL, tgt_lang=target_lang
+        )
         model = model.to(device)
 
     logger.info(f"Translating to {target_lang}")
-    translated = translate_single(model, tokenizer, text, target_lang)
+    translated = translate_single(model, tokenizer, text)
     print(translated)
 
 
