@@ -18,6 +18,9 @@ def clear_device_cache() -> None:
     get_device() uses @cache, so a previous test that ran on this machine
     (which has MPS) would have cached 'mps'. Without clearing, all
     subsequent tests would return the cached value regardless of mocks.
+
+    Yields:
+        Control to the test function.
     """
     get_device.cache_clear()
     yield
