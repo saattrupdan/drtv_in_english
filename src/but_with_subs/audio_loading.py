@@ -82,7 +82,7 @@ def validate_audio(
     expected_sample_rate: int = TARGET_SAMPLE_RATE,
     min_duration_seconds: float = 0.1,
     max_duration_seconds: float = 3600.0,
-) -> dict[str, bool | str | float]:
+) -> dict[str, bool | str | float | list[str]]:
     """Validate audio data for speech recognition.
 
     Checks audio for common issues including:
