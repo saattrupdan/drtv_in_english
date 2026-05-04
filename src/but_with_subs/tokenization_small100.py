@@ -27,7 +27,7 @@ import sentencepiece
 from transformers import BatchEncoding, PreTrainedTokenizer
 from transformers.utils import logging
 
-from .constants import DEFAULT_TARGET_LANGUAGE
+from .constants import DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL, FAIRSEQ_LANGUAGE_CODES
 
 logger = logging.get_logger(__name__)
 
@@ -39,127 +39,24 @@ VOCAB_FILES_NAMES = {
     "tokenizer_config_file": "tokenizer_config.json",
 }
 
+_PRETRAINED_MODEL = DEFAULT_TRANSLATION_MODEL
+
 PRETRAINED_VOCAB_FILES_MAP = {
     "vocab_file": {
-        "alirezamsh/small100": "https://huggingface.co/alirezamsh/small100/"
-        "resolve/main/vocab.json"
+        _PRETRAINED_MODEL: "https://huggingface.co/"
+        f"{_PRETRAINED_MODEL}/resolve/main/vocab.json"
     },
     "spm_file": {
-        "alirezamsh/small100": "https://huggingface.co/alirezamsh/small100/"
-        "resolve/main/sentencepiece.bpe.model"
+        _PRETRAINED_MODEL: "https://huggingface.co/"
+        f"{_PRETRAINED_MODEL}/resolve/main/sentencepiece.bpe.model"
     },
     "tokenizer_config_file": {
-        "alirezamsh/small100": "https://huggingface.co/alirezamsh/small100/"
-        "resolve/main/tokenizer_config.json"
+        _PRETRAINED_MODEL: "https://huggingface.co/"
+        f"{_PRETRAINED_MODEL}/resolve/main/tokenizer_config.json"
     },
 }
 
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"alirezamsh/small100": 1024}
-
-FAIRSEQ_LANGUAGE_CODES = {
-    "m2m100": [
-        "af",
-        "am",
-        "ar",
-        "ast",
-        "az",
-        "ba",
-        "be",
-        "bg",
-        "bn",
-        "br",
-        "bs",
-        "ca",
-        "ceb",
-        "cs",
-        "cy",
-        "da",
-        "de",
-        "el",
-        "en",
-        "es",
-        "et",
-        "fa",
-        "ff",
-        "fi",
-        "fr",
-        "fy",
-        "ga",
-        "gd",
-        "gl",
-        "gu",
-        "ha",
-        "he",
-        "hi",
-        "hr",
-        "ht",
-        "hu",
-        "hy",
-        "id",
-        "ig",
-        "ilo",
-        "is",
-        "it",
-        "ja",
-        "jv",
-        "ka",
-        "kk",
-        "km",
-        "kn",
-        "ko",
-        "lb",
-        "lg",
-        "ln",
-        "lo",
-        "lt",
-        "lv",
-        "mg",
-        "mk",
-        "ml",
-        "mn",
-        "mr",
-        "ms",
-        "my",
-        "ne",
-        "nl",
-        "no",
-        "ns",
-        "oc",
-        "or",
-        "pa",
-        "pl",
-        "ps",
-        "pt",
-        "ro",
-        "ru",
-        "sd",
-        "si",
-        "sk",
-        "sl",
-        "so",
-        "sq",
-        "sr",
-        "ss",
-        "su",
-        "sv",
-        "sw",
-        "ta",
-        "th",
-        "tl",
-        "tn",
-        "tr",
-        "uk",
-        "ur",
-        "uz",
-        "vi",
-        "wo",
-        "xh",
-        "yi",
-        "yo",
-        "zh",
-        "zu",
-    ]
-}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {_PRETRAINED_MODEL: 1024}
 
 
 class SMALL100Tokenizer(PreTrainedTokenizer):
@@ -190,8 +87,6 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         pad_token (`str`, *optional*, defaults to `"<pad>"`):
             The token used for padding, for example when batching sequences of
             different lengths.
-        language_codes (`str`, *optional*):
-            What language codes to use. Should be `"m2m100"`.
         sp_model_kwargs (`dict`, *optional*):
             Will be passed to the `SentencePieceProcessor.__init__()` method. The
             [Python wrapper for SentencePiece](https://github.com/google/sentencepiece/
@@ -225,9 +120,6 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
     pretrained_vocab_files_map = PRETRAINED_VOCAB_FILES_MAP
     model_input_names = ["input_ids", "attention_mask"]
 
-    prefix_tokens: list[int] | None = []
-    suffix_tokens: list[int] = []
-
     def __init__(
         self,
         vocab_file: str,
@@ -238,9 +130,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         sep_token: str = "</s>",
         pad_token: str = "<pad>",
         unk_token: str = "<unk>",
-        language_codes: str = "m2m100",
         sp_model_kwargs: dict[str, t.Any] | None = None,
-        num_madeup_words: int = 8,
         **kwargs,
     ) -> None:
         """Initialize the SMALL100Tokenizer.
@@ -250,19 +140,16 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
             spm_file: Path to the SentencePiece model file.
             tgt_lang: Optional target language string.
             bos_token: Beginning-of-sequence token.
-            eos_token: End-of-sequence token.
+            eos_token: End of sequence token.
             sep_token: Separator token.
             pad_token: Padding token.
             unk_token: Unknown token.
-            language_codes: Language codes identifier.
             sp_model_kwargs: SentencePiece model initialization kwargs.
-            num_madeup_words: Number of made-up words.
             **kwargs: Additional keyword arguments passed to the parent class.
         """
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
 
-        self.language_codes = language_codes
-        fairseq_language_code = FAIRSEQ_LANGUAGE_CODES[language_codes]
+        fairseq_language_code = FAIRSEQ_LANGUAGE_CODES
         self.lang_code_to_token = {
             lang_code: f"__{lang_code}__" for lang_code in fairseq_language_code
         }
@@ -296,7 +183,6 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
 
         self._tgt_lang = tgt_lang if tgt_lang is not None else DEFAULT_TARGET_LANGUAGE
         self.cur_lang_id = self.get_lang_id(self._tgt_lang)
-        self.num_madeup_words = num_madeup_words
 
         super().__init__(
             tgt_lang=tgt_lang,
@@ -305,9 +191,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
             sep_token=sep_token,
             unk_token=unk_token,
             pad_token=pad_token,
-            language_codes=language_codes,
             sp_model_kwargs=self.sp_model_kwargs,
-            num_madeup_words=num_madeup_words,
             **kwargs,
         )
 
@@ -316,7 +200,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
     @property
     def vocab_size(self) -> int:
         """Return the total vocabulary size."""
-        return len(self.encoder) + len(self.lang_token_to_id) + self.num_madeup_words
+        return len(self.encoder) + len(self.lang_token_to_id)
 
     @property
     def tgt_lang(self) -> str:
@@ -390,16 +274,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
                 already_has_special_tokens=True,
             )
 
-        prefix_ones = [1] * len(self.prefix_tokens)  # ty: ignore[invalid-argument-type]
-        suffix_ones = [1] * len(self.suffix_tokens)
-        if token_ids_1 is None:
-            return prefix_ones + ([0] * len(token_ids_0)) + suffix_ones
-        return (
-            prefix_ones
-            + ([0] * len(token_ids_0))
-            + ([0] * len(token_ids_1))
-            + suffix_ones
-        )
+        return self.build_inputs_with_special_tokens(token_ids_0, token_ids_1)
 
     def build_inputs_with_special_tokens(
         self, token_ids_0: list[int], token_ids_1: list[int] | None = None
@@ -426,16 +301,12 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
             appropriate special tokens.
         """
         if token_ids_1 is None:
-            if self.prefix_tokens is None:
-                return token_ids_0 + self.suffix_tokens
-            else:
+            if hasattr(self, "prefix_tokens") and self.prefix_tokens is not None:
                 return self.prefix_tokens + token_ids_0 + self.suffix_tokens
-        # We don't expect to process pairs, but leave the pair logic for API
-        # consistency
-        if self.prefix_tokens is None:
-            return token_ids_0 + token_ids_1 + self.suffix_tokens
-        else:
+            return token_ids_0 + self.suffix_tokens
+        if hasattr(self, "prefix_tokens") and self.prefix_tokens is not None:
             return self.prefix_tokens + token_ids_0 + token_ids_1 + self.suffix_tokens
+        return token_ids_0 + token_ids_1 + self.suffix_tokens
 
     def get_vocab(self) -> dict[str, int]:
         """Return the vocabulary dictionary including special tokens."""
