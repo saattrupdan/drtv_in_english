@@ -557,7 +557,7 @@ class TestGenerateSubtitles:
         result_path = generate_subtitles(overlapping_chunks, temp_audio_file)
         content = result_path.read_text(encoding="utf-8")
 
-        assert "<c." in content or True
+        assert "<c." in content
 
     def test_generate_subtitles_uses_correct_indexing(
         self, sample_chunks: Chunk, temp_audio_file: Path
