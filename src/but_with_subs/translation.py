@@ -7,7 +7,7 @@ Prioritises translation quality by processing chunks in batches rather
 than one at a time, as batch processing provides more context to the model.
 """
 
-import typing as t
+import collections.abc as c
 
 import bits_and_bobs as bnb
 from transformers import M2M100ForConditionalGeneration
@@ -24,15 +24,11 @@ def translate_chunks(
     target_lang: str,
     batch_size: int,
     model_id: str = TRANSLATION_MODEL,
-) -> t.Generator[list[Chunk] | tuple[int, int], None, None]:
+) -> c.Generator[tuple[int, int], None, list[Chunk]]:
     """Translate multiple chunks with batch processing for quality.
 
     Batch processing improves translation quality by providing more
     context to the model compared to chunk-by-chunk translation.
-
-    Yields:
-        Progress tuples ``(current, total)`` after each batch completes,
-        followed by the final list of translated chunks.
 
     Args:
         chunks:
@@ -44,9 +40,15 @@ def translate_chunks(
         model_id (optional):
             HuggingFace model ID for translation. Defaults to
             ``DEFAULT_TRANSLATION_MODEL``.
+
+    Yields:
+        Progress tuples ``(current, total)`` after each batch completes.
+
+    Returns:
+        List of translated chunks.
     """
     if not chunks:
-        yield []
+        return list()
 
     logger.info(f"Loading translation model: {model_id}")
     device = get_device()
@@ -60,12 +62,16 @@ def translate_chunks(
     chunks_with_text: list[Chunk] = [c for c in chunks if c.text is not None]
     if not chunks_with_text:
         logger.warning("No chunks with text to translate")
-        yield chunks
+        return list()
 
     logger.info(f"Translating {len(chunks_with_text)} chunks to {target_lang}")
 
     texts: list[str] = [c.text or "" for c in chunks_with_text]
     translated_texts: list[str] = []
+
+    num_batches = len(texts) // batch_size
+    if len(texts) % batch_size != 0:
+        num_batches += 1
 
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
@@ -76,13 +82,13 @@ def translate_chunks(
             for segment_text in batch:
                 try:
                     translated_texts.append(
-                        translate_single(model, tokenizer, segment_text, target_lang)
+                        translate_single(model, tokenizer, segment_text)
                     )
                 except Exception as e2:
                     logger.error(f"Individual translation failed: {e2}")
                     translated_texts.append(segment_text)
 
-        yield (i + len(batch), len(texts))
+        yield (i + len(batch), num_batches)
 
     translated_chunks: list[Chunk] = []
     text_idx = 0
@@ -101,7 +107,7 @@ def translate_chunks(
         else:
             translated_chunks.append(chunk)
 
-    yield translated_chunks
+    return translated_chunks
 
 
 def _translate_batch(
