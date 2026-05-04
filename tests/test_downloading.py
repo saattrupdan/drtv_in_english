@@ -11,7 +11,11 @@ import unittest.mock as um
 import pytest
 
 from but_with_subs.data_models import DownloadProgress, File
-from but_with_subs.downloading import _parse_progress_info, download
+from but_with_subs.downloading import (
+    _noop_progress,
+    _parse_progress_info,
+    download,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -677,8 +681,6 @@ def test_progress_callback_default_handler() -> None:
 
     Verifies that _noop_progress doesn't raise errors when called.
     """
-    from but_with_subs.downloading import _noop_progress
-
     progress = DownloadProgress(
         percentage=50.0, status="downloading", current_file="test.mp4"
     )
