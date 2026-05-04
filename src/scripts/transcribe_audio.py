@@ -34,7 +34,7 @@ from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
 from but_with_subs.transcribing import transcribe_chunks_dynamic
-from but_with_subs.translation import Translator
+from but_with_subs.translation import translate_chunks
 
 logger = logging.getLogger("but_with_subs")
 
@@ -141,8 +141,7 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
 
     # Translate all chunks to target language
     logger.info(f"Translating transcriptions to {language}")
-    translator = Translator(model_id=DEFAULT_TRANSLATION_MODEL)
-    translated_chunks = translator.translate_chunks(
+    translated_chunks = translate_chunks(
         chunks, language, batch_size=batch_size
     )
 
