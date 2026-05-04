@@ -5,7 +5,6 @@ including mocking the AutomaticSpeechRecognitionPipeline to verify
 correct behavior under various conditions.
 """
 
-import typing as t
 import unittest.mock as um
 
 import numpy as np
@@ -15,7 +14,6 @@ from but_with_subs.constants import MIN_CHUNK_LENGTH_SECONDS
 from but_with_subs.data_models import Chunk
 from but_with_subs.transcribing import transcribe_audio
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -23,7 +21,11 @@ from but_with_subs.transcribing import transcribe_audio
 
 @pytest.fixture
 def mock_audio() -> np.ndarray:
-    """Create a 2-second audio array at 16 kHz."""
+    """Create a 2-second audio array at 16 kHz.
+
+    Returns:
+        A NumPy array of float32 samples.
+    """
     duration = 2.0
     sample_rate = 16_000
     n_samples = int(duration * sample_rate)
@@ -66,9 +68,7 @@ def test_transcribe_audio_returns_list_of_chunks(mock_audio: np.ndarray) -> None
         ]
     }
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert isinstance(results, list)
     assert all(isinstance(r, Chunk) for r in results)
@@ -84,9 +84,7 @@ def test_transcribe_audio_correct_time_offsets(mock_audio: np.ndarray) -> None:
         ]
     }
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert results[0].start_time == 0.0
     assert results[0].end_time == 0.5
@@ -104,9 +102,7 @@ def test_transcribe_audio_preserves_text(mock_audio: np.ndarray) -> None:
         ]
     }
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert results[0].text == "First segment"
     assert results[1].text == "Second segment"
@@ -115,15 +111,9 @@ def test_transcribe_audio_preserves_text(mock_audio: np.ndarray) -> None:
 def test_transcribe_audio_sets_speaker_to_none(mock_audio: np.ndarray) -> None:
     """Test that speaker is set to None since no diarization is done."""
     mock_model = um.MagicMock()
-    mock_model.return_value = {
-        "chunks": [
-            {"text": "Hello", "timestamp": (0.0, 0.5)},
-        ]
-    }
+    mock_model.return_value = {"chunks": [{"text": "Hello", "timestamp": (0.0, 0.5)}]}
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert results[0].speaker is None
 
@@ -133,9 +123,7 @@ def test_transcribe_audio_empty_input(mock_audio: np.ndarray) -> None:
     mock_model = um.MagicMock()
     mock_model.return_value = {"chunks": []}
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert results == []
 
@@ -150,9 +138,7 @@ def test_transcribe_audio_skips_short_segments(mock_audio: np.ndarray) -> None:
         ]
     }
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert len(results) == 1
     assert results[0].text == "Hello"
@@ -170,10 +156,7 @@ def test_transcribe_audio_custom_min_chunk_length(mock_audio: np.ndarray) -> Non
 
     # With threshold 1.0, only the 1.2s segment should remain
     results = transcribe_audio(
-        audio=mock_audio,
-        model=mock_model,
-        min_chunk_length=1.0,
-        show_progress=False,
+        audio=mock_audio, model=mock_model, min_chunk_length=1.0, show_progress=False
     )
 
     assert len(results) == 1
@@ -190,9 +173,7 @@ def test_transcribe_audio_all_short_segments_filtered(mock_audio: np.ndarray) ->
         ]
     }
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert results == []
 
@@ -201,15 +182,9 @@ def test_transcribe_audio_audio_slice_correct(mock_audio: np.ndarray) -> None:
     """Test that audio slices match the segment timestamps."""
     sample_rate = 16_000
     mock_model = um.MagicMock()
-    mock_model.return_value = {
-        "chunks": [
-            {"text": "Hello", "timestamp": (0.5, 1.0)},
-        ]
-    }
+    mock_model.return_value = {"chunks": [{"text": "Hello", "timestamp": (0.5, 1.0)}]}
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     expected_start = int(0.5 * sample_rate)
     expected_end = int(1.0 * sample_rate)
@@ -218,9 +193,7 @@ def test_transcribe_audio_audio_slice_correct(mock_audio: np.ndarray) -> None:
     np.testing.assert_array_equal(results[0].audio, expected_audio)
 
 
-def test_transcribe_audio_audio_clipped_to_audio_length(
-    mock_audio: np.ndarray,
-) -> None:
+def test_transcribe_audio_audio_clipped_to_audio_length(mock_audio: np.ndarray) -> None:
     """Test that audio slicing respects the actual audio length."""
     sample_rate = 16_000
     # Create a 1-second audio array
@@ -228,34 +201,22 @@ def test_transcribe_audio_audio_clipped_to_audio_length(
 
     mock_model = um.MagicMock()
     # Pipeline reports a segment past the end of the audio
-    mock_model.return_value = {
-        "chunks": [
-            {"text": "Hello", "timestamp": (0.5, 2.0)},
-        ]
-    }
+    mock_model.return_value = {"chunks": [{"text": "Hello", "timestamp": (0.5, 2.0)}]}
 
-    results = transcribe_audio(
-        audio=short_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=short_audio, model=mock_model, show_progress=False)
 
     # Audio should be clipped to the actual array length
     expected_audio = short_audio[int(0.5 * sample_rate) :]
     np.testing.assert_array_equal(results[0].audio, expected_audio)
 
 
-def test_progress_bar_disabled_when_show_progress_false(
-    mock_audio: np.ndarray,
-) -> None:
+def test_progress_bar_disabled_when_show_progress_false(mock_audio: np.ndarray) -> None:
     """Test that progress bar is disabled when show_progress=False."""
     mock_model = um.MagicMock()
-    mock_model.return_value = {
-        "chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]
-    }
+    mock_model.return_value = {"chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]}
 
     # Should complete without errors
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert len(results) == 1
     assert results[0].text == "Hello"
@@ -266,9 +227,7 @@ def test_progress_bar_disabled_when_show_progress_false(
 # ---------------------------------------------------------------------------
 
 
-def test_transcribe_audio_raises_on_pipeline_error(
-    mock_audio: np.ndarray,
-) -> None:
+def test_transcribe_audio_raises_on_pipeline_error(mock_audio: np.ndarray) -> None:
     """Test that pipeline errors are propagated."""
     mock_model = um.MagicMock()
     mock_model.side_effect = RuntimeError("Pipeline failed")
@@ -277,9 +236,7 @@ def test_transcribe_audio_raises_on_pipeline_error(
         transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
 
-def test_transcribe_audio_all_segments_same_duration(
-    mock_audio: np.ndarray,
-) -> None:
+def test_transcribe_audio_all_segments_same_duration(mock_audio: np.ndarray) -> None:
     """Test with uniformly sized segments."""
     mock_model = um.MagicMock()
     mock_model.return_value = {
@@ -291,9 +248,7 @@ def test_transcribe_audio_all_segments_same_duration(
         ]
     }
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     assert len(results) == 4
     texts = [r.text for r in results]
@@ -312,27 +267,19 @@ def test_transcribe_audio_segment_at_exact_min_threshold(
         ]
     }
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     # Exact threshold should be included
     assert len(results) == 1
     assert results[0].text == "Exact"
 
 
-def test_transcribe_audio_chunk_has_all_required_fields(
-    mock_audio: np.ndarray,
-) -> None:
+def test_transcribe_audio_chunk_has_all_required_fields(mock_audio: np.ndarray) -> None:
     """Test that returned Chunks have all required fields set."""
     mock_model = um.MagicMock()
-    mock_model.return_value = {
-        "chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]
-    }
+    mock_model.return_value = {"chunks": [{"text": "Hello", "timestamp": (0.0, 1.0)}]}
 
-    results = transcribe_audio(
-        audio=mock_audio, model=mock_model, show_progress=False
-    )
+    results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     chunk = results[0]
     assert chunk.start_time is not None

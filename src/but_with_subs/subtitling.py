@@ -9,9 +9,7 @@ from .vtt import format_vtt_timestamp
 
 
 def generate_subtitles(
-    chunks: list[Chunk],
-    audio_path: str | Path,
-    output_path: Path | None = None,
+    chunks: list[Chunk], audio_path: str | Path, output_path: Path | None = None
 ) -> Path:
     """Generate a WebVTT subtitle file from word-level transcriptions.
 

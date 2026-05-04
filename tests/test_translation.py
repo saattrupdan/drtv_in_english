@@ -136,10 +136,7 @@ def test_translate_chunks_does_not_mutate_originals() -> None:
     mock_tokenizer = _make_mock_tokenizer()
     mock_tokenizer.batch_decode.return_value = ["Translated 1", "Translated 2"]
 
-    chunks = [
-        _make_chunk("Original text"),
-        _make_chunk("Another text"),
-    ]
+    chunks = [_make_chunk("Original text"), _make_chunk("Another text")]
     original_texts = [c.text for c in chunks]
 
     results = _run_translate_chunks(
@@ -147,7 +144,9 @@ def test_translate_chunks_does_not_mutate_originals() -> None:
     )
 
     for orig, chunk in zip(original_texts, chunks):
-        assert chunk.text == orig, f"Original chunk was mutated: {orig!r} -> {chunk.text!r}"
+        assert chunk.text == orig, (
+            f"Original chunk was mutated: {orig!r} -> {chunk.text!r}"
+        )
 
     for chunk in results:
         assert chunk.text not in original_texts
@@ -536,7 +535,7 @@ def test_translate_batch_handles_tensor_return_from_generate() -> None:
 
 
 def test_translate_batch_handles_tensor_return_in_batch_mode() -> None:
-    """Test that _translate_batch handles a raw Tensor from model.generate() in batch mode.
+    """Test _translate_batch handles raw Tensor from model.generate() in batch mode.
 
     Regression test for the bug where model.generate() returns a Tensor
     directly instead of an object with a .sequences attribute, causing

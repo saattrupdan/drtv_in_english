@@ -42,17 +42,10 @@ def transcribe_audio(
     Returns:
         List of word-level transcribed ``Chunk`` objects.
     """
-    with tqdm(
-        total=1,
-        desc="Transcribing",
-        disable=not show_progress,
-    ) as pbar:
+    with tqdm(total=1, desc="Transcribing", disable=not show_progress) as pbar:
         try:
             with bnb.no_terminal_output():
-                result = t.cast(
-                    dict,
-                    model(audio, return_timestamps="word"),
-                )
+                result = t.cast(dict, model(audio, return_timestamps="word"))
         except Exception as e:
             logger.error(f"Transcription failed: {e}")
             raise

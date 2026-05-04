@@ -72,11 +72,7 @@ def main(audio_path: str, language: str) -> None:
     audio = load_audio(path=path)
 
     # Transcribe the full audio in one pass
-    word_chunks = transcribe_audio(
-        audio=audio,
-        model=model,
-        show_progress=True,
-    )
+    word_chunks = transcribe_audio(audio=audio, model=model, show_progress=True)
     logger.info(f"Generated {len(word_chunks)} word-level segments")
 
     # Group word-level chunks into readable segments

@@ -99,9 +99,9 @@ def _translate_batch(
         generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
         sequences = getattr(generated, "sequences", generated)
         return [
-            tokenizer.batch_decode(
-                t.cast(t.Any, sequences), skip_special_tokens=True
-            )[0]
+            tokenizer.batch_decode(t.cast(t.Any, sequences), skip_special_tokens=True)[
+                0
+            ]
         ]
 
     encoded = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(
@@ -109,9 +109,7 @@ def _translate_batch(
     )
     generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
     sequences = getattr(generated, "sequences", generated)
-    return tokenizer.batch_decode(
-        t.cast(t.Any, sequences), skip_special_tokens=True
-    )
+    return tokenizer.batch_decode(t.cast(t.Any, sequences), skip_special_tokens=True)
 
 
 def translate_single(
@@ -130,6 +128,4 @@ def translate_single(
     encoded = tokenizer(text, return_tensors="pt").to(model.device)
     generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
     sequences = getattr(generated, "sequences", generated)
-    return tokenizer.batch_decode(
-        t.cast(t.Any, sequences), skip_special_tokens=True
-    )[0]
+    return tokenizer.batch_decode(t.cast(t.Any, sequences), skip_special_tokens=True)[0]

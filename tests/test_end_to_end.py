@@ -20,12 +20,11 @@ import numpy as np
 import pytest
 import scipy.io.wavfile
 
+import but_with_subs.transcribing as transcribing
 from but_with_subs.audio_loading import load_audio, validate_audio
 from but_with_subs.data_models import Chunk
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
-
-import but_with_subs.transcribing as transcribing
 
 # =============================================================================
 # Fixtures
@@ -733,10 +732,15 @@ class TestScriptInvocation:
         iterating over the translate_chunks generator and collecting results,
         then passing them to generate_subtitles().
         """
+
         def mock_translate_chunks_generator(
             chunks: list[Chunk], language: str, batch_size: int
-        ):
-            """Mock translate_chunks that yields translated chunks."""
+        ) -> None:
+            """Mock translate_chunks that yields translated chunks.
+
+            Yields:
+                Translated ``Chunk`` objects.
+            """
             for chunk in chunks:
                 chunk.text = f"[EN] {chunk.text}"
                 yield chunk

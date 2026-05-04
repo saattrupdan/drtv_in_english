@@ -572,7 +572,7 @@ class TestGenerateSubtitles:
     def test_generate_subtitles_rejects_non_list_chunks(
         self, temp_audio_file: Path
     ) -> None:
-        """Regression test: ensure generate_subtitles receives a list of Chunks, not a single Chunk.
+        """Regression test: ensure generate_subtitles() gets a list of Chunks, not one.
 
         Previously, translated_chunks was reassigned to a single Chunk instead of
         being appended to a list, causing an AttributeError when sorting.
