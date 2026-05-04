@@ -80,7 +80,11 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
 
 
 def _format_vtt_timestamp(seconds: float) -> str:
-    """Format seconds into WebVTT ``HH:MM:SS.mmm`` timestamp."""
+    """Format seconds into WebVTT ``HH:MM:SS.mmm`` timestamp.
+
+    Returns:
+        Formatted timestamp string in ``HH:MM:SS.mmm`` format.
+    """
     total_ms = round(seconds * 1000)
     hours = total_ms // 3_600_000
     remainder = total_ms % 3_600_000
@@ -92,7 +96,11 @@ def _format_vtt_timestamp(seconds: float) -> str:
 
 
 def _escape_vtt_text(text: str) -> str:
-    """Escape ``<``, ``>``, and ``&`` for WebVTT cue text."""
+    """Escape ``<``, ``>``, and ``&`` for WebVTT cue text.
+
+    Returns:
+        Escaped text string with HTML special characters replaced.
+    """
     text = text.replace("&", "&amp;")
     text = text.replace("<", "&lt;")
     text = text.replace(">", "&gt;")
