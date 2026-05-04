@@ -25,7 +25,7 @@ logger = logging.getLogger(__package__)
     type=str,
     default=DEFAULT_TARGET_LANGUAGE,
     show_default=True,
-    help="Target language code (e.g., 'eng' for English).",
+    help="Target language code (e.g., 'en' for English).",
 )
 @click.option(
     "--model",
