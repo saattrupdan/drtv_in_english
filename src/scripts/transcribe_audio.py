@@ -130,7 +130,7 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
                 pbar.n = current
                 pbar.refresh()
             else:
-                translated_chunks = result
+                translated_chunks.append(result)
                 pbar.n = pbar.total
                 pbar.refresh()
         pbar.close()

@@ -569,6 +569,24 @@ class TestGenerateSubtitles:
         assert "1 (" in content
         assert "2 (" in content
 
+    def test_generate_subtitles_rejects_non_list_chunks(
+        self, temp_audio_file: Path
+    ) -> None:
+        """Regression test: ensure generate_subtitles receives a list of Chunks, not a single Chunk.
+
+        Previously, translated_chunks was reassigned to a single Chunk instead of
+        being appended to a list, causing an AttributeError when sorting.
+        """
+        single_chunk = Chunk(
+            start_time=0.0,
+            end_time=2.0,
+            audio=np.array([0.1, 0.2, 0.3]),
+            text="Hello world",
+            speaker="Alice",
+        )
+        with pytest.raises(AttributeError):
+            generate_subtitles(chunks=single_chunk, audio_path=temp_audio_file)
+
 
 # =============================================================================
 # Edge Case Tests
