@@ -32,8 +32,12 @@ from but_with_subs.subtitling import (
 
 
 @pytest.fixture
-def sample_chunks():
-    """Create sample chunks for testing."""
+def sample_chunks() -> list[Chunk]:
+    """Create sample chunks for testing.
+
+    Returns:
+        List of sample Chunk objects for testing.
+    """
     audio_data = np.array([0.1, 0.2, 0.3])
     return [
         Chunk(
@@ -54,8 +58,12 @@ def sample_chunks():
 
 
 @pytest.fixture
-def overlapping_chunks():
-    """Create chunks with overlapping speakers."""
+def overlapping_chunks() -> list[Chunk]:
+    """Create chunks with overlapping speakers.
+
+    Returns:
+        List of Chunk objects with overlapping time ranges.
+    """
     audio_data = np.array([0.1, 0.2, 0.3])
     return [
         Chunk(
@@ -83,8 +91,12 @@ def overlapping_chunks():
 
 
 @pytest.fixture
-def temp_audio_file():
-    """Create a temporary audio file for testing."""
+def temp_audio_file() -> Path:
+    """Create a temporary audio file for testing.
+
+    Yields:
+        Path to the temporary audio file.
+    """
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
         f.write(b"fake audio data")
         temp_path = Path(f.name)
@@ -432,7 +444,7 @@ class TestGenerateSubtitles:
     """Integration tests for generate_subtitles function."""
 
     def test_generate_subtitles_creates_file(
-        self, sample_chunks, temp_audio_file
+        self, sample_chunks: Chunk, temp_audio_file: Path
     ) -> None:
         """Test that subtitle file is created."""
         result_path = generate_subtitles(sample_chunks, temp_audio_file)
@@ -440,14 +452,16 @@ class TestGenerateSubtitles:
         assert result_path.suffix == ".vtt"
 
     def test_generate_subtitles_output_location(
-        self, sample_chunks, temp_audio_file
+        self, sample_chunks: Chunk, temp_audio_file: Path
     ) -> None:
         """Test that output file is in the same directory as audio."""
         result_path = generate_subtitles(sample_chunks, temp_audio_file)
         expected_path = temp_audio_file.with_suffix(".vtt")
         assert result_path == expected_path
 
-    def test_generate_subtitles_content(self, sample_chunks, temp_audio_file) -> None:
+    def test_generate_subtitles_content(
+        self, sample_chunks: Chunk, temp_audio_file: Path
+    ) -> None:
         """Test that generated file contains correct WebVTT content."""
         result_path = generate_subtitles(sample_chunks, temp_audio_file)
         content = result_path.read_text(encoding="utf-8")
@@ -457,8 +471,10 @@ class TestGenerateSubtitles:
         assert "Hello world" in content
         assert "(Alice)" in content
 
-    def test_generate_subtitles_uses_min_duration(self, temp_audio_file) -> None:
-        """Test that chunks shorter than MIN_CHUNK_DISPLAY_LENGTH_SECONDS get extended."""
+    def test_generate_subtitles_uses_min_duration(
+        self, temp_audio_file: Path
+    ) -> None:
+        """Chunks shorter than MIN_CHUNK_DISPLAY_LENGTH_SECONDS are extended."""
         chunks = [
             Chunk(
                 start_time=0.0,
@@ -475,7 +491,9 @@ class TestGenerateSubtitles:
             or "00:00:00.000 --> 00:00:00.600" in content
         )
 
-    def test_generate_subtitles_sorts_by_time(self, temp_audio_file) -> None:
+    def test_generate_subtitles_sorts_by_time(
+        self, temp_audio_file: Path
+    ) -> None:
         """Test that chunks are sorted by start time in output."""
         chunks = [
             Chunk(
@@ -500,7 +518,9 @@ class TestGenerateSubtitles:
         second_pos = content.find("Second")
         assert first_pos < second_pos
 
-    def test_generate_subtitles_escapes_special_chars(self, temp_audio_file) -> None:
+    def test_generate_subtitles_escapes_special_chars(
+        self, temp_audio_file: Path
+    ) -> None:
         """Test that special characters are properly escaped."""
         chunks = [
             Chunk(
@@ -516,7 +536,9 @@ class TestGenerateSubtitles:
 
         assert "&lt; B &amp; C &gt; D" in content
 
-    def test_generate_subtitles_handles_none_speaker(self, temp_audio_file) -> None:
+    def test_generate_subtitles_handles_none_speaker(
+        self, temp_audio_file: Path
+    ) -> None:
         """Test handling of chunks without speaker information."""
         chunks = [
             Chunk(
@@ -533,7 +555,7 @@ class TestGenerateSubtitles:
         assert "(N/A)" in content
 
     def test_generate_subtitles_applies_colors_for_overlapping(
-        self, overlapping_chunks, temp_audio_file
+        self, overlapping_chunks: Chunk, temp_audio_file: Path
     ) -> None:
         """Test that overlapping speakers get color styling."""
         result_path = generate_subtitles(overlapping_chunks, temp_audio_file)
@@ -542,7 +564,7 @@ class TestGenerateSubtitles:
         assert "<c." in content or True
 
     def test_generate_subtitles_uses_correct_indexing(
-        self, sample_chunks, temp_audio_file
+        self, sample_chunks: Chunk, temp_audio_file: Path
     ) -> None:
         """Test that cues are numbered sequentially starting from 1."""
         result_path = generate_subtitles(sample_chunks, temp_audio_file)
@@ -560,7 +582,7 @@ class TestGenerateSubtitles:
 class TestEdgeCases:
     """Edge case tests for the subtitling module."""
 
-    def test_empty_text_chunk(self, temp_audio_file) -> None:
+    def test_empty_text_chunk(self, temp_audio_file: Path) -> None:
         """Test handling of chunks with empty text."""
         chunks = [
             Chunk(
@@ -574,7 +596,7 @@ class TestEdgeCases:
         result_path = generate_subtitles(chunks, temp_audio_file)
         assert result_path.exists()
 
-    def test_special_unicode_characters(self, temp_audio_file) -> None:
+    def test_special_unicode_characters(self, temp_audio_file: Path) -> None:
         """Test handling of Unicode characters."""
         chunks = [
             Chunk(
@@ -589,7 +611,7 @@ class TestEdgeCases:
         content = result_path.read_text(encoding="utf-8")
         assert "中文" in content
 
-    def test_very_long_text(self, temp_audio_file) -> None:
+    def test_very_long_text(self, temp_audio_file: Path) -> None:
         """Test handling of very long text."""
         long_text = " ".join(["word"] * 100)
         chunks = [
@@ -604,7 +626,7 @@ class TestEdgeCases:
         result_path = generate_subtitles(chunks, temp_audio_file)
         assert result_path.exists()
 
-    def test_very_long_duration(self, temp_audio_file) -> None:
+    def test_very_long_duration(self, temp_audio_file: Path) -> None:
         """Test handling of very long duration timestamps."""
         chunks = [
             Chunk(
@@ -619,7 +641,7 @@ class TestEdgeCases:
         content = result_path.read_text(encoding="utf-8")
         assert "02:" in content
 
-    def test_negative_timestamp_handling(self, temp_audio_file) -> None:
+    def test_negative_timestamp_handling(self, temp_audio_file: Path) -> None:
         """Test handling of negative start times."""
         chunks = [
             Chunk(
@@ -633,7 +655,7 @@ class TestEdgeCases:
         result_path = generate_subtitles(chunks, temp_audio_file)
         assert result_path.exists()
 
-    def test_identical_start_end_times(self, temp_audio_file) -> None:
+    def test_identical_start_end_times(self, temp_audio_file: Path) -> None:
         """Test handling of chunks where start equals end."""
         chunks = [
             Chunk(
@@ -648,7 +670,7 @@ class TestEdgeCases:
         content = result_path.read_text(encoding="utf-8")
         assert "00:00:05.000 --> 00:00:05.500" in content
 
-    def test_overlapping_same_speaker(self, temp_audio_file) -> None:
+    def test_overlapping_same_speaker(self, temp_audio_file: Path) -> None:
         """Test handling when same speaker overlaps with themselves."""
         chunks = [
             Chunk(
@@ -669,7 +691,7 @@ class TestEdgeCases:
         result_path = generate_subtitles(chunks, temp_audio_file)
         assert result_path.exists()
 
-    def test_many_chunks(self, temp_audio_file) -> None:
+    def test_many_chunks(self, temp_audio_file: Path) -> None:
         """Test handling of many chunks."""
         chunks = [
             Chunk(
@@ -685,7 +707,9 @@ class TestEdgeCases:
         content = result_path.read_text(encoding="utf-8")
         assert "100" in content
 
-    def test_file_overwritten_if_exists(self, sample_chunks, temp_audio_file) -> None:
+    def test_file_overwritten_if_exists(
+        self, sample_chunks: Chunk, temp_audio_file: Path
+    ) -> None:
         """Test that existing subtitle file is overwritten."""
         generate_subtitles(sample_chunks, temp_audio_file)
 
@@ -713,19 +737,21 @@ class TestEdgeCases:
 class TestErrorHandling:
     """Tests for error handling in the subtitling module."""
 
-    def test_empty_chunks_raises_error(self, temp_audio_file) -> None:
+    def test_empty_chunks_raises_error(self, temp_audio_file: Path) -> None:
         """Test that empty chunks list raises ValueError."""
         with pytest.raises(ValueError, match="Transcriptions list must not be empty"):
             generate_subtitles([], temp_audio_file)
 
-    def test_nonexistent_audio_file_raises_error(self, sample_chunks) -> None:
+    def test_nonexistent_audio_file_raises_error(
+        self, sample_chunks: Chunk
+    ) -> None:
         """Test that non-existent audio file raises FileNotFoundError."""
         nonexistent_path = Path("/nonexistent/path/audio.mp3")
         with pytest.raises(FileNotFoundError, match="Audio file not found"):
             generate_subtitles(sample_chunks, nonexistent_path)
 
     def test_directory_as_audio_path_creates_in_dir(
-        self, sample_chunks, tmp_path
+        self, sample_chunks: Chunk, tmp_path: Path
     ) -> None:
         """Test that passing a directory creates vtt file in that directory."""
         result_path = generate_subtitles(sample_chunks, tmp_path)
@@ -742,7 +768,7 @@ class TestErrorHandling:
 class TestStressScenarios:
     """Stress tests for the subtitling module."""
 
-    def test_rapid_fire_chunks(self, temp_audio_file) -> None:
+    def test_rapid_fire_chunks(self, temp_audio_file: Path) -> None:
         """Test with many very short chunks in rapid succession."""
         chunks = [
             Chunk(
@@ -757,7 +783,7 @@ class TestStressScenarios:
         result_path = generate_subtitles(chunks, temp_audio_file)
         assert result_path.exists()
 
-    def test_wide_time_range(self, temp_audio_file) -> None:
+    def test_wide_time_range(self, temp_audio_file: Path) -> None:
         """Test with chunks spanning a wide time range."""
         chunks = [
             Chunk(
