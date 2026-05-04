@@ -102,7 +102,7 @@ class TestFormatVttTimestamp:
 class TestParseVttFile:
     """Tests for _parse_vtt_file function."""
 
-    def test_parse_simple_vtt(self, tmp_path) -> None:
+    def test_parse_simple_vtt(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test parsing a simple VTT file."""
         vtt_content = """WEBVTT
 
@@ -126,7 +126,7 @@ This is a test
         assert chunks[0].speaker is None
         assert chunks[1].text == "This is a test"
 
-    def test_parse_vtt_with_speaker(self, tmp_path) -> None:
+    def test_parse_vtt_with_speaker(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test parsing VTT file with speaker information."""
         vtt_content = """WEBVTT
 
@@ -149,7 +149,7 @@ This is a test
         assert chunks[1].speaker == "Mary"
         assert chunks[1].text == "How are you?"
 
-    def test_parse_empty_vtt(self, tmp_path) -> None:
+    def test_parse_empty_vtt(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test parsing an empty VTT file."""
         vtt_content = "WEBVTT\n\n"
         vtt_file = tmp_path / "empty.vtt"
@@ -159,7 +159,7 @@ This is a test
 
         assert len(chunks) == 0
 
-    def test_parse_vtt_with_html_tags(self, tmp_path) -> None:
+    def test_parse_vtt_with_html_tags(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test parsing VTT file with HTML tags that should be stripped."""
         vtt_content = """WEBVTT
 
@@ -175,7 +175,9 @@ This has <b>bold</b> and <i>italic</i> text
         assert len(chunks) == 1
         assert chunks[0].text == "This has bold and italic text"
 
-    def test_parse_vtt_with_multiline_text(self, tmp_path) -> None:
+    def test_parse_vtt_with_multiline_text(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
         """Test parsing VTT file with multiline text."""
         vtt_content = """WEBVTT
 
@@ -198,7 +200,7 @@ Third line
 class TestWriteVttFile:
     """Tests for _write_vtt_file function."""
 
-    def test_write_simple_chunks(self, tmp_path) -> None:
+    def test_write_simple_chunks(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test writing simple chunks to VTT file."""
         chunks = [
             Chunk(
@@ -227,7 +229,7 @@ class TestWriteVttFile:
         assert "Hello world" in content
         assert "This is a test" in content
 
-    def test_write_with_speaker(self, tmp_path) -> None:
+    def test_write_with_speaker(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test writing chunks with speaker information."""
         chunks = [
             Chunk(
@@ -246,7 +248,7 @@ class TestWriteVttFile:
         assert "<v John>" in content
         assert "Hello there" in content
 
-    def test_write_empty_chunks(self, tmp_path) -> None:
+    def test_write_empty_chunks(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test writing empty chunk list."""
         chunks: list[Chunk] = []
         vtt_file = tmp_path / "empty.vtt"
@@ -358,12 +360,12 @@ class TestTranslator:
         assert result[1].text == "translated"
 
     def test_translate_chunks_all_none_text_logs_warning_and_returns_original(
-        self, caplog
+        self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Test that translate_chunks logs warning and returns original when all chunks have None text.
+        """Test translate_chunks logs warning when all chunks have None text.
 
-        This tests lines 95-96 in translation.py where a warning is logged and
-        the original chunks are returned when no chunks have text.
+        This tests lines 95-96 in translation.py where a warning is logged
+        and the original chunks are returned when no chunks have text.
         """
         chunks = [
             Chunk(
@@ -428,7 +430,7 @@ class TestTranslator:
 class TestTranslateSubtitles:
     """Tests for the translate_subtitles function with mocked dependencies."""
 
-    def test_translate_subtitles_basic(self, tmp_path) -> None:
+    def test_translate_subtitles_basic(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test basic subtitle translation workflow."""
         input_vtt = tmp_path / "input.vtt"
         input_vtt.write_text("""WEBVTT
@@ -451,7 +453,9 @@ Hej verden
         assert "WEBVTT" in content
         assert "Hello world" in content
 
-    def test_translate_subtitles_custom_output_path(self, tmp_path) -> None:
+    def test_translate_subtitles_custom_output_path(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
         """Test translation with custom output path."""
         input_vtt = tmp_path / "input.vtt"
         input_vtt.write_text("WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\nTest\n")
@@ -467,7 +471,9 @@ Hej verden
         assert result == output_vtt
         assert output_vtt.exists()
 
-    def test_translate_subtitles_auto_output_path(self, tmp_path) -> None:
+    def test_translate_subtitles_auto_output_path(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
         """Test translation with auto-generated output path."""
         input_vtt = tmp_path / "subtitles.vtt"
         input_vtt.write_text("WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\nTest\n")
@@ -482,7 +488,9 @@ Hej verden
         assert result == expected
         assert result.exists()
 
-    def test_translate_subtitles_with_speaker(self, tmp_path) -> None:
+    def test_translate_subtitles_with_speaker(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
         """Test translation preserving speaker information."""
         input_vtt = tmp_path / "input.vtt"
         input_vtt.write_text("""WEBVTT
@@ -526,7 +534,9 @@ class TestErrorHandling:
             with pytest.raises(Exception, match="Translation failed"):
                 translator.translate_text("test", "dan", "eng")
 
-    def test_translate_chunks_batch_fallback(self, caplog) -> None:
+    def test_translate_chunks_batch_fallback(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test fallback to individual translation when batch fails."""
         mock_pipeline = MagicMock()
         mock_pipeline.side_effect = [
@@ -560,7 +570,9 @@ class TestErrorHandling:
         assert result[0].text == "fallback 1"
         assert result[1].text == "fallback 2"
 
-    def test_translate_chunks_all_failures(self, caplog) -> None:
+    def test_translate_chunks_all_failures(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test handling when all translations fail."""
         mock_pipeline = MagicMock()
         mock_pipeline.side_effect = Exception("Always fails")
@@ -583,7 +595,9 @@ class TestErrorHandling:
         assert len(result) == 1
         assert result[0].text == "original 1"
 
-    def test_parse_vtt_invalid_timestamp(self, tmp_path) -> None:
+    def test_parse_vtt_invalid_timestamp(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
         """Test error handling for invalid timestamp format."""
         vtt_content = """WEBVTT
 
@@ -598,7 +612,9 @@ Test
         chunks = _parse_vtt_file(vtt_file)
         assert len(chunks) == 0
 
-    def test_parse_vtt_malformed_content(self, tmp_path) -> None:
+    def test_parse_vtt_malformed_content(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
         """Test parsing malformed VTT content."""
         vtt_content = "This is not valid VTT content at all"
         vtt_file = tmp_path / "malformed.vtt"
@@ -607,7 +623,7 @@ Test
         chunks = _parse_vtt_file(vtt_file)
         assert len(chunks) == 0
 
-    def test_write_vtt_invalid_path(self, tmp_path) -> None:
+    def test_write_vtt_invalid_path(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test error when writing to invalid path."""
         chunks = [
             Chunk(
@@ -634,7 +650,7 @@ Test
 class TestIntegration:
     """Integration tests for the translation module."""
 
-    def test_full_round_trip(self, tmp_path) -> None:
+    def test_full_round_trip(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test complete round trip: parse -> translate -> write -> parse."""
         original_vtt = tmp_path / "original.vtt"
         original_vtt.write_text("""WEBVTT
@@ -664,7 +680,7 @@ Hej verden
         assert chunks[0].start_time == 1.0
         assert chunks[0].end_time == 4.0
 
-    def test_preserves_timing_structure(self, tmp_path) -> None:
+    def test_preserves_timing_structure(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test that translation preserves timing structure."""
         original_vtt = tmp_path / "original.vtt"
         original_vtt.write_text("""WEBVTT
@@ -699,7 +715,7 @@ Segment three
         assert chunks[2].start_time == 5.0
         assert chunks[2].end_time == 10.5
 
-    def test_handles_complex_vtt_format(self, tmp_path) -> None:
+    def test_handles_complex_vtt_format(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test handling of complex VTT with various features."""
         original_vtt = tmp_path / "complex.vtt"
         original_vtt.write_text("""WEBVTT
