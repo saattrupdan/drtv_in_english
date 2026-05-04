@@ -4,16 +4,16 @@ This module provides functions to transcribe audio chunks into text segments
 using a pretrained ASR pipeline from the Hugging Face transformers library.
 """
 
+import collections.abc as c
 import logging
 import typing as t
-from typing import Generator
 
 import bits_and_bobs as bnb
 import numpy as np
 from tqdm.auto import tqdm
 from transformers import AutomaticSpeechRecognitionPipeline
 
-from .constants import MIN_CHUNK_LENGTH_SECONDS
+from .constants import MIN_CHUNK_LENGTH_SECONDS, TARGET_SAMPLE_RATE
 from .data_models import Chunk
 
 logger = logging.getLogger(__package__)
@@ -68,8 +68,8 @@ def _transcribe_chunks_batch(
                 continue
 
             # Extract audio for this word segment
-            audio_start = int(16_000 * start_time)
-            audio_end = int(16_000 * end_time)
+            audio_start = int(TARGET_SAMPLE_RATE * start_time)
+            audio_end = int(TARGET_SAMPLE_RATE * end_time)
             # Ensure we don't exceed the original chunk bounds
             audio_end = min(audio_end, len(chunk.audio))
             audio = chunk.audio[audio_start:audio_end]
@@ -90,8 +90,8 @@ def _transcribe_chunks_batch(
 
 
 def create_dynamic_batches(
-    chunks: list[Chunk], batch_size: int = 20, max_duration: float = 60.0
-) -> Generator[list[Chunk], None, None]:
+    chunks: list[Chunk], batch_size: int, max_duration: float = 60.0
+) -> c.Generator[list[Chunk], None, None]:
     """Create dynamic batches from audio chunks for efficient transcription.
 
     Groups chunks of similar duration to minimise padding waste during batch
@@ -145,7 +145,7 @@ def create_dynamic_batches(
 def transcribe_chunks_dynamic(
     chunks: list[Chunk],
     model: AutomaticSpeechRecognitionPipeline,
-    batch_size: int = 20,
+    batch_size: int,
     max_duration: float = 60.0,
     show_progress: bool = True,
 ) -> list[list[Chunk]]:
