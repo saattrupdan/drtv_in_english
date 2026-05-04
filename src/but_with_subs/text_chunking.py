@@ -93,9 +93,6 @@ def group_word_chunks(
             if word_chunk.start_time >= segment_start
             and word_chunk.end_time <= segment_end
         ]
-        if not word_chunks_in_segment:
-            logger.warning(f"Could not find transcription for {segment!r}. Skipping.")
-            continue
 
         result.append(
             Chunk(
