@@ -424,8 +424,7 @@ class TestSplitTextEdgeCases:
         """Test splitting an empty string."""
         result = _split_text(text="", max_words=5)
 
-        assert len(result) == 1
-        assert result[0] == ""
+        assert result == []
 
     def test_whitespace_only(self) -> None:
         """Test splitting whitespace-only text."""
