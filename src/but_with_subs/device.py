@@ -1,10 +1,13 @@
 """Hardware-specific device information."""
 
+from functools import cache
+
 import torch
 
 from .logging_config import logger
 
 
+@cache
 def get_device() -> torch.device:
     """Get the device to use for inference.
 
