@@ -19,9 +19,10 @@
 
 import json
 import os
+import typing as t
 from pathlib import Path
 from shutil import copyfile
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import sentencepiece
 from transformers import BatchEncoding, PreTrainedTokenizer
@@ -135,21 +136,21 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
     pretrained_vocab_files_map = PRETRAINED_VOCAB_FILES_MAP
     model_input_names = ["input_ids", "attention_mask"]
 
-    prefix_tokens: Optional[List[int]] = []
-    suffix_tokens: List[int] = []
+    prefix_tokens: list[int] | None = []
+    suffix_tokens: list[int] = []
 
     def __init__(
         self,
         vocab_file: str,
         spm_file: str,
-        tgt_lang: Optional[str] = None,
+        tgt_lang: str | None = None,
         bos_token: str = "<s>",
         eos_token: str = "</s>",
         sep_token: str = "</s>",
         pad_token: str = "<pad>",
         unk_token: str = "<unk>",
         language_codes: str = "m2m100",
-        sp_model_kwargs: Optional[Dict[str, Any]] = None,
+        sp_model_kwargs: dict[str, Any] | None = None,
         num_madeup_words: int = 8,
         **kwargs,
     ) -> None:
@@ -187,7 +188,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         ]
 
         self.vocab_file = vocab_file
-        self.encoder: Dict[str, Any] = load_json(vocab_file)  # ty: ignore[invalid-assignment]
+        self.encoder: dict[str, int] = load_json(vocab_file)  # ty: ignore[invalid-assignment]
         self.decoder = {v: k for k, v in self.encoder.items()}
         self.spm_file = spm_file
         self.sp_model = load_spm(spm_file, self.sp_model_kwargs)
@@ -243,7 +244,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         self._tgt_lang = new_tgt_lang
         self.set_lang_special_tokens(self._tgt_lang)
 
-    def _tokenize(self, text: str) -> List[str]:  # ty: ignore[invalid-method-override]
+    def _tokenize(self, text: str) -> list[str]:  # ty: ignore[invalid-method-override]
         return self.sp_model.encode(text, out_type=str)  # ty: ignore[unresolved-attribute]
 
     def _convert_token_to_id(self, token: str) -> int:
@@ -261,7 +262,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
             return self.id_to_lang_token[index]
         return self.decoder.get(index, self.unk_token)
 
-    def convert_tokens_to_string(self, tokens: List[str]) -> str:
+    def convert_tokens_to_string(self, tokens: list[str]) -> str:
         """Converts a sequence of tokens (strings for sub-words) in a single string.
 
         Returns:
@@ -271,10 +272,10 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
 
     def get_special_tokens_mask(
         self,
-        token_ids_0: List[int],
-        token_ids_1: Optional[List[int]] = None,
+        token_ids_0: list[int],
+        token_ids_1: list[int] | None = None,
         already_has_special_tokens: bool = False,
-    ) -> List[int]:
+    ) -> list[int]:
         """Retrieve sequence ids from a token list that has no special tokens added.
 
         This method is called when adding special tokens using the tokenizer
@@ -312,8 +313,8 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         )
 
     def build_inputs_with_special_tokens(
-        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
-    ) -> List[int]:
+        self, token_ids_0: list[int], token_ids_1: list[int] | None = None
+    ) -> list[int]:
         """Build model inputs from a sequence or pair of sequences.
 
         Concatenates and adds special tokens. An MBART sequence has the following
@@ -347,13 +348,13 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         else:
             return self.prefix_tokens + token_ids_0 + token_ids_1 + self.suffix_tokens
 
-    def get_vocab(self) -> Dict:
+    def get_vocab(self) -> dict[str, int]:
         """Return the vocabulary dictionary including special tokens."""
         vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
 
-    def __getstate__(self) -> Dict:
+    def __getstate__(self) -> dict[str, t.Any]:
         """Return the serializable state of the tokenizer.
 
         Returns:
@@ -363,7 +364,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         state["sp_model"] = None
         return state
 
-    def __setstate__(self, d: Dict) -> None:
+    def __setstate__(self, d: dict[str, t.Any]) -> None:
         """Restore the tokenizer state from a serialized dictionary.
 
         Args:
@@ -378,8 +379,8 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         self.sp_model = load_spm(self.spm_file, self.sp_model_kwargs)
 
     def save_vocabulary(
-        self, save_directory: str, filename_prefix: Optional[str] = None
-    ) -> Tuple[str, str]:
+        self, save_directory: str, filename_prefix: str | None = None
+    ) -> tuple[str, str]:
         """Save the vocabulary files to disk.
 
         Args:
@@ -419,8 +420,8 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
 
     def prepare_seq2seq_batch(
         self,
-        src_texts: List[str],
-        tgt_texts: Optional[List[str]] = None,
+        src_texts: list[str],
+        tgt_texts: list[str] | None = None,
         tgt_lang: str = "ro",
         **kwargs,
     ) -> BatchEncoding:
@@ -440,7 +441,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         return super().prepare_seq2seq_batch(src_texts, tgt_texts, **kwargs)  # ty: ignore[unresolved-attribute]
 
     def _build_translation_inputs(
-        self, raw_inputs: Union[str, List[str]], tgt_lang: Optional[str], **extra_kwargs
+        self, raw_inputs: str | list[str], tgt_lang: str | None, **extra_kwargs
     ) -> BatchEncoding:
         """Used by translation pipeline, to prepare inputs for the generate function.
 
@@ -503,7 +504,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
 
 
 def load_spm(
-    path: str, sp_model_kwargs: Dict[str, Any]
+    path: str, sp_model_kwargs: dict[str, Any]
 ) -> sentencepiece.SentencePieceProcessor:
     """Load a SentencePiece model from a file.
 
@@ -519,7 +520,7 @@ def load_spm(
     return spm
 
 
-def load_json(path: str) -> Union[Dict, List]:
+def load_json(path: str) -> dict | list:
     """Load a JSON file and return its contents.
 
     Args:
@@ -532,7 +533,7 @@ def load_json(path: str) -> Union[Dict, List]:
         return json.load(f)
 
 
-def save_json(data: Union[Dict[str, Any], List[Any]], path: str) -> None:
+def save_json(data: dict[str, Any] | list[Any], path: str) -> None:
     """Save data to a JSON file with indentation.
 
     Args:
