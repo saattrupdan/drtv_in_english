@@ -96,9 +96,10 @@ def _translate_batch(
     if len(texts) == 1:
         encoded = tokenizer(texts[0], return_tensors="pt").to(model.device)
         generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
+        sequences = getattr(generated, "sequences", generated)
         return [
             tokenizer.batch_decode(
-                t.cast(t.Any, generated).sequences, skip_special_tokens=True
+                t.cast(t.Any, sequences), skip_special_tokens=True
             )[0]
         ]
 
@@ -106,8 +107,9 @@ def _translate_batch(
         model.device
     )
     generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
+    sequences = getattr(generated, "sequences", generated)
     return tokenizer.batch_decode(
-        t.cast(t.Any, generated).sequences, skip_special_tokens=True
+        t.cast(t.Any, sequences), skip_special_tokens=True
     )
 
 
