@@ -24,7 +24,7 @@ from but_with_subs.audio_loading import load_audio, validate_audio
 from but_with_subs.data_models import Chunk
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
-from but_with_subs.transcribing import transcribe_audio
+import but_with_subs.transcribing as transcribing
 
 # =============================================================================
 # Fixtures
@@ -168,7 +168,7 @@ class TestCompletePipeline:
         # Step 2: Transcribe (mocked - use pre-made word chunks)
         with patch("but_with_subs.transcribing.transcribe_audio") as mock_transcribe:
             mock_transcribe.return_value = mock_word_chunks
-            transcribed = transcribe_audio(
+            transcribed = transcribing.transcribe_audio(
                 audio=audio, model=MagicMock(), show_progress=False
             )
 
@@ -518,7 +518,9 @@ class TestPipelineErrorHandling:
         mock_model.side_effect = RuntimeError("ASR model failed")
 
         with pytest.raises(RuntimeError, match="ASR model failed"):
-            transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
+            transcribing.transcribe_audio(
+                audio=mock_audio, model=mock_model, show_progress=False
+            )
 
     def test_subtitling_failure_with_empty_chunks(self, tmp_path: Path) -> None:
         """Test handling of empty chunk list for subtitling."""
