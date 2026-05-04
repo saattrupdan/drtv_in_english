@@ -95,7 +95,7 @@ Check that it works on the sample URLs above.
 
 Ensure good logging along the way, with the same logger as defined in Phase 1.
 
-### Phase 5: Translating subtitles
+### Phase 5: Translating subtitles ✅
 
 We should have a `translate` function in a separate `translation` module that takes
 transcribed text, a target language, and an LLM configuration, and returns the
