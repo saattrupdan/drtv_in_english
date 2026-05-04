@@ -414,6 +414,19 @@ class TestGetSpecialTokensMask(TokenizerTestCase):
             mock_super.assert_called_once()
             self.assertEqual(result, [1, 0, 1])
 
+    def test_get_special_tokens_mask_already_has_special_tokens(self) -> None:
+        """Test get_special_tokens_mask when already_has_special_tokens=True."""
+        tok, _, _ = _make_tokenizer(self.tmp_path)
+        # This should call super().get_special_tokens_mask(...) since
+        # already_has_special_tokens=True
+        result = tok.get_special_tokens_mask(
+            token_ids_0=[3, 4],  # hello, world
+            token_ids_1=None,
+            already_has_special_tokens=True,
+        )
+        self.assertIsInstance(result, list)
+        self.assertTrue(all(v in (0, 1) for v in result))
+
     def test_no_special_tokens_builds_inputs(self) -> None:
         """Test that the mask is built from inputs when no special tokens."""
         tok, _, _ = _make_tokenizer(self.tmp_path)
@@ -664,6 +677,21 @@ class TestSaveVocabulary(TokenizerTestCase):
         saved_vocab_path = os.path.join(out_dir, "vocab.json")
         saved = load_json(saved_vocab_path)
         self.assertEqual(saved, tok.encoder)
+
+    def test_save_vocabulary_when_spm_file_missing(self) -> None:
+        """Test save_vocabulary writes serialized model when SPM file missing."""
+        tok, vocab_path, spm_path = _make_tokenizer(self.tmp_path)
+        # Remove the SPM file so the elif branch is taken
+        os.remove(spm_path)
+        self.assertFalse(os.path.isfile(spm_path))
+
+        out_dir = os.path.join(self.tmp_path, "output2")
+        os.makedirs(out_dir)
+        paths = tok.save_vocabulary(out_dir)
+        self.assertEqual(len(paths), 2)
+        vocab_saved, spm_saved = paths
+        self.assertTrue(os.path.exists(vocab_saved))
+        self.assertTrue(os.path.exists(spm_saved))
 
 
 # ---------------------------------------------------------------------------
