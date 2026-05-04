@@ -6,6 +6,9 @@ import numpy as np
 import torch
 from silero_vad import get_speech_timestamps
 
+from pyannote.audio import Pipeline
+from pyannote.audio.core.inference import ProgressHook
+
 from .constants import MIN_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 from .device import get_device
