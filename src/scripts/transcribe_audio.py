@@ -3,8 +3,8 @@
 Usage:
     uv run src/scripts/transcribe_audio.py [audio_path]
 
-The script transcribes the audio, splits it into chunks based on silence,
-and outputs a `.vtt` subtitle file alongside the original audio file.
+The script transcribes the full audio in one pass and outputs a ``.vtt``
+subtitle file alongside the original audio file.
 """
 
 import logging
@@ -19,14 +19,13 @@ from tqdm.auto import tqdm
 from transformers import pipeline
 
 from but_with_subs import configure_logging
-from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
 from but_with_subs.constants import ASR_MODEL_ID, MAX_WORDS
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
-from but_with_subs.transcribing import transcribe_chunks_dynamic
+from but_with_subs.transcribing import transcribe_audio
 from but_with_subs.translation import translate_chunks
 
 logger = logging.getLogger("but_with_subs")
@@ -45,29 +44,8 @@ configure_logging()
     show_default=True,
     help="Target language for translation (e.g. 'en' for English).",
 )
-@click.option(
-    "--batch-size",
-    type=int,
-    default=16,
-    show_default=True,
-    help=(
-        "Maximum number of chunks per batch. "
-        "Higher values increase throughput but require more GPU memory."
-    ),
-)
-@click.option(
-    "--max-duration",
-    type=float,
-    default=60,
-    show_default=True,
-    help=(
-        "Maximum total audio duration (seconds) per batch. "
-        "Lower values reduce padding waste for varied-length chunks "
-        "but increase batch count."
-    ),
-)
-def main(audio_path: str, language: str, batch_size: int, max_duration: float) -> None:
-    """Transcribe an audio file using Wav2Vec2 and silence-based chunking."""
+def main(audio_path: str, language: str) -> None:
+    """Transcribe an audio file using Wav2Vec2 and generate subtitles."""
     path = Path(audio_path)
     if not path.is_file():
         logger.error(f"File not found: {audio_path}")
@@ -93,35 +71,26 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
     logger.info("Loading the audio file...")
     audio = load_audio(path=path)
 
-    # Generate all chunks first
-    all_chunks = chunk_by_audio(audio=audio)
-    logger.info(f"Generated {len(all_chunks)} initial audio chunks")
-
-    # Process chunks using dynamic batching with configurable parameters
-    batch_results = transcribe_chunks_dynamic(
-        chunks=all_chunks,
+    # Transcribe the full audio in one pass
+    word_chunks = transcribe_audio(
+        audio=audio,
         model=model,
-        batch_size=batch_size,
-        max_duration=max_duration,
         show_progress=True,
     )
+    logger.info(f"Generated {len(word_chunks)} word-level segments")
 
-    # Post-process each chunk's transcription
-    chunks: list[Chunk] = list()
-    for word_chunks in tqdm(
-        batch_results, unit="batch", desc="Processing transcriptions"
-    ):
-        chunked_transcriptions = group_word_chunks(
-            word_chunks=word_chunks,
-            punctuation_model=punctuation_model,
-            max_words=MAX_WORDS,
-        )
-        chunks.extend(chunked_transcriptions)
+    # Group word-level chunks into readable segments
+    chunks: list[Chunk] = group_word_chunks(
+        word_chunks=word_chunks,
+        punctuation_model=punctuation_model,
+        max_words=MAX_WORDS,
+    )
+    logger.info(f"Grouped into {len(chunks)} text segments")
 
     # Translate all chunks to target language
     translated_chunks: list[Chunk] = []
     with tqdm(total=len(chunks), desc="Translating", unit="chunk") as pbar:
-        for result in translate_chunks(chunks, language, batch_size=batch_size):
+        for result in translate_chunks(chunks, language, batch_size=16):
             if isinstance(result, tuple):
                 current, total = result
                 pbar.set_description(f"Translating {current}/{total}")
@@ -138,7 +107,6 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
     generate_subtitles(
         chunks=chunks, audio_path=path, output_path=output_path.with_suffix(".da.vtt")
     )
-
     generate_subtitles(
         chunks=translated_chunks,
         audio_path=path,
