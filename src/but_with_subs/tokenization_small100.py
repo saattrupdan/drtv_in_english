@@ -22,8 +22,6 @@ import os
 import typing as t
 from pathlib import Path
 from shutil import copyfile
-from typing import Any
-
 import sentencepiece
 from transformers import BatchEncoding, PreTrainedTokenizer
 from transformers.utils import logging
