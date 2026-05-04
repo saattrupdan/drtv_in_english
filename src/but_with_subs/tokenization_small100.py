@@ -102,17 +102,6 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
             - `alpha`: Smoothing parameter for unigram sampling, and dropout
               probability of merge operations for BPE-dropout.
 
-    Examples:
-    ```python
-    >>> from .tokenization_small100 import SMALL100Tokenizer
-    >>> tokenizer = SMALL100Tokenizer.from_pretrained(
-    ...     "alirezamsh/small100", tgt_lang="ro"
-    ... )
-    >>> src_text = " UN Chief Says There Is No Military Solution in Syria"
-    >>> tgt_text = "Şeful ONU declară că nu există o soluţie militară în Siria"
-    >>> model_inputs = tokenizer(src_text, text_target=tgt_text, return_tensors="pt")
-    >>> model(**model_inputs)  # should work
-    ```
     """
 
     vocab_files_names = VOCAB_FILES_NAMES
