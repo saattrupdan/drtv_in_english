@@ -6,7 +6,7 @@ models or network access while verifying the data flow between modules.
 
 The tests cover:
 1. Complete pipeline execution with mocked dependencies
-2. Integration between modules (audio -> chunking -> transcription
+2. Integration between modules (audio -> transcription
    -> subtitling -> translation)
 3. Real-world scenarios with realistic data patterns
 4. Error handling and edge cases throughout the pipeline
@@ -24,7 +24,7 @@ from but_with_subs.audio_loading import load_audio, validate_audio
 from but_with_subs.data_models import Chunk
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
-from but_with_subs.transcribing import transcribe_chunks_dynamic
+from but_with_subs.transcribing import transcribe_audio
 
 # =============================================================================
 # Fixtures
@@ -50,31 +50,6 @@ def sample_audio_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def mock_audio_chunks() -> list[Chunk]:
-    """Create mock audio chunks for testing.
-
-    Returns:
-        A list of mock audio chunks.
-    """
-    return [
-        Chunk(
-            start_time=0.0,
-            end_time=2.0,
-            audio=np.zeros(32000, dtype=np.float32),
-            text=None,
-            speaker="Alice",
-        ),
-        Chunk(
-            start_time=2.5,
-            end_time=5.0,
-            audio=np.zeros(40000, dtype=np.float32),
-            text=None,
-            speaker="Bob",
-        ),
-    ]
-
-
-@pytest.fixture
 def mock_word_chunks() -> list[Chunk]:
     """Create mock word-level chunks for testing.
 
@@ -87,49 +62,49 @@ def mock_word_chunks() -> list[Chunk]:
             end_time=0.5,
             audio=np.zeros(8000, dtype=np.float32),
             text="Hej",
-            speaker="Alice",
+            speaker=None,
         ),
         Chunk(
             start_time=0.5,
             end_time=1.0,
             audio=np.zeros(8000, dtype=np.float32),
             text="verden",
-            speaker="Alice",
+            speaker=None,
         ),
         Chunk(
             start_time=1.0,
             end_time=1.5,
             audio=np.zeros(8000, dtype=np.float32),
             text="hvad",
-            speaker="Alice",
+            speaker=None,
         ),
         Chunk(
             start_time=1.5,
             end_time=2.0,
             audio=np.zeros(8000, dtype=np.float32),
             text="så",
-            speaker="Alice",
+            speaker=None,
         ),
         Chunk(
             start_time=2.5,
             end_time=3.5,
             audio=np.zeros(16000, dtype=np.float32),
             text="Jeg",
-            speaker="Bob",
+            speaker=None,
         ),
         Chunk(
             start_time=3.5,
             end_time=4.5,
             audio=np.zeros(16000, dtype=np.float32),
             text="hedder",
-            speaker="Bob",
+            speaker=None,
         ),
         Chunk(
             start_time=4.5,
             end_time=5.0,
             audio=np.zeros(8000, dtype=np.float32),
             text="Bob",
-            speaker="Bob",
+            speaker=None,
         ),
     ]
 
@@ -172,38 +147,17 @@ class TestCompletePipeline:
     """Tests for the complete end-to-end pipeline from audio to translated subtitles."""
 
     def test_full_pipeline_audio_to_translated_subtitles(
-        self, tmp_path: Path, mock_audio_chunks: list[Chunk]
+        self, tmp_path: Path, mock_word_chunks: list[Chunk]
     ) -> None:
         """Test the complete pipeline from audio loading to translated subtitles.
 
         This end-to-end test verifies:
-        1. Audio loading and validation
-        2. Audio chunking
-        3. Transcription of chunks
-        4. Text chunking/grouping
-        5. Subtitle generation
-        6. Subtitle translation
+        1. Audio loading
+        2. Transcription (mocked to return word chunks)
+        3. Text grouping
+        4. Subtitle generation
+        5. Subtitle translation
         """
-        # Mock the ASR pipeline for transcription
-        mock_asr_model = MagicMock()
-        mock_asr_model.return_value = [
-            {
-                "chunks": [
-                    {"text": "Hej", "timestamp": (0.0, 0.5)},
-                    {"text": "verden", "timestamp": (0.5, 1.0)},
-                    {"text": "hvad", "timestamp": (1.0, 1.5)},
-                    {"text": "så", "timestamp": (1.5, 2.0)},
-                ]
-            },
-            {
-                "chunks": [
-                    {"text": "Jeg", "timestamp": (0.0, 1.0)},
-                    {"text": "hedder", "timestamp": (1.0, 2.0)},
-                    {"text": "Bob", "timestamp": (2.0, 2.5)},
-                ]
-            },
-        ]
-
         # Step 1: Load audio (mocked)
         with patch("but_with_subs.audio_loading.scipy.io.wavfile.read") as mock_read:
             mock_read.return_value = (16000, np.zeros(80000, dtype=np.int16))
@@ -211,95 +165,30 @@ class TestCompletePipeline:
             assert audio is not None
             assert len(audio) > 0
 
-        # Step 2: Chunk audio (mocked - use pre-made chunks)
-        chunks = mock_audio_chunks
-        assert len(chunks) == 2
-        assert all(c.audio is not None for c in chunks)
-
-        # Step 3: Transcribe chunks
-        with patch(
-            "but_with_subs.transcribing._transcribe_chunks_batch"
-        ) as mock_transcribe:
-            mock_transcribe.return_value = [
-                [
-                    Chunk(
-                        start_time=0.0,
-                        end_time=0.5,
-                        audio=np.zeros(8000),
-                        text="Hej",
-                        speaker="Alice",
-                    ),
-                    Chunk(
-                        start_time=0.5,
-                        end_time=1.0,
-                        audio=np.zeros(8000),
-                        text="verden",
-                        speaker="Alice",
-                    ),
-                    Chunk(
-                        start_time=1.0,
-                        end_time=1.5,
-                        audio=np.zeros(8000),
-                        text="hvad",
-                        speaker="Alice",
-                    ),
-                    Chunk(
-                        start_time=1.5,
-                        end_time=2.0,
-                        audio=np.zeros(8000),
-                        text="så",
-                        speaker="Alice",
-                    ),
-                ],
-                [
-                    Chunk(
-                        start_time=2.5,
-                        end_time=3.5,
-                        audio=np.zeros(16000),
-                        text="Jeg",
-                        speaker="Bob",
-                    ),
-                    Chunk(
-                        start_time=3.5,
-                        end_time=4.5,
-                        audio=np.zeros(16000),
-                        text="hedder",
-                        speaker="Bob",
-                    ),
-                    Chunk(
-                        start_time=4.5,
-                        end_time=5.0,
-                        audio=np.zeros(8000),
-                        text="Bob",
-                        speaker="Bob",
-                    ),
-                ],
-            ]
-            transcribed = transcribe_chunks_dynamic(
-                chunks, mock_asr_model, batch_size=20, show_progress=False
+        # Step 2: Transcribe (mocked - use pre-made word chunks)
+        with patch("but_with_subs.transcribing.transcribe_audio") as mock_transcribe:
+            mock_transcribe.return_value = mock_word_chunks
+            transcribed = transcribe_audio(
+                audio=audio, model=MagicMock(), show_progress=False
             )
 
-        # Flatten transcribed chunks
-        all_word_chunks = []
-        for chunk_list in transcribed:
-            all_word_chunks.extend(chunk_list)
-        assert len(all_word_chunks) == 7
-        assert all(c.text is not None for c in all_word_chunks)
+        assert len(transcribed) == len(mock_word_chunks)
+        assert all(c.text is not None for c in transcribed)
 
-        # Step 4: Group word chunks into segments
+        # Step 3: Group word chunks into segments
         with patch("but_with_subs.text_chunking.PunctFixer") as mock_punctfixer_class:
             mock_punctfixer = Mock()
             mock_punctfixer.punctuate = Mock(side_effect=lambda text: text)
             mock_punctfixer_class.return_value = mock_punctfixer
 
             grouped_chunks = group_word_chunks(
-                all_word_chunks, mock_punctfixer, max_words=5
+                transcribed, mock_punctfixer, max_words=5
             )
 
         assert len(grouped_chunks) >= 1
         assert all(c.text is not None for c in grouped_chunks)
 
-        # Step 5: Generate subtitles
+        # Step 4: Generate subtitles
         audio_path = tmp_path / "output.mp3"
         audio_path.write_bytes(b"fake audio")
         vtt_path = generate_subtitles(grouped_chunks, audio_path)
@@ -308,7 +197,7 @@ class TestCompletePipeline:
         vtt_content = vtt_path.read_text()
         assert "WEBVTT" in vtt_content
 
-        # Step 6: Translate subtitles
+        # Step 5: Translate subtitles
         translated_vtt_path = _mock_translate_subtitles(
             vtt_path, source_lang="dan", target_lang="eng"
         )
@@ -321,40 +210,10 @@ class TestCompletePipeline:
 class TestPipelineDataIntegrity:
     """Tests for data integrity across the pipeline."""
 
-    def test_speaker_info_preserved_through_pipeline(
-        self, mock_word_chunks: list[Chunk], tmp_path: Path
-    ) -> None:
-        """Test that speaker information is preserved through all pipeline stages."""
-        # Group chunks
-        with patch("but_with_subs.text_chunking.PunctFixer") as mock_punctfixer_class:
-            mock_punctfixer = Mock()
-            mock_punctfixer.punctuate = Mock(side_effect=lambda text: text)
-            mock_punctfixer_class.return_value = mock_punctfixer
-
-            grouped = group_word_chunks(mock_word_chunks, mock_punctfixer, max_words=5)
-
-        # Check speaker info preserved
-        alice_chunks = [c for c in grouped if c.speaker == "Alice"]
-        bob_chunks = [c for c in grouped if c.speaker == "Bob"]
-
-        assert len(alice_chunks) >= 1
-        assert len(bob_chunks) >= 1
-
-        # Generate subtitles
-        audio_path = tmp_path / "test.mp3"
-        audio_path.write_bytes(b"fake")
-        vtt_path = generate_subtitles(grouped, audio_path)
-
-        content = vtt_path.read_text()
-        assert "(Alice)" in content or "Alice" in content
-        assert "(Bob)" in content or "Bob" in content
-
     def test_timing_info_preserved_through_pipeline(
         self, mock_word_chunks: list[Chunk], tmp_path: Path
     ) -> None:
         """Test that timing information is preserved through all pipeline stages."""
-        [(c.start_time, c.end_time) for c in mock_word_chunks]
-
         # Group chunks
         with patch("but_with_subs.text_chunking.PunctFixer") as mock_punctfixer_class:
             mock_punctfixer = Mock()
@@ -386,23 +245,13 @@ class TestPipelineDataIntegrity:
 class TestModuleInteractions:
     """Tests for interactions between different modules."""
 
-    def test_audio_loading_to_chunking_integration(
-        self, mock_audio_chunks: list[Chunk]
-    ) -> None:
-        """Test the integration between audio loading and chunking modules."""
-        # Simulate the output of audio loading being passed to chunking
-        audio_data = np.concatenate([c.audio for c in mock_audio_chunks])
-
-        # Verify the audio can be used for chunking
-        assert len(audio_data) > 0
-        assert audio_data.dtype == np.float32
-
-        # The chunking would normally use pyannote, but we verify the data structure
-        for chunk in mock_audio_chunks:
-            assert hasattr(chunk, "start_time")
-            assert hasattr(chunk, "end_time")
-            assert hasattr(chunk, "audio")
-            assert hasattr(chunk, "speaker")
+    def test_audio_loading_integration(self, sample_audio_file: Path) -> None:
+        """Test the integration between audio loading and the rest of the pipeline."""
+        # Verify the audio file can be loaded
+        audio = load_audio(sample_audio_file)
+        assert audio is not None
+        assert len(audio) > 0
+        assert audio.dtype == np.float32
 
     def test_transcription_to_text_chunking_integration(
         self, mock_word_chunks: list[Chunk]
@@ -662,17 +511,14 @@ class TestPipelineErrorHandling:
         with pytest.raises(ValueError, match="Audio array cannot be empty"):
             validate_audio(audio=empty_audio, sample_rate=16000)
 
-    def test_transcription_failure_handling(
-        self, mock_audio_chunks: list[Chunk]
-    ) -> None:
+    def test_transcription_failure_handling(self) -> None:
         """Test handling of transcription failures."""
-        mock_asr_model = MagicMock()
-        mock_asr_model.side_effect = RuntimeError("ASR model failed")
+        mock_audio = np.zeros(16000, dtype=np.float32)
+        mock_model = MagicMock()
+        mock_model.side_effect = RuntimeError("ASR model failed")
 
         with pytest.raises(RuntimeError, match="ASR model failed"):
-            transcribe_chunks_dynamic(
-                mock_audio_chunks, mock_asr_model, batch_size=20, show_progress=False
-            )
+            transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
 
     def test_subtitling_failure_with_empty_chunks(self, tmp_path: Path) -> None:
         """Test handling of empty chunk list for subtitling."""
@@ -765,102 +611,6 @@ class TestPipelineStressScenarios:
 
 
 # =============================================================================
-# Mocking Tests - Complete Pipeline with Full Mocks
-# =============================================================================
-
-
-class TestFullyMockedPipeline:
-    """Tests with complete mocking of external dependencies."""
-
-    def test_fully_mocked_end_to_end(self, tmp_path: Path) -> None:
-        """Test complete pipeline with all external dependencies mocked."""
-        # Mock all external dependencies
-        with (
-            patch("but_with_subs.audio_loading.scipy.io.wavfile.read") as mock_read,
-            patch("but_with_subs.audio_chunking.Pipeline") as mock_pipeline_class,
-            patch("but_with_subs.transcribing.tqdm") as mock_tqdm,
-        ):
-            # Setup audio loading mock
-            mock_read.return_value = (16000, np.zeros(80000, dtype=np.int16))
-
-            # Setup pyannote pipeline mock
-            mock_pipeline = MagicMock()
-            mock_pipeline.return_value = MagicMock(
-                speaker_diarization=[((0.0, 2.0), "Alice"), ((2.5, 5.0), "Bob")]
-            )
-            mock_pipeline_class.from_pretrained.return_value = mock_pipeline
-
-            # Setup tqdm mock
-            mock_tqdm.return_value.__enter__.return_value = []
-
-            # Run the pipeline
-            audio = load_audio(tmp_path / "test.wav")
-            assert audio is not None
-
-            # Note: chunk_by_audio would use the mocked pipeline
-            # For this test, we simulate the output
-            chunks = [
-                Chunk(
-                    start_time=0.0,
-                    end_time=2.0,
-                    audio=np.zeros(32000),
-                    text=None,
-                    speaker="Alice",
-                )
-            ]
-
-            # Generate subtitles
-            audio_path = tmp_path / "output.mp3"
-            audio_path.write_bytes(b"fake")
-            vtt_path = generate_subtitles(chunks, audio_path)
-
-            assert vtt_path.exists()
-
-    def test_mocked_batch_transcription(self, mock_audio_chunks: list[Chunk]) -> None:
-        """Test batch transcription with mocked pipeline."""
-        mock_asr_model = MagicMock()
-
-        # Mock _transcribe_chunks_batch directly to avoid ASR model complexity
-        def mock_batch_fn(chunks: list[Chunk], model: MagicMock) -> list[list[Chunk]]:
-            # Return one list per input chunk so assertions work correctly
-            return [
-                [
-                    Chunk(
-                        start_time=c.start_time,
-                        end_time=c.end_time,
-                        audio=c.audio,
-                        text=f"Transcript for {c.speaker}",
-                        speaker=c.speaker,
-                    )
-                ]
-                for c in chunks
-            ]
-
-        # Create a mock tqdm iterator that has set_description method
-        mock_iterator = MagicMock()
-        mock_iterator.__enter__ = MagicMock(return_value=mock_iterator)
-        mock_iterator.__exit__ = MagicMock(return_value=False)
-        mock_iterator.set_description = MagicMock()
-        mock_iterator.__iter__ = MagicMock(return_value=iter([mock_audio_chunks]))
-
-        # Use dynamic batching with mocked batch transcription
-        with (
-            patch("but_with_subs.transcribing.tqdm", return_value=mock_iterator),
-            patch(
-                "but_with_subs.transcribing._transcribe_chunks_batch",
-                side_effect=mock_batch_fn,
-            ),
-        ):
-            results = transcribe_chunks_dynamic(
-                mock_audio_chunks, mock_asr_model, batch_size=20, show_progress=False
-            )
-
-        assert len(results) == len(mock_audio_chunks)
-        assert all(len(r) > 0 for r in results)
-        assert all(c.text is not None for r in results for c in r)
-
-
-# =============================================================================
 # Data Flow Verification Tests
 # =============================================================================
 
@@ -915,8 +665,6 @@ class TestDataFlowVerification:
 
     def test_timestamp_flow_accuracy(self, mock_word_chunks: list[Chunk]) -> None:
         """Verify timestamps remain accurate through the pipeline."""
-        {(chunk.start_time, chunk.end_time) for chunk in mock_word_chunks}
-
         # Group chunks
         with patch("but_with_subs.text_chunking.PunctFixer") as mock_punctfixer_class:
             mock_punctfixer = Mock()
@@ -968,7 +716,7 @@ class TestScriptInvocation:
     """Tests that verify the transcribe_audio.py script entrypoint works."""
 
     def test_script_entrypoint_translates_chunks_properly(
-        self, tmp_path: Path, mock_audio_chunks: list[Chunk]
+        self, tmp_path: Path, mock_word_chunks: list[Chunk]
     ) -> None:
         """Test that the script's translation loop collects chunks into a list.
 
@@ -992,7 +740,7 @@ class TestScriptInvocation:
 
         translated_chunks: list[Chunk] = []
         for result in mock_translate_chunks_generator(
-            chunks=mock_audio_chunks, language="en", batch_size=2
+            chunks=mock_word_chunks, language="en", batch_size=2
         ):
             if isinstance(result, tuple):
                 current, total = result
@@ -1000,7 +748,7 @@ class TestScriptInvocation:
                 translated_chunks.append(result)
 
         assert isinstance(translated_chunks, list)
-        assert len(translated_chunks) == len(mock_audio_chunks)
+        assert len(translated_chunks) == len(mock_word_chunks)
         assert all(isinstance(c, Chunk) for c in translated_chunks)
         assert all(c.text is not None for c in translated_chunks)
 
