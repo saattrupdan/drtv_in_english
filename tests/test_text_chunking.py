@@ -1,16 +1,16 @@
 """Tests for the text_chunking module."""
 
+import importlib
 import logging
 import re
 import sys
 from unittest.mock import MagicMock
 
+import nltk
 import numpy as np
 import pytest
 
 from but_with_subs.data_models import Chunk
-
-# Import the punctuation pattern used in the module
 from but_with_subs.text_chunking import (
     PUNCTUATION_PATTERN,
     _split_text,
@@ -1300,8 +1300,6 @@ class TestNltkInitialization:
         nltk.data.find to raise LookupError before re-importing, we
         exercise the except block in-process.
         """
-        import nltk
-
         # Store the original nltk.data.find so we can restore it
         original_find = nltk.data.find
 
@@ -1329,19 +1327,18 @@ class TestNltkInitialization:
 
         monkeypatch.setattr(nltk.data, "find", mock_find)
 
-        # Remove the module from sys.modules so it gets re-imported
-        for key in list(sys.modules.keys()):
-            if key.startswith("but_with_subs"):
-                del sys.modules[key]
+        # Remove only the text_chunking module from sys.modules so it
+        # gets re-imported, exercising the try/except at module level.
+        # Do not remove other but_with_subs modules to avoid breaking
+        # test isolation for downstream tests that rely on patched modules.
+        del sys.modules["but_with_subs.text_chunking"]
 
         # Re-import the module — this triggers the try/except at module level
-        from but_with_subs import text_chunking  # noqa: F811
+        text_chunking_module = importlib.import_module("but_with_subs.text_chunking")
 
         # Verify the except branch ran
-        assert download_called is True, (
-            "The except LookupError branch was not executed"
-        )
+        assert download_called is True, "The except LookupError branch was not executed"
 
         # The module should still be functional
-        result = text_chunking._split_text(text="Hello world.", max_words=10)
+        result = text_chunking_module._split_text(text="Hello world.", max_words=10)
         assert isinstance(result, list)

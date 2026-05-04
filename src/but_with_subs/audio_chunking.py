@@ -21,9 +21,7 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
     Returns:
         List of audio chunks.
     """
-    model = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization-community-1"
-    )
+    model = Pipeline.from_pretrained("pyannote/speaker-diarization-community-1")
     assert model is not None
     model.to(get_device())
 
