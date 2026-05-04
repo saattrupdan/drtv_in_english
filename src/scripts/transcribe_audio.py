@@ -119,8 +119,6 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
         chunks.extend(chunked_transcriptions)
 
     # Translate all chunks to target language
-    logger.info(f"Translating transcriptions to {language}")
-
     translated_chunks: list[Chunk] = []
     with tqdm(total=len(chunks), desc="Translating", unit="chunk") as pbar:
         for result in translate_chunks(chunks, language, batch_size=batch_size):
@@ -135,7 +133,17 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
                 pbar.refresh()
         pbar.close()
 
-    generate_subtitles(chunks=translated_chunks, audio_path=path)
+    output_path = path.with_suffix(".vtt")
+
+    generate_subtitles(
+        chunks=chunks, audio_path=path, output_path=output_path.with_suffix(".en.vtt")
+    )
+
+    generate_subtitles(
+        chunks=translated_chunks,
+        audio_path=path,
+        output_path=output_path.with_suffix(f".{language}.vtt"),
+    )
 
 
 if __name__ == "__main__":

@@ -8,13 +8,19 @@ from .logging_config import logger
 from .vtt import format_vtt_timestamp
 
 
-def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
+def generate_subtitles(
+    chunks: list[Chunk],
+    audio_path: str | Path,
+    output_path: Path | None = None,
+) -> Path:
     """Generate a WebVTT subtitle file from word-level transcriptions.
 
     Args:
         chunks: List of chunks to generate subtitles from.
         audio_path: Path to the source audio file. Output `.vtt` file
             will be in the same directory with the same base name.
+        output_path: Optional explicit output path. If provided, overrides
+            the default derivation from ``audio_path``.
 
     Returns:
         Path to the generated subtitle file.
@@ -24,6 +30,9 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
         FileNotFoundError: If the audio path does not exist.
     """
     audio_path = Path(audio_path)
+
+    if output_path is None:
+        output_path = audio_path.with_suffix(suffix=".vtt")
 
     if not chunks:
         logger.error("Cannot generate subtitles since there are no chunks")
@@ -36,7 +45,6 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
     # Sort chunks by start time to ensure chronological order
     chunks = sorted(chunks, key=lambda c: c.start_time)
 
-    output_path = audio_path.with_suffix(suffix=".vtt")
     output_path.unlink(missing_ok=True)
 
     logger.info(f"Generating subtitles for {len(chunks)} chunks -> {output_path}")
