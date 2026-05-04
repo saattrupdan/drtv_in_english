@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import torch
 from silero_vad import get_speech_timestamps
+import silero_vad
 
 from pyannote.audio import Pipeline
 from pyannote.audio.core.inference import ProgressHook
