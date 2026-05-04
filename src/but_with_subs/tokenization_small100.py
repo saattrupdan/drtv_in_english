@@ -27,7 +27,7 @@ import sentencepiece
 from transformers import BatchEncoding, PreTrainedTokenizer
 from transformers.utils import logging
 
-from .constants import DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL, FAIRSEQ_LANGUAGE_CODES
+from .constants import TRANSLATION_MODEL, FAIRSEQ_LANGUAGE_CODES
 
 logger = logging.get_logger(__name__)
 
@@ -39,7 +39,7 @@ VOCAB_FILES_NAMES = {
     "tokenizer_config_file": "tokenizer_config.json",
 }
 
-_PRETRAINED_MODEL = DEFAULT_TRANSLATION_MODEL
+_PRETRAINED_MODEL = TRANSLATION_MODEL
 
 PRETRAINED_VOCAB_FILES_MAP = {
     "vocab_file": {
@@ -181,7 +181,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         }
         self.id_to_lang_token = {v: k for k, v in self.lang_token_to_id.items()}
 
-        self._tgt_lang = tgt_lang if tgt_lang is not None else DEFAULT_TARGET_LANGUAGE
+        self._tgt_lang = tgt_lang if tgt_lang is not None else "en"
         self.cur_lang_id = self.get_lang_id(self._tgt_lang)
 
         super().__init__(
@@ -382,7 +382,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         self,
         src_texts: list[str],
         tgt_texts: list[str] | None = None,
-        tgt_lang: str = DEFAULT_TARGET_LANGUAGE,
+        tgt_lang: str = "en",
         **kwargs,
     ) -> BatchEncoding:
         """Prepare a batch for sequence-to-sequence training.
