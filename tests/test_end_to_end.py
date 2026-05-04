@@ -814,9 +814,15 @@ class TestFullyMockedPipeline:
         
         mock_asr_model.side_effect = mock_batch_call
         
+        # Create a mock tqdm iterator that has set_description method
+        mock_iterator = MagicMock()
+        mock_iterator.__enter__ = MagicMock(return_value=mock_iterator)
+        mock_iterator.__exit__ = MagicMock(return_value=False)
+        mock_iterator.set_description = MagicMock()
+        mock_iterator.__iter__ = MagicMock(return_value=iter([mock_audio_chunks]))
+        
         # Use dynamic batching
-        with patch("but_with_subs.transcribing.tqdm") as mock_tqdm:
-            mock_tqdm.return_value.__enter__.return_value = [mock_audio_chunks]
+        with patch("but_with_subs.transcribing.tqdm", return_value=mock_iterator):
             results = transcribe_chunks_dynamic(mock_audio_chunks, mock_asr_model, show_progress=False)
         
         assert len(results) == len(mock_audio_chunks)

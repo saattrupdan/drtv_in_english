@@ -205,7 +205,7 @@ def _parse_vtt_file(path: Path) -> list[Chunk]:
     
     # Pattern to match VTT cues with optional speaker in <v Speaker> format or (Speaker) format
     cue_pattern = re.compile(
-        r'(\d+)\s*\n'
+        r'(\d+)\s*(?:\(([^)]+)\))?\s*\n'  # Cue number and optional (Speaker) format
         r'(?:<v ([^>]+)>\n)?'  # Optional speaker line in <v Speaker> format
         r'(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})\s*(?:[A-Za-z]+:[^\n]*)?\n'
         r'((?:(?!\n\n|\n\d+\s*\n(?:<v [^>]+>\n)?\d{2}:\d{2}:\d{2}\.\d{3}).)*)',
@@ -213,12 +213,14 @@ def _parse_vtt_file(path: Path) -> list[Chunk]:
     )
     
     for match in cue_pattern.finditer(content):
-        start_time = _parse_vtt_timestamp(match.group(3))
-        end_time = _parse_vtt_timestamp(match.group(4))
-        text = match.group(5).strip()
+        start_time = _parse_vtt_timestamp(match.group(4))
+        end_time = _parse_vtt_timestamp(match.group(5))
+        text = match.group(6).strip()
         
-        # Extract speaker from <v Speaker> format (group 2) or (Speaker) format in text
-        speaker = match.group(2)
+        # Extract speaker from (Speaker) format (group 2) or <v Speaker> format (group 3)
+        speaker = match.group(2)  # (Speaker) format
+        if speaker is None:
+            speaker = match.group(3)  # <v Speaker> format
         if speaker is None:
             speaker_match = re.match(r'\(([^)]+)\)\s*', text)
             if speaker_match:
