@@ -41,7 +41,7 @@ class Translator:
                 task="translation",
                 model=model_id,
                 device=device if device is not None else -1,
-            )
+            )  # type: ignore[no-matching-overload]
 
         logger.info(f"Translation model loaded: {model_id}")
 
@@ -109,15 +109,15 @@ class Translator:
                 translated_texts.extend([r["translation_text"] for r in batch_results])
             except Exception as e:
                 logger.error(f"Batch translation failed: {e}")
-                for text in batch:
+                for segment_text in batch:
                     try:
                         result = self._pipeline(
-                            text, src_lang=source_lang, tgt_lang=target_lang
+                            segment_text, src_lang=source_lang, tgt_lang=target_lang
                         )
                         translated_texts.append(result[0]["translation_text"])
                     except Exception as e2:
                         logger.error(f"Individual translation failed: {e2}")
-                        translated_texts.append(text)
+                        translated_texts.append(segment_text)  # type: ignore[invalid-argument-type]
 
         translated_chunks: list[Chunk] = []
         text_idx = 0
