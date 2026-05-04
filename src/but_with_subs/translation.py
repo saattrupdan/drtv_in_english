@@ -8,7 +8,9 @@ than one at a time, as batch processing provides more context to the model.
 """
 
 import collections.abc as c
+import typing as t
 
+import torch
 import bits_and_bobs as bnb
 from transformers import M2M100ForConditionalGeneration
 
@@ -95,13 +97,19 @@ def _translate_batch(
     if len(texts) == 1:
         encoded = tokenizer(texts[0], return_tensors="pt").to(model.device)
         generated = model.generate(**encoded)
-        return [tokenizer.batch_decode(generated.sequences, skip_special_tokens=True)[0]]
+        return [
+            tokenizer.batch_decode(
+                t.cast(torch.Tensor, generated).sequences, skip_special_tokens=True
+            )[0]
+        ]
 
     encoded = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(
         model.device
     )
     generated = model.generate(**encoded)
-    return tokenizer.batch_decode(generated.sequences, skip_special_tokens=True)
+    return tokenizer.batch_decode(
+        t.cast(torch.Tensor, generated).sequences, skip_special_tokens=True
+    )
 
 
 def translate_single(
@@ -119,4 +127,6 @@ def translate_single(
     """
     encoded = tokenizer(text, return_tensors="pt").to(model.device)
     generated = model.generate(**encoded)
-    return tokenizer.batch_decode(generated.sequences, skip_special_tokens=True)[0]
+    return tokenizer.batch_decode(
+        t.cast(torch.Tensor, generated).sequences, skip_special_tokens=True
+    )[0]

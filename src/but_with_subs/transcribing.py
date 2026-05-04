@@ -14,7 +14,6 @@ from transformers import AutomaticSpeechRecognitionPipeline
 
 from .constants import MIN_CHUNK_LENGTH_SECONDS, TARGET_SAMPLE_RATE
 from .data_models import Chunk
-
 from .logging_config import logger
 
 
