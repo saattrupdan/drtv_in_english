@@ -7,9 +7,9 @@ import numpy as np
 import scipy.io.wavfile
 import scipy.signal
 
-logger = logging.getLogger(__package__)
+from .constants import TARGET_SAMPLE_RATE
 
-TARGET_SAMPLE_RATE = 16_000
+logger = logging.getLogger(__package__)
 
 
 def load_audio(path: Path) -> np.ndarray:
@@ -68,7 +68,7 @@ def _resample_to_16k_mono(audio: np.ndarray, original_sr: int) -> np.ndarray:
         Resampled audio array at 16 kHz.
 
     """
-    target_sr = 16_000
+    target_sr = TARGET_SAMPLE_RATE
     if target_sr != original_sr:
         logger.info(f"Resampling audio from {original_sr:,} Hz to 16,000 Hz...")
         n_samples = int(audio.size * target_sr / original_sr)

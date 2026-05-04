@@ -21,3 +21,5 @@ DEFAULT_BATCH_SIZE = 16
 
 # ASR model for transcription
 ASR_MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
+
+TARGET_SAMPLE_RATE = 16_000

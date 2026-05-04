@@ -123,7 +123,7 @@ def _split_text(*, text: str, max_words: int) -> list[str]:
 
     # Try sentence segmentation first
     sentence_segments: list[str] = list()
-    sentences = nltk.sent_tokenize(text=text, language="danish")
+    sentences = nltk.sent_tokenize(text=text, language="da")
     if sentences:
         for sentence in sentences:
             sentence_segments.append(sentence)
