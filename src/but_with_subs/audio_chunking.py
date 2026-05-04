@@ -4,8 +4,6 @@ import logging
 
 import numpy as np
 import torch
-from silero_vad import get_speech_timestamps
-import silero_vad
 
 from pyannote.audio import Pipeline
 from pyannote.audio.core.inference import ProgressHook
@@ -18,7 +16,7 @@ logger = logging.getLogger(__package__)
 
 
 def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
-    """Split chunk based on the audio.
+    """Split audio into chunks based on speech timestamps.
 
     Args:
         audio:
@@ -27,15 +25,11 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
     Returns:
         List of audio chunks.
     """
-    speech_timestamps = get_speech_timestamps(
-        audio=torch.from_numpy(audio),
-        sampling_rate=16_000,
-        model=silero_vad.load_silero_vad(),
-    )
-    pipeline.to(get_device())
+    model = Pipeline.from_pretrained()
+    model.to(get_device())
 
     with ProgressHook() as hook:
-        speech_timestamps = pipeline(
+        speech_timestamps = model(
             dict(waveform=torch.from_numpy(audio).unsqueeze(dim=0), sample_rate=16_000),
             hook=hook,
         ).speaker_diarization
