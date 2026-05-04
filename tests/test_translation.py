@@ -492,3 +492,41 @@ def test_translate_batch_single_text_sends_tensor_to_device() -> None:
     _translate_batch(model=mock_model, tokenizer=mock_tokenizer, texts=["Single"])
 
     assert mock_tokenizer.return_value.to.called
+
+
+def test_translate_batch_handles_tensor_return_from_generate() -> None:
+    """Test that _translate_batch handles a raw Tensor from model.generate().
+
+    Regression test for the bug where model.generate() returns a Tensor
+    directly instead of an object with a .sequences attribute, causing
+    an AttributeError.
+    """
+    mock_model = _make_mock_model()
+    mock_model.generate.return_value = torch.tensor([[1, 2, 3, 4]])
+    mock_tokenizer = _make_mock_tokenizer()
+    mock_tokenizer.batch_decode.return_value = ["Single result"]
+
+    result = _translate_batch(
+        model=mock_model, tokenizer=mock_tokenizer, texts=["Hello"]
+    )
+
+    assert result == ["Single result"]
+
+
+def test_translate_batch_handles_tensor_return_in_batch_mode() -> None:
+    """Test that _translate_batch handles a raw Tensor from model.generate() in batch mode.
+
+    Regression test for the bug where model.generate() returns a Tensor
+    directly instead of an object with a .sequences attribute, causing
+    an AttributeError in the batch code path.
+    """
+    mock_model = _make_mock_model()
+    mock_model.generate.return_value = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    mock_tokenizer = _make_mock_tokenizer()
+    mock_tokenizer.batch_decode.return_value = ["Result A", "Result B"]
+
+    result = _translate_batch(
+        model=mock_model, tokenizer=mock_tokenizer, texts=["Hello", "World"]
+    )
+
+    assert result == ["Result A", "Result B"]
