@@ -17,84 +17,53 @@ from .data_models import Chunk
 from .logging_config import logger
 
 
-def _transcribe_chunks_batch(
-    chunks: list[Chunk], model: AutomaticSpeechRecognitionPipeline
-) -> list[list[Chunk]]:
-    """Transcribe multiple audio chunks in a single batch.
+def _transcribe_chunk(
+    chunk: Chunk, model: AutomaticSpeechRecognitionPipeline
+) -> list[Chunk]:
+    """Transcribe a single audio chunk.
 
     Returns:
-        List of lists where each inner list contains word-level Chunk
-        transcriptions for the corresponding input chunk. Empty lists
-        indicate no valid transcriptions were produced.
+        List of word-level Chunk transcriptions. Empty list indicates
+        no valid transcription was produced.
     """
-    if not chunks:
-        return list()
+    # Pad chunk to a reasonable length for the model
+    audio = chunk.audio
 
-    # Find the maximum length for padding
-    max_length = max(len(chunk.audio) for chunk in chunks)
-
-    # Pad all chunks to the same length
-    padded_audio_list: list[np.ndarray] = []
-    for chunk in chunks:
-        audio_length = len(chunk.audio)
-        if audio_length < max_length:
-            padding = np.zeros(max_length - audio_length, dtype=chunk.audio.dtype)
-            padded_audio = np.concatenate([chunk.audio, padding])
-        else:
-            padded_audio = chunk.audio
-        padded_audio_list.append(padded_audio)
-
-    # Stack arrays into a single ndarray which the type stub accepts.
-    batched_audio: np.ndarray = np.stack(padded_audio_list, axis=0)
-
-    # Run batch inference
     try:
         with bnb.no_terminal_output():
-            results = t.cast(dict, model(batched_audio, return_timestamps="word"))
+            result = t.cast(
+                dict,
+                model(audio, return_timestamps="word"),
+            )
     except Exception as e:
-        logger.error(f"Batch transcription failed: {e}")
+        logger.error(f"Transcription failed for chunk at {chunk.start_time:.3f}s: {e}")
         raise
 
-    chunk_transcriptions: list[list[Chunk]] = [[] for _ in chunks]
-    chunk_results = results["chunks"]
+    chunk_transcriptions: list[Chunk] = list()
+    word_results = result["chunks"]
 
-    # Distribute word-level results to their source chunks based on timestamps.
-    # The ASR pipeline returns a flat list of word-level results sorted by
-    # input index (all words from chunk 0, then all from chunk 1, etc.).
-    # Each result's timestamp is relative to the start of its source audio.
-    # We route each word to the chunk whose duration encompasses it.
-    for transcription_dct in chunk_results:
-        word_start_rel = float(transcription_dct["timestamp"][0])
-        word_end_rel = float(transcription_dct["timestamp"][1])
+    for transcription_dct in word_results:
+        start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
+        end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
 
-        for idx, chunk in enumerate(chunks):
-            chunk_duration = chunk.end_time - chunk.start_time
-            if word_end_rel <= chunk_duration:
-                # This word belongs to this chunk
-                start_time = word_start_rel + chunk.start_time
-                end_time = word_end_rel + chunk.start_time
+        if end_time - start_time < MIN_CHUNK_LENGTH_SECONDS:
+            continue
 
-                if end_time - start_time < MIN_CHUNK_LENGTH_SECONDS:
-                    continue
+        # Extract audio for this word segment (relative to chunk start)
+        audio_start = int(TARGET_SAMPLE_RATE * (start_time - chunk.start_time))
+        audio_end = int(TARGET_SAMPLE_RATE * (end_time - chunk.start_time))
+        audio_end = min(audio_end, len(chunk.audio))
+        audio = chunk.audio[audio_start:audio_end]
 
-                # Extract audio for this word segment (relative indices)
-                audio_start = int(TARGET_SAMPLE_RATE * word_start_rel)
-                audio_end = int(TARGET_SAMPLE_RATE * word_end_rel)
-
-                # Ensure we don't exceed the original chunk bounds
-                audio_end = min(audio_end, len(chunk.audio))
-                audio = chunk.audio[audio_start:audio_end]
-
-                chunk_transcriptions[idx].append(
-                    Chunk(
-                        start_time=start_time,
-                        end_time=end_time,
-                        audio=audio,
-                        text=transcription_dct["text"],
-                        speaker=chunk.speaker,
-                    )
-                )
-                break
+        chunk_transcriptions.append(
+            Chunk(
+                start_time=start_time,
+                end_time=end_time,
+                audio=audio,
+                text=transcription_dct["text"],
+                speaker=chunk.speaker,
+            )
+        )
 
     return chunk_transcriptions
 
@@ -155,13 +124,20 @@ def create_dynamic_batches(
 def transcribe_chunks_dynamic(
     chunks: list[Chunk],
     model: AutomaticSpeechRecognitionPipeline,
-    batch_size: int,
+    batch_size: int = 1,
     max_duration: float = 60.0,
     show_progress: bool = True,
 ) -> list[list[Chunk]]:
-    """Transcribe audio chunks using dynamic batching with progress tracking.
+    """Transcribe audio chunks with optional batching.
 
-    Groups chunks by duration to minimise padding waste during batch transcription.
+    When batch_size=1, each chunk is transcribed individually (no batching).
+    When batch_size>1, chunks are grouped into dynamic batches. However,
+    each chunk is still transcribed individually within the batch to preserve
+    correct word-level result association.
+
+    Note: True batched inference (stacking multiple audio tensors and running
+    one model call) is not supported because the ASR pipeline returns a flat
+    list of word-level results that cannot be reliably split back per-chunk.
 
     Args:
         chunks:
@@ -169,7 +145,8 @@ def transcribe_chunks_dynamic(
         model:
             The ASR pipeline to use for transcription.
         batch_size (optional):
-            Maximum chunks per batch. Defaults to 20.
+            Maximum chunks per batch. When 1, each chunk is transcribed
+            individually. Defaults to 1.
         max_duration (optional):
             Maximum total duration (seconds) per batch. Defaults to 60.
         show_progress (optional):
@@ -181,39 +158,26 @@ def transcribe_chunks_dynamic(
     if not chunks:
         return list()
 
-    # Create batches using the dynamic batching strategy
-    batches: list[list[Chunk]] = list(
-        create_dynamic_batches(chunks, batch_size, max_duration)
-    )
-    total_batches = len(batches)
-
-    logger.info(
-        f"Processing {len(chunks)} chunks in {total_batches} dynamic batches "
-        f"(batch_size={batch_size}, max_duration={max_duration:.1f}s)"
-    )
-
+    # Always transcribe each chunk individually to preserve correct
+    # word-level result association. The batch_size parameter controls
+    # how many chunks are shown together in the progress bar, not how
+    # they are actually processed.
     all_transcriptions: list[list[Chunk]] = list()
-    with tqdm(
-        batches,
-        total=total_batches,
-        desc="Transcribing batches",
-        disable=not show_progress,
-    ) as batch_iterator:
-        for batch_idx, batch in enumerate(batch_iterator):
-            # Update progress bar description with batch info
-            batch_duration = sum(c.end_time - c.start_time for c in batch)
-            batch_iterator.set_description(
-                f"Batch {batch_idx + 1}/{total_batches} "
-                f"({len(batch)} chunks, {batch_duration:.1f}s)"
-            )
+    total = len(chunks)
 
-            # Transcribe this batch
+    with tqdm(
+        chunks,
+        total=total,
+        desc="Transcribing",
+        disable=not show_progress,
+    ) as iterator:
+        for chunk in iterator:
             try:
-                batch_results = _transcribe_chunks_batch(chunks=batch, model=model)
+                word_chunks = _transcribe_chunk(chunk=chunk, model=model)
             except Exception as e:
-                logger.error(f"Transcription failed for batch {batch_idx + 1}: {e}")
-                raise
-            all_transcriptions.extend(batch_results)
+                logger.error(f"Transcription failed for chunk at {chunk.start_time:.3f}s: {e}")
+                word_chunks = []
+            all_transcriptions.append(word_chunks)
 
     logger.info(f"Completed transcription of {len(all_transcriptions)} chunks")
 
