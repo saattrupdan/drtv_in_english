@@ -1,7 +1,5 @@
 """Audio chunking functionality for splitting audio into segments."""
 
-import typing as t
-
 import numpy as np
 import torch
 from pyannote.audio import Pipeline
@@ -23,8 +21,8 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
     Returns:
         List of audio chunks.
     """
-    model = t.cast(
-        Pipeline, Pipeline.from_pretrained("pyannote/speaker-diarization-community-1")
+    model: Pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization-community-1"
     )
     model.to(get_device())
 

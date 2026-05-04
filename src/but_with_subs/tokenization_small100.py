@@ -72,22 +72,22 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         spm_file (`str`):
             Path to [SentencePiece](https://github.com/google/sentencepiece) file
             (generally has a .spm extension) that contains the vocabulary.
-        tgt_lang (`str`, *optional*):
+        tgt_lang (`str`, (optional)):
             A string representing the target language.
-        eos_token (`str`, *optional*, defaults to `"</s>"`):
+        eos_token (`str`, (optional), defaults to `"</s>"`):
             The end of sequence token.
-        sep_token (`str`, *optional*, defaults to `"</s>"`):
+        sep_token (`str`, (optional), defaults to `"</s>"`):
             The separator token, which is used when building a sequence from multiple
             sequences, e.g. two sequences for sequence classification or for a text
             and a question for question answering. It is also used as the last token
             of a sequence built with special tokens.
-        unk_token (`str`, *optional*, defaults to `"<unk>"`):
+        unk_token (`str`, (optional), defaults to `"<unk>"`):
             The unknown token. A token that is not in the vocabulary cannot be
             converted to an ID and is set to be this token instead.
-        pad_token (`str`, *optional*, defaults to `"<pad>"`):
+        pad_token (`str`, (optional), defaults to `"<pad>"`):
             The token used for padding, for example when batching sequences of
             different lengths.
-        sp_model_kwargs (`dict`, *optional*):
+        sp_model_kwargs (`dict`, (optional)):
             Will be passed to the `SentencePieceProcessor.__init__()` method. The
             [Python wrapper for SentencePiece](https://github.com/google/sentencepiece/
             tree/master/python) can be used, among other things, to set:
@@ -207,9 +207,25 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         self.set_lang_special_tokens(self._tgt_lang)
 
     def _tokenize(self, text: str) -> list[str]:  # ty: ignore[invalid-method-override]
+        """Tokenize a string.
+
+        Args:
+            text: The string to tokenize.
+
+        Returns:
+            List of token strings.
+        """
         return self.sp_model.encode(text, out_type=str)  # ty: ignore[unresolved-attribute]
 
     def _convert_token_to_id(self, token: str) -> int:
+        """Converts a token (str) in an ID using the encoder.
+
+        Args:
+            token: The token string to convert.
+
+        Returns:
+            The token ID as an integer.
+        """
         if token in self.lang_token_to_id:
             return self.lang_token_to_id[token]
         return self.encoder.get(token, self.encoder[self.unk_token])
@@ -246,9 +262,9 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         Args:
             token_ids_0 (`List[int]`):
                 List of IDs.
-            token_ids_1 (`List[int]`, *optional*):
+            token_ids_1 (`List[int]`, (optional)):
                 Optional second list of IDs for sequence pairs.
-            already_has_special_tokens (`bool`, *optional*, defaults to `False`):
+            already_has_special_tokens (`bool`, (optional), defaults to `False`):
                 Whether or not the token list is already formatted with special tokens
                 for the model.
 
@@ -282,7 +298,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         Args:
             token_ids_0 (`List[int]`):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (`List[int]`, *optional*):
+            token_ids_1 (`List[int]`, (optional)):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
@@ -412,9 +428,11 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         return inputs
 
     def _switch_to_input_mode(self) -> None:
+        """Switch to input mode by setting special tokens."""
         self.set_lang_special_tokens(self.tgt_lang)
 
     def _switch_to_target_mode(self) -> None:
+        """Switch to target mode by setting suffix tokens."""
         self.prefix_tokens = None
         self.suffix_tokens = [self.eos_token_id]
 
@@ -422,6 +440,9 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         """Reset the special tokens to the tgt lang setting.
 
         No prefix and suffix=[eos, tgt_lang_code].
+
+        Args:
+            src_lang: The source/target language code string.
         """
         lang_token = self.get_lang_token(src_lang)
         self.cur_lang_id = self.lang_token_to_id[lang_token]
@@ -469,7 +490,7 @@ def load_spm(
     return spm
 
 
-def load_json(path: str) -> dict | list:
+def load_json(path: str) -> dict[str, t.Any] | list[t.Any]:
     """Load a JSON file and return its contents.
 
     Args:
@@ -478,8 +499,8 @@ def load_json(path: str) -> dict | list:
     Returns:
         The parsed JSON data as a dict or list.
     """
-    with open(path, "r") as f:
-        return json.load(f)
+    with open(file=path, mode="r") as f:
+        return json.load(fp=f)
 
 
 def save_json(data: dict[str, t.Any] | list[t.Any], path: str) -> None:
@@ -489,5 +510,5 @@ def save_json(data: dict[str, t.Any] | list[t.Any], path: str) -> None:
         data: The data to serialize to JSON.
         path: Path to the output JSON file.
     """
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(file=path, mode="w") as f:
+        json.dump(obj=data, fp=f, indent=2)
