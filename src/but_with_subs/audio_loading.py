@@ -133,7 +133,8 @@ def validate_audio(
     sample_rate_valid = sample_rate == expected_sample_rate
     if not sample_rate_valid:
         errors.append(
-            f"Sample rate {sample_rate} Hz does not match expected {expected_sample_rate} Hz"
+            f"Sample rate {sample_rate} Hz does not match "
+            f"expected {expected_sample_rate} Hz"
         )
 
     # Calculate duration
@@ -142,11 +143,13 @@ def validate_audio(
     if not duration_valid:
         if duration_seconds < min_duration_seconds:
             errors.append(
-                f"Audio duration {duration_seconds:.3f}s is below minimum {min_duration_seconds}s"
+                f"Audio duration {duration_seconds:.3f}s is below "
+                f"minimum {min_duration_seconds}s"
             )
         if duration_seconds > max_duration_seconds:
             errors.append(
-                f"Audio duration {duration_seconds:.1f}s exceeds maximum {max_duration_seconds}s"
+                f"Audio duration {duration_seconds:.1f}s exceeds "
+                f"maximum {max_duration_seconds}s"
             )
 
     # Check for signal presence (not silence)

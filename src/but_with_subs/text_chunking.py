@@ -22,15 +22,12 @@ def group_word_chunks(
     """Group word chunks into segments.
 
     Args:
-        chunks:
+        word_chunks:
             A list of Chunk objects to be chunked.
         punctuation_model:
             The punctuation model to use for fixing punctuation.
         max_words:
             The maximum number of words per segment.
-        punctuation_model (optional):
-            The punctuation model to use for fixing punctuation.
-            Defaults to a fresh ``PunctFixer`` instance.
 
     Returns:
         A list of Chunk objects, each containing a segment of the original
@@ -117,6 +114,9 @@ def _split_text(*, text: str, max_words: int) -> list[str]:
 
     Uses sentence segmentation, punctuation splitting, and word splitting
     as fallback strategies.
+
+    Returns:
+        A list of text segments.
     """
     if not text:
         return []

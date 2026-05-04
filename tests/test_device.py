@@ -12,15 +12,23 @@ from but_with_subs.device import get_device
 
 
 @pytest.fixture
-def mock_torch_cuda():
-    """Mock torch.cuda module."""
+def mock_torch_cuda() -> MagicMock:
+    """Mock torch.cuda module.
+
+    Returns:
+        Mocked torch.cuda module.
+    """
     mock_cuda = MagicMock()
     return mock_cuda
 
 
 @pytest.fixture
-def mock_torch_backends():
-    """Mock torch.backends module."""
+def mock_torch_backends() -> MagicMock:
+    """Mock torch.backends module.
+
+    Returns:
+        Mocked torch.backends module.
+    """
     mock_backends = MagicMock()
     mock_mps = MagicMock()
     mock_backends.mps = mock_mps
@@ -261,7 +269,7 @@ class TestDeviceSelectionPriority:
 class TestDeviceLogging:
     """Tests for device logging."""
 
-    def test_device_is_logged(self, caplog) -> None:
+    def test_device_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that the selected device is logged."""
         with patch("but_with_subs.device.torch.cuda") as mock_cuda:
             mock_cuda.is_available.return_value = True
@@ -272,7 +280,9 @@ class TestDeviceLogging:
             # Check that device info was logged
             assert any("Using device" in record.message for record in caplog.records)
 
-    def test_cuda_device_is_logged_correctly(self, caplog) -> None:
+    def test_cuda_device_is_logged_correctly(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that CUDA device is logged correctly."""
         with patch("but_with_subs.device.torch.cuda") as mock_cuda:
             mock_cuda.is_available.return_value = True
@@ -282,7 +292,9 @@ class TestDeviceLogging:
 
             assert any("cuda" in record.message.lower() for record in caplog.records)
 
-    def test_mps_device_is_logged_correctly(self, caplog) -> None:
+    def test_mps_device_is_logged_correctly(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that MPS device is logged correctly."""
         with (
             patch("but_with_subs.device.torch.cuda") as mock_cuda,
@@ -296,7 +308,9 @@ class TestDeviceLogging:
 
             assert any("mps" in record.message.lower() for record in caplog.records)
 
-    def test_cpu_device_is_logged_correctly(self, caplog) -> None:
+    def test_cpu_device_is_logged_correctly(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that CPU device is logged correctly."""
         with (
             patch("but_with_subs.device.torch.cuda") as mock_cuda,
