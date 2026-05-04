@@ -10,9 +10,12 @@ from pathlib import Path
 
 import click
 
+from but_with_subs import configure_logging
 from but_with_subs.audio_extraction import extract_audio
 
 logger = logging.getLogger(__package__)
+
+configure_logging()
 
 
 @click.command()

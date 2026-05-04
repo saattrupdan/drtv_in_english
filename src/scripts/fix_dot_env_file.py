@@ -8,11 +8,9 @@ from pathlib import Path
 
 import click
 
-# List of all the environment variables that are desired
-DESIRED_ENVIRONMENT_VARIABLES = dict(
-    GIT_NAME="Enter your full name, to be shown in Git commits:\n> ",
-    GIT_EMAIL="Enter your email, as registered on your Github account:\n> ",
-)
+from but_with_subs import configure_logging
+
+configure_logging()
 
 
 @click.command()

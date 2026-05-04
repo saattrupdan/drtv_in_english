@@ -9,9 +9,12 @@ from pathlib import Path
 
 import click
 
+from but_with_subs import configure_logging
 from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
 from but_with_subs.logging_config import logger
+
+configure_logging()
 
 
 @click.command()

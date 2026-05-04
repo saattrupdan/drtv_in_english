@@ -18,9 +18,15 @@ from punctfix.inference import PunctFixer
 from tqdm.auto import tqdm
 from transformers import pipeline
 
+from but_with_subs import configure_logging
 from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
-from but_with_subs.constants import DEFAULT_BATCH_SIZE, DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL, ASR_MODEL_ID
+from but_with_subs.constants import (
+    ASR_MODEL_ID,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_TARGET_LANGUAGE,
+    DEFAULT_TRANSLATION_MODEL,
+)
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
@@ -31,6 +37,8 @@ from but_with_subs.translation import Translator
 logger = logging.getLogger(__package__)
 
 warnings.filterwarnings("ignore", category=UserWarning)
+
+configure_logging()
 
 
 @click.command()
@@ -63,9 +71,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
         "but increase batch count."
     ),
 )
-def main(
-    audio_path: str, language: str, batch_size: int, max_duration: float
-) -> None:
+def main(audio_path: str, language: str, batch_size: int, max_duration: float) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
     Loads the audio file, splits it into chunks based on silence breaks,
@@ -132,7 +138,9 @@ def main(
     # Translate all chunks to target language
     logger.info(f"Translating transcriptions to {language}")
     translator = Translator(model_id=DEFAULT_TRANSLATION_MODEL)
-    translated_chunks = translator.translate_chunks(chunks, language, batch_size=batch_size)
+    translated_chunks = translator.translate_chunks(
+        chunks, language, batch_size=batch_size
+    )
 
     generate_subtitles(chunks=translated_chunks, audio_path=path)
 

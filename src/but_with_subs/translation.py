@@ -8,10 +8,8 @@ than one at a time, as batch processing provides more context to the model.
 """
 
 import bits_and_bobs as bnb
-import numpy as np
 from transformers import M2M100ForConditionalGeneration
 
-from .constants import DEFAULT_TRANSLATION_MODEL
 from .data_models import Chunk
 from .device import get_device
 from .logging_config import logger

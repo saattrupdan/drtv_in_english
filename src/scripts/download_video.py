@@ -9,9 +9,11 @@ import logging
 import click
 from tqdm.auto import tqdm
 
-from but_with_subs import download
+from but_with_subs import configure_logging, download
 
 logger = logging.getLogger(__package__)
+
+configure_logging()
 
 
 @click.command()

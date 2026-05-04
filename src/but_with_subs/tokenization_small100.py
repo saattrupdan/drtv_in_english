@@ -22,9 +22,12 @@ import os
 import typing as t
 from pathlib import Path
 from shutil import copyfile
+
 import sentencepiece
 from transformers import BatchEncoding, PreTrainedTokenizer
 from transformers.utils import logging
+
+from .constants import DEFAULT_TARGET_LANGUAGE
 
 logger = logging.get_logger(__name__)
 
@@ -148,7 +151,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         pad_token: str = "<pad>",
         unk_token: str = "<unk>",
         language_codes: str = "m2m100",
-        sp_model_kwargs: dict[str, Any] | None = None,
+        sp_model_kwargs: dict[str, t.Any] | None = None,
         num_madeup_words: int = 8,
         **kwargs,
     ) -> None:
@@ -203,7 +206,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         }
         self.id_to_lang_token = {v: k for k, v in self.lang_token_to_id.items()}
 
-        self._tgt_lang = tgt_lang if tgt_lang is not None else "en"
+        self._tgt_lang = tgt_lang if tgt_lang is not None else DEFAULT_TARGET_LANGUAGE
         self.cur_lang_id = self.get_lang_id(self._tgt_lang)
         self.num_madeup_words = num_madeup_words
 
@@ -502,7 +505,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
 
 
 def load_spm(
-    path: str, sp_model_kwargs: dict[str, Any]
+    path: str, sp_model_kwargs: dict[str, t.Any]
 ) -> sentencepiece.SentencePieceProcessor:
     """Load a SentencePiece model from a file.
 
@@ -531,7 +534,7 @@ def load_json(path: str) -> dict | list:
         return json.load(f)
 
 
-def save_json(data: dict[str, Any] | list[Any], path: str) -> None:
+def save_json(data: dict[str, t.Any] | list[t.Any], path: str) -> None:
     """Save data to a JSON file with indentation.
 
     Args:

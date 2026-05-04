@@ -11,11 +11,18 @@ from pathlib import Path
 
 import click
 
-from but_with_subs.constants import DEFAULT_BATCH_SIZE, DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL
+from but_with_subs import configure_logging
+from but_with_subs.constants import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_TARGET_LANGUAGE,
+    DEFAULT_TRANSLATION_MODEL,
+)
 from but_with_subs.translation import Translator
 from but_with_subs.vtt import parse_vtt_file, write_vtt_file
 
 logger = logging.getLogger(__package__)
+
+configure_logging()
 
 
 @click.command()
@@ -67,7 +74,9 @@ def main(
     logger.info(f"Parsing file: {path}")
     chunks = parse_vtt_file(path)
 
-    logger.info(f"Translating {len([c for c in chunks if c.text])} text segments to {target_lang}")
+    logger.info(
+        f"Translating {len([c for c in chunks if c.text])} text segments to {target_lang}"
+    )
     translator = Translator(model_id=model)
     translated_chunks = translator.translate_chunks(chunks, target_lang, batch_size)
 
