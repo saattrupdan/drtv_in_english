@@ -103,7 +103,7 @@ def main(
     audio = load_audio(path=path)
 
     # Generate all chunks first
-    all_chunks = list(chunk_by_audio(audio=audio))
+    all_chunks = chunk_by_audio(audio=audio)
     logger.info(f"Generated {len(all_chunks)} initial audio chunks")
 
     # Process chunks using dynamic batching with configurable parameters
