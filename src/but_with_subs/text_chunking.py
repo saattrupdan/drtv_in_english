@@ -7,7 +7,7 @@ import nltk
 import numpy as np
 from punctfix import PunctFixer
 
-from .constants import DA, MIN_CHUNK_LENGTH_SECONDS
+from .constants import MIN_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 from .logging_config import logger
 
@@ -123,7 +123,7 @@ def _split_text(*, text: str, max_words: int) -> list[str]:
 
     # Try sentence segmentation first
     sentence_segments: list[str] = list()
-    sentences = nltk.sent_tokenize(text=text, language=DA)
+    sentences = nltk.sent_tokenize(text=text, language="danish")
     if sentences:
         for sentence in sentences:
             sentence_segments.append(sentence)
