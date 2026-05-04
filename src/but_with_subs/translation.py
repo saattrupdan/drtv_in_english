@@ -8,6 +8,7 @@ than one at a time, as batch processing provides more context to the model.
 """
 
 import bits_and_bobs as bnb
+import typing as t
 from transformers import M2M100ForConditionalGeneration
 
 from .constants import DEFAULT_TRANSLATION_MODEL
@@ -22,11 +23,15 @@ def translate_chunks(
     target_lang: str,
     batch_size: int,
     model_id: str = DEFAULT_TRANSLATION_MODEL,
-) -> list[Chunk]:
+) -> t.Generator[list[Chunk] | tuple[int, int], None, None]:
     """Translate multiple chunks with batch processing for quality.
 
     Batch processing improves translation quality by providing more
     context to the model compared to chunk-by-chunk translation.
+
+    Yields:
+        Progress tuples ``(current, total)`` after each batch completes,
+        followed by the final list of translated chunks.
 
     Args:
         chunks:
@@ -38,12 +43,9 @@ def translate_chunks(
         model_id (optional):
             HuggingFace model ID for translation. Defaults to
             ``DEFAULT_TRANSLATION_MODEL``.
-
-    Returns:
-        New list of chunks with translated text.
     """
     if not chunks:
-        return []
+        yield []
 
     logger.info(f"Loading translation model: {model_id}")
     device = get_device()
@@ -57,7 +59,7 @@ def translate_chunks(
     chunks_with_text: list[Chunk] = [c for c in chunks if c.text is not None]
     if not chunks_with_text:
         logger.warning("No chunks with text to translate")
-        return chunks
+        yield chunks
 
     logger.info(f"Translating {len(chunks_with_text)} chunks to {target_lang}")
 
@@ -79,6 +81,8 @@ def translate_chunks(
                     logger.error(f"Individual translation failed: {e2}")
                     translated_texts.append(segment_text)
 
+        yield (i + len(batch), len(texts))
+
     translated_chunks: list[Chunk] = []
     text_idx = 0
     for chunk in chunks:
@@ -96,7 +100,7 @@ def translate_chunks(
         else:
             translated_chunks.append(chunk)
 
-    return translated_chunks
+    yield translated_chunks
 
 
 def _translate_batch(
