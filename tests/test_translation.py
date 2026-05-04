@@ -26,7 +26,9 @@ def _make_mock_model() -> um.MagicMock:
     """
     mock = um.MagicMock()
     mock.device = torch.device("cpu")
-    mock.generate.return_value = torch.tensor([[1, 2, 3, 4]])
+    mock_sequences = um.MagicMock()
+    mock_sequences.sequences = torch.tensor([[1, 2, 3, 4]])
+    mock.generate.return_value = mock_sequences
     return mock
 
 
