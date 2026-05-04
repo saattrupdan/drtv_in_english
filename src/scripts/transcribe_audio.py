@@ -136,11 +136,7 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
     logger.info(f"Translating transcriptions to {language}")
 
     translated_chunks: list[Chunk] = []
-    with tqdm(
-        total=len(chunks),
-        desc="Translating",
-        unit="chunk",
-    ) as pbar:
+    with tqdm(total=len(chunks), desc="Translating", unit="chunk") as pbar:
         for result in translate_chunks(chunks, language, batch_size=batch_size):
             if isinstance(result, tuple):
                 current, total = result
