@@ -126,6 +126,7 @@ def translate_single(
     """
     encoded = tokenizer(text, return_tensors="pt").to(model.device)
     generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
+    sequences = getattr(generated, "sequences", generated)
     return tokenizer.batch_decode(
-        t.cast(t.Any, generated).sequences, skip_special_tokens=True
+        t.cast(t.Any, sequences), skip_special_tokens=True
     )[0]
