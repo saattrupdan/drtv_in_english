@@ -1,12 +1,13 @@
-"""Comprehensive end-to-end integration tests for the complete audio-to-translated-subtitles pipeline.
+"""End-to-end integration tests for the audio-to-subtitle pipeline.
 
-This module tests the complete workflow from audio loading through to translated subtitles,
-using extensive mocking to avoid requiring actual models or network access while verifying
-the complete data flow between modules.
+This module tests the complete workflow from audio loading through to
+translated subtitles, using extensive mocking to avoid requiring actual
+models or network access while verifying the data flow between modules.
 
 The tests cover:
 1. Complete pipeline execution with mocked dependencies
-2. Integration between modules (audio -> chunking -> transcription -> subtitling -> translation)
+2. Integration between modules (audio -> chunking -> transcription
+   -> subtitling -> translation)
 3. Real-world scenarios with realistic data patterns
 4. Error handling and edge cases throughout the pipeline
 5. Data integrity across module boundaries
@@ -33,7 +34,11 @@ from but_with_subs.translation import translate_subtitles
 
 @pytest.fixture
 def sample_audio_file(tmp_path: Path) -> Path:
-    """Create a sample audio file for end-to-end testing."""
+    """Create a sample audio file for end-to-end testing.
+
+    Returns:
+        Path to the created WAV file.
+    """
     sample_rate = 16_000
     duration_seconds = 5.0
     n_samples = int(sample_rate * duration_seconds)
@@ -47,7 +52,11 @@ def sample_audio_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def mock_audio_chunks() -> list[Chunk]:
-    """Create mock audio chunks for testing."""
+    """Create mock audio chunks for testing.
+
+    Returns:
+        A list of mock audio chunks.
+    """
     return [
         Chunk(
             start_time=0.0,
@@ -68,7 +77,11 @@ def mock_audio_chunks() -> list[Chunk]:
 
 @pytest.fixture
 def mock_word_chunks() -> list[Chunk]:
-    """Create mock word-level chunks for testing."""
+    """Create mock word-level chunks for testing.
+
+    Returns:
+        A list of mock word-level chunks.
+    """
     return [
         Chunk(
             start_time=0.0,
@@ -124,7 +137,11 @@ def mock_word_chunks() -> list[Chunk]:
 
 @pytest.fixture
 def mock_punctfixer() -> Mock:
-    """Create a mock punctuation fixer."""
+    """Create a mock punctuation fixer.
+
+    Returns:
+        A Mock object with a punctuate method.
+    """
     mock = Mock()
     mock.punctuate = Mock(side_effect=lambda text: text + ".")
     return mock
@@ -508,13 +525,12 @@ class TestRealWorldScenarios:
 
         # Translate
         mock_translate = MagicMock()
+        long_text = "I have researched artificial intelligence for ten years"
         mock_translate.return_value = [
             {"translation_text": "Welcome to the podcast"},
             {"translation_text": "Thank you for inviting me"},
             {"translation_text": "What have you worked on?"},
-            {
-                "translation_text": "I have researched artificial intelligence for ten years"
-            },
+            {"translation_text": long_text},
         ]
 
         with patch("but_with_subs.translation.pipeline", return_value=mock_translate):
@@ -856,7 +872,9 @@ class TestFullyMockedPipeline:
         mock_asr_model = MagicMock()
 
         # Simulate batch transcription results
-        def mock_batch_call(audio_list, return_timestamps=None):
+        def mock_batch_call(
+            audio_list: list, return_timestamps: bool = False
+        ) -> list:
             results = []
             for i, audio in enumerate(audio_list):
                 results.append(
@@ -966,9 +984,11 @@ class TestDataFlowVerification:
                     g_chunk.end_time < o.start_time or g_chunk.start_time > o.end_time
                 )
             ]
-            assert len(overlapping) > 0, (
-                f"No overlapping original chunk found for {g_chunk.start_time}-{g_chunk.end_time}"
+            msg = (
+                f"No overlapping original chunk found for "
+                f"{g_chunk.start_time}-{g_chunk.end_time}"
             )
+            assert len(overlapping) > 0, msg
 
     def test_text_content_flow(self, mock_word_chunks: list[Chunk]) -> None:
         """Verify text content flows correctly through the pipeline."""

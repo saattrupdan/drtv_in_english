@@ -20,8 +20,12 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def mock_speech_timestamps_single_speaker():
-    """Create mock speech timestamps for a single speaker."""
+def mock_speech_timestamps_single_speaker() -> MagicMock:
+    """Create mock speech timestamps for a single speaker.
+
+    Returns:
+        A mock speech timestamps object.
+    """
     # Format: (Turn, speaker_id) where Turn has start and end attributes
     mock_turn1 = MagicMock()
     mock_turn1.start = 0.5
@@ -35,8 +39,12 @@ def mock_speech_timestamps_single_speaker():
 
 
 @pytest.fixture
-def mock_speech_timestamps_multiple_speakers():
-    """Create mock speech timestamps for multiple speakers."""
+def mock_speech_timestamps_multiple_speakers() -> MagicMock:
+    """Create mock speech timestamps for multiple speakers.
+
+    Returns:
+        A mock speech timestamps object.
+    """
     mock_turn1 = MagicMock()
     mock_turn1.start = 0.5
     mock_turn1.end = 1.5
@@ -62,8 +70,12 @@ def mock_speech_timestamps_multiple_speakers():
 
 
 @pytest.fixture
-def mock_speech_timestamps_short_segments():
-    """Create mock speech timestamps with segments below minimum duration."""
+def mock_speech_timestamps_short_segments() -> MagicMock:
+    """Create mock speech timestamps with segments below minimum duration.
+
+    Returns:
+        A mock speech timestamps object.
+    """
     mock_turn1 = MagicMock()
     mock_turn1.start = 0.0
     mock_turn1.end = 0.03  # Below MIN_CHUNK_LENGTH_SECONDS (0.05)
@@ -84,8 +96,12 @@ def mock_speech_timestamps_short_segments():
 
 
 @pytest.fixture
-def mock_audio_10_seconds():
-    """Create a 10-second audio array at 16kHz."""
+def mock_audio_10_seconds() -> np.ndarray:
+    """Create a 10-second audio array at 16kHz.
+
+    Returns:
+        A numpy array of audio samples.
+    """
     duration = 10.0
     sample_rate = 16_000
     n_samples = int(duration * sample_rate)
@@ -96,8 +112,12 @@ def mock_audio_10_seconds():
 
 
 @pytest.fixture
-def mock_audio_5_seconds():
-    """Create a 5-second audio array at 16kHz."""
+def mock_audio_5_seconds() -> np.ndarray:
+    """Create a 5-second audio array at 16kHz.
+
+    Returns:
+        A numpy array of audio samples.
+    """
     duration = 5.0
     sample_rate = 16_000
     n_samples = int(duration * sample_rate)
@@ -107,16 +127,24 @@ def mock_audio_5_seconds():
 
 
 @pytest.fixture
-def mock_audio_silent():
-    """Create a silent audio array."""
+def mock_audio_silent() -> np.ndarray:
+    """Create a silent audio array.
+
+    Returns:
+        A numpy array of zeros.
+    """
     sample_rate = 16_000
     n_samples = int(5.0 * sample_rate)
     return np.zeros(n_samples, dtype=np.float32)
 
 
 @pytest.fixture
-def mock_audio_very_short():
-    """Create a very short audio array (below minimum chunk length)."""
+def mock_audio_very_short() -> np.ndarray:
+    """Create a very short audio array (below minimum chunk length).
+
+    Returns:
+        A numpy array of audio samples.
+    """
     sample_rate = 16_000
     n_samples = int(0.02 * sample_rate)  # 20ms
     return np.sin(2 * np.pi * 440 * np.linspace(0, 0.02, n_samples)).astype(np.float32)
@@ -747,7 +775,10 @@ class TestChunkByAudioIntegration:
             assert len(chunks) == 20
 
     def test_mixed_duration_segments(self, mock_audio_10_seconds: np.ndarray) -> None:
-        """Test processing with mixed duration segments (some above, some below threshold)."""
+        """Test processing with mixed duration segments.
+
+        Some segments are above, some below threshold.
+        """
         mock_turns = [
             (MagicMock(start=0.0, end=0.03), "SPEAKER_00"),  # Below minimum
             (MagicMock(start=0.5, end=1.5), "SPEAKER_00"),  # Above minimum

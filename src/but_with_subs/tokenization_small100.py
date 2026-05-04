@@ -135,7 +135,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
     pretrained_vocab_files_map = PRETRAINED_VOCAB_FILES_MAP
     model_input_names = ["input_ids", "attention_mask"]
 
-    prefix_tokens: List[int] = []
+    prefix_tokens: Optional[List[int]] = []
     suffix_tokens: List[int] = []
 
     def __init__(
@@ -187,7 +187,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         ]
 
         self.vocab_file = vocab_file
-        self.encoder = load_json(vocab_file)
+        self.encoder: Dict[str, Any] = load_json(vocab_file)  # ty: ignore[invalid-assignment]
         self.decoder = {v: k for k, v in self.encoder.items()}
         self.spm_file = spm_file
         self.sp_model = load_spm(spm_file, self.sp_model_kwargs)
@@ -243,8 +243,8 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         self._tgt_lang = new_tgt_lang
         self.set_lang_special_tokens(self._tgt_lang)
 
-    def _tokenize(self, text: str) -> List[str]:
-        return self.sp_model.encode(text, out_type=str)
+    def _tokenize(self, text: str) -> List[str]:  # ty: ignore[invalid-method-override]
+        return self.sp_model.encode(text, out_type=str)  # ty: ignore[unresolved-attribute]
 
     def _convert_token_to_id(self, token: str) -> int:
         if token in self.lang_token_to_id:
@@ -267,7 +267,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         Returns:
             The decoded string.
         """
-        return self.sp_model.decode(tokens)
+        return self.sp_model.decode(tokens)  # ty: ignore[unresolved-attribute]
 
     def get_special_tokens_mask(
         self,
@@ -300,7 +300,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
                 already_has_special_tokens=True,
             )
 
-        prefix_ones = [1] * len(self.prefix_tokens)
+        prefix_ones = [1] * len(self.prefix_tokens)  # ty: ignore[invalid-argument-type]
         suffix_ones = [1] * len(self.suffix_tokens)
         if token_ids_1 is None:
             return prefix_ones + ([0] * len(token_ids_0)) + suffix_ones
@@ -379,7 +379,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
 
     def save_vocabulary(
         self, save_directory: str, filename_prefix: Optional[str] = None
-    ) -> Tuple[str]:
+    ) -> Tuple[str, str]:
         """Save the vocabulary files to disk.
 
         Args:
@@ -404,7 +404,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
             + self.vocab_files_names["spm_file"]
         )
 
-        save_json(self.encoder, vocab_save_path)
+        save_json(self.encoder, str(vocab_save_path))
 
         if os.path.abspath(self.spm_file) != os.path.abspath(
             spm_save_path
@@ -437,13 +437,10 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
         """
         self.tgt_lang = tgt_lang
         self.set_lang_special_tokens(self.tgt_lang)
-        return super().prepare_seq2seq_batch(src_texts, tgt_texts, **kwargs)
+        return super().prepare_seq2seq_batch(src_texts, tgt_texts, **kwargs)  # ty: ignore[unresolved-attribute]
 
     def _build_translation_inputs(
-        self,
-        raw_inputs: Union[str, List[str]],
-        tgt_lang: Optional[str],
-        **extra_kwargs,
+        self, raw_inputs: Union[str, List[str]], tgt_lang: Optional[str], **extra_kwargs
     ) -> BatchEncoding:
         """Used by translation pipeline, to prepare inputs for the generate function.
 
@@ -535,9 +532,7 @@ def load_json(path: str) -> Union[Dict, List]:
         return json.load(f)
 
 
-def save_json(
-    data: Union[Dict[str, Any], List[Any]], path: str
-) -> None:
+def save_json(data: Union[Dict[str, Any], List[Any]], path: str) -> None:
     """Save data to a JSON file with indentation.
 
     Args:

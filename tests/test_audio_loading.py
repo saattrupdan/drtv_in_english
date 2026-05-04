@@ -24,7 +24,11 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def temp_wav_file(tmp_path: Path) -> Path:
-    """Create a temporary valid WAV file."""
+    """Create a temporary valid WAV file.
+
+    Returns:
+        A Path to the created temporary WAV file.
+    """
     sample_rate = 16_000
     duration_seconds = 1.0
     n_samples = int(sample_rate * duration_seconds)
@@ -38,7 +42,11 @@ def temp_wav_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def temp_mp3_file(tmp_path: Path) -> Path:
-    """Create a temporary MP3 file (simulated as WAV for testing)."""
+    """Create a temporary MP3 file (simulated as WAV for testing).
+
+    Returns:
+        A Path to the created temporary MP3 file.
+    """
     # Note: True MP3 files require pydub or similar libraries
     # For testing purposes, we'll create a WAV file but test the handling
     sample_rate = 16_000
@@ -54,7 +62,11 @@ def temp_mp3_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def stereo_audio_file(tmp_path: Path) -> Path:
-    """Create a temporary stereo WAV file."""
+    """Create a temporary stereo WAV file.
+
+    Returns:
+        A Path to the created temporary stereo WAV file.
+    """
     sample_rate = 44_100
     duration_seconds = 1.0
     n_samples = int(sample_rate * duration_seconds)
@@ -72,7 +84,11 @@ def stereo_audio_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def empty_wav_file(tmp_path: Path) -> Path:
-    """Create an empty WAV file."""
+    """Create an empty WAV file.
+
+    Returns:
+        A Path to the created empty WAV file.
+    """
     file_path = tmp_path / "empty_audio.wav"
     file_path.touch()
     return file_path
@@ -80,7 +96,11 @@ def empty_wav_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def corrupted_wav_file(tmp_path: Path) -> Path:
-    """Create a corrupted WAV file."""
+    """Create a corrupted WAV file.
+
+    Returns:
+        A Path to the created corrupted WAV file.
+    """
     file_path = tmp_path / "corrupted_audio.wav"
     file_path.write_bytes(b"not a valid wav file content" + b"\x00" * 100)
     return file_path
@@ -88,7 +108,11 @@ def corrupted_wav_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def very_short_audio_file(tmp_path: Path) -> Path:
-    """Create a very short audio file (few samples)."""
+    """Create a very short audio file (few samples).
+
+    Returns:
+        A Path to the created very short audio file.
+    """
     sample_rate = 16_000
     audio_data = np.array([0.5, -0.5, 0.5, -0.5], dtype=np.int16)
     file_path = tmp_path / "very_short.wav"
@@ -98,7 +122,11 @@ def very_short_audio_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def high_sample_rate_audio_file(tmp_path: Path) -> Path:
-    """Create an audio file with high sample rate."""
+    """Create an audio file with high sample rate.
+
+    Returns:
+        A Path to the created high sample rate audio file.
+    """
     sample_rate = 48_000
     duration_seconds = 0.5
     n_samples = int(sample_rate * duration_seconds)
@@ -661,7 +689,8 @@ class TestAudioLoadingIntegration:
         # The resampled audio should still have the same frequency characteristics
         # We can check this by looking at the zero-crossings
         zero_crossings = np.sum(np.diff(np.sign(loaded_audio)) != 0)
-        # For a 440Hz tone at 16kHz for 1 second, we expect approximately 880 zero-crossings
+        # For a 440Hz tone at 16kHz for 1 second, we expect
+        # approximately 880 zero-crossings
         expected_zero_crossings = int(2 * frequency * duration)
         # Allow some tolerance due to resampling
         assert (

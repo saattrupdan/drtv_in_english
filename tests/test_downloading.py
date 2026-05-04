@@ -475,7 +475,21 @@ def test_download_with_retry_on_transient_error() -> None:
     attempt_count = 0
 
     def _download_with_retry(url: str, max_retries: int = 3) -> File:
-        """Wrapper that adds retry logic to download."""
+        """Wrapper that adds retry logic to download.
+
+        Args:
+            url:
+                The URL to download from.
+            max_retries:
+                Maximum number of retry attempts.
+
+        Returns:
+            The File model from a successful download.
+
+        Raises:
+            socket.error: If download fails after all retry attempts.
+            ConnectionError: If download fails after all retry attempts.
+        """
         nonlocal attempt_count
         last_exception = None
 
@@ -527,7 +541,15 @@ def test_retry_exponential_backoff_simulation() -> None:
     max_retries = 4
 
     def _calculate_backoff(attempt: int) -> float:
-        """Calculate exponential backoff delay."""
+        """Calculate exponential backoff delay.
+
+        Args:
+            attempt:
+                The current retry attempt number (zero-indexed).
+
+        Returns:
+            The delay in seconds to wait before the next retry.
+        """
         base_delay = 0.1
         return base_delay * (2**attempt)
 
