@@ -20,7 +20,7 @@ from transformers import pipeline
 
 from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
-from but_with_subs.constants import DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL, MODEL_ID
+from but_with_subs.constants import DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL, ASR_MODEL_ID
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
@@ -40,7 +40,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
     type=str,
     default=DEFAULT_TARGET_LANGUAGE,
     show_default=True,
-    help="Target language for translation (e.g. 'eng' for English).",
+    help="Target language for translation (e.g. 'en' for English).",
 )
 @click.option(
     "--batch-size",
@@ -79,7 +79,7 @@ def main(
         audio_path:
             Path to the input WAV audio file.
         language:
-            Target language code for translation (e.g., 'eng' for English).
+            Target language code for translation (e.g., 'en' for English).
         batch_size:
             Maximum number of chunks per batch.
         max_duration:
@@ -90,11 +90,11 @@ def main(
         logger.error(f"File not found: {audio_path}")
         sys.exit(1)
 
-    logger.info(f"Loading the {MODEL_ID} model...")
+    logger.info(f"Loading the {ASR_MODEL_ID} model...")
     with bnb.no_terminal_output():
         model = pipeline(
             task="automatic-speech-recognition",
-            model=MODEL_ID,
+            model=ASR_MODEL_ID,
             device=get_device(),
             num_beams=5,
         )

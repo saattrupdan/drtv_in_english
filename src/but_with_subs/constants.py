@@ -16,5 +16,8 @@ OVERLAPPING_SPEAKER_COLORS = [
 ]
 
 DEFAULT_TRANSLATION_MODEL = "alirezamsh/small100"
-DEFAULT_TARGET_LANGUAGE = "eng"
+DEFAULT_TARGET_LANGUAGE = "en"
 DEFAULT_BATCH_SIZE = 16
+
+# ASR model for transcription
+ASR_MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
