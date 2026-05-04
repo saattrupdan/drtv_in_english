@@ -104,7 +104,7 @@ class SMALL100Tokenizer(PreTrainedTokenizer):
 
     Examples:
     ```python
-    >>> from tokenization_small100 import SMALL100Tokenizer
+    >>> from .tokenization_small100 import SMALL100Tokenizer
     >>> tokenizer = SMALL100Tokenizer.from_pretrained(
     ...     "alirezamsh/small100", tgt_lang="ro"
     ... )
