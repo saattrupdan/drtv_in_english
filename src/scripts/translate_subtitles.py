@@ -76,9 +76,8 @@ def main(
 
     text_count = len([c for c in chunks if c.text])
     logger.info(f"Translating {text_count} text segments to {target_lang}")
-    translated_chunks = translate_chunks(
-        chunks, target_lang, batch_size, model_id=model
-    )
+    progress_updates = list(translate_chunks(chunks, target_lang, batch_size, model_id=model))
+    translated_chunks = progress_updates[-1]  # Last item is the result list[Chunk]
 
     write_vtt_file(translated_chunks, Path(output_path))
 
