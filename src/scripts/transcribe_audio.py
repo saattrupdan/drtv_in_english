@@ -1,7 +1,7 @@
 """Transcribe an audio file using Wav2Vec2 and generate subtitle files.
 
 Usage:
-    uv run src/scripts/transcribe_audio.py [audio_path] [--language LANG]
+    uv run src/scripts/transcribe_audio.py [audio_path]
 
 The script transcribes the audio, splits it into chunks based on silence,
 and outputs a `.vtt` subtitle file alongside the original audio file.
@@ -20,18 +20,17 @@ from transformers import pipeline
 
 from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
+from but_with_subs.constants import DEFAULT_TARGET_LANGUAGE, DEFAULT_TRANSLATION_MODEL, MODEL_ID
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
 from but_with_subs.transcribing import transcribe_chunks_dynamic
+from but_with_subs.translation import Translator
 
 logger = logging.getLogger(__package__)
 
 warnings.filterwarnings("ignore", category=UserWarning)
-
-
-MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
 
 
 @click.command()
@@ -39,9 +38,9 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
 @click.option(
     "--language",
     type=str,
-    default=None,
+    default=DEFAULT_TARGET_LANGUAGE,
     show_default=True,
-    help="Target language for translation (e.g. 'French', 'Spanish').",
+    help="Target language for translation (e.g. 'eng' for English).",
 )
 @click.option(
     "--batch-size",
@@ -65,13 +64,13 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
     ),
 )
 def main(
-    audio_path: str, language: str | None, batch_size: int, max_duration: float
+    audio_path: str, language: str, batch_size: int, max_duration: float
 ) -> None:
     """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
 
     Loads the audio file, splits it into chunks based on silence breaks,
     transcribes each chunk using a Wav2Vec2 ASR pipeline with dynamic batching,
-    and outputs subtitle files.
+    translates the transcribed text, and outputs subtitle files.
 
     The dynamic batching strategy groups chunks intelligently to minimise
     padding waste while maintaining high throughput through batch processing.
@@ -79,9 +78,8 @@ def main(
     Args:
         audio_path:
             Path to the input WAV audio file.
-        language (optional):
-            Target language for translation. If not provided, no translation
-            is performed.
+        language:
+            Target language code for translation (e.g., 'eng' for English).
         batch_size:
             Maximum number of chunks per batch.
         max_duration:
@@ -131,7 +129,12 @@ def main(
         )
         chunks.extend(chunked_transcriptions)
 
-    generate_subtitles(chunks=chunks, audio_path=path)
+    # Translate all chunks to target language
+    logger.info(f"Translating transcriptions to {language}")
+    translator = Translator(model_id=DEFAULT_TRANSLATION_MODEL)
+    translated_chunks = translator.translate_chunks(chunks, language, batch_size=16)
+
+    generate_subtitles(chunks=translated_chunks, audio_path=path)
 
 
 if __name__ == "__main__":
