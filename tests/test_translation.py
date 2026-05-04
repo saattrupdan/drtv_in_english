@@ -131,6 +131,28 @@ def _run_translate_chunks(
 # ---------------------------------------------------------------------------
 
 
+def test_translate_chunks_does_not_mutate_originals() -> None:
+    """Regression test: translate_chunks must not mutate original Chunk objects."""
+    mock_tokenizer = _make_mock_tokenizer()
+    mock_tokenizer.batch_decode.return_value = ["Translated 1", "Translated 2"]
+
+    chunks = [
+        _make_chunk("Original text"),
+        _make_chunk("Another text"),
+    ]
+    original_texts = [c.text for c in chunks]
+
+    results = _run_translate_chunks(
+        chunks=chunks, batch_size=2, mock_tokenizer=mock_tokenizer
+    )
+
+    for orig, chunk in zip(original_texts, chunks):
+        assert chunk.text == orig, f"Original chunk was mutated: {orig!r} -> {chunk.text!r}"
+
+    for chunk in results:
+        assert chunk.text not in original_texts
+
+
 def test_translate_chunks_empty_chunks_yields_nothing() -> None:
     """Test that translate_chunks yields nothing when given empty chunks.
 

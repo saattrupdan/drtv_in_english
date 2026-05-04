@@ -74,8 +74,9 @@ def translate_chunks(
             model, tokenizer, [chunk.text or "" for chunk in batch]
         )
         for chunk, translated_text in zip(batch, translated_texts):
-            chunk.text = translated_text
-            yield chunk
+            translated_chunk = chunk.model_copy()
+            translated_chunk.text = translated_text
+            yield translated_chunk
 
 
 def _translate_batch(
