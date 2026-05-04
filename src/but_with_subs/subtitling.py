@@ -5,6 +5,7 @@ from pathlib import Path
 from .constants import MIN_CHUNK_DISPLAY_LENGTH_SECONDS, OVERLAPPING_SPEAKER_COLORS
 from .data_models import Chunk
 from .logging_config import logger
+from .vtt import format_vtt_timestamp
 
 
 def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
@@ -59,8 +60,8 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
                 chunk.end_time, chunk.start_time + MIN_CHUNK_DISPLAY_LENGTH_SECONDS
             )
 
-            start_ts = _format_vtt_timestamp(seconds=chunk.start_time)
-            end_ts = _format_vtt_timestamp(seconds=chunk.end_time)
+            start_ts = format_vtt_timestamp(chunk.start_time)
+            end_ts = format_vtt_timestamp(chunk.end_time)
             escaped_text = _escape_vtt_text(text=chunk.text or "")
             speaker = chunk.speaker or "N/A"
 
@@ -77,22 +78,6 @@ def generate_subtitles(chunks: list[Chunk], audio_path: str | Path) -> Path:
 
     logger.info(f"Subtitles written to {output_path}")
     return output_path
-
-
-def _format_vtt_timestamp(seconds: float) -> str:
-    """Format seconds into WebVTT ``HH:MM:SS.mmm`` timestamp.
-
-    Returns:
-        Formatted timestamp string in ``HH:MM:SS.mmm`` format.
-    """
-    total_ms = round(seconds * 1000)
-    hours = total_ms // 3_600_000
-    remainder = total_ms % 3_600_000
-    minutes = remainder // 60_000
-    remainder = remainder % 60_000
-    secs = remainder // 1_000
-    ms = remainder % 1_000
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
 
 
 def _escape_vtt_text(text: str) -> str:
