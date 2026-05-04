@@ -26,6 +26,8 @@ from but_with_subs.constants import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_TARGET_LANGUAGE,
     DEFAULT_TRANSLATION_MODEL,
+    MAX_DURATION,
+    MAX_WORDS,
 )
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
@@ -34,7 +36,7 @@ from but_with_subs.text_chunking import group_word_chunks
 from but_with_subs.transcribing import transcribe_chunks_dynamic
 from but_with_subs.translation import Translator
 
-logger = logging.getLogger(__package__)
+logger = logging.getLogger("but_with_subs")
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -63,10 +65,10 @@ configure_logging()
 @click.option(
     "--max-duration",
     type=float,
-    default=60.0,
+    default=MAX_DURATION,
     show_default=True,
     help=(
-        "Maximum total audio duration (seconds) per batch. Default: 60.0. "
+        "Maximum total audio duration (seconds) per batch. "
         "Lower values reduce padding waste for varied-length chunks "
         "but increase batch count."
     ),
@@ -131,7 +133,9 @@ def main(audio_path: str, language: str, batch_size: int, max_duration: float) -
         batch_results, unit="batch", desc="Processing transcriptions"
     ):
         chunked_transcriptions = group_word_chunks(
-            word_chunks=word_chunks, punctuation_model=punctuation_model, max_words=12
+            word_chunks=word_chunks,
+            punctuation_model=punctuation_model,
+            max_words=MAX_WORDS,
         )
         chunks.extend(chunked_transcriptions)
 

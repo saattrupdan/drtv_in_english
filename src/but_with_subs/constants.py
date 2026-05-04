@@ -23,3 +23,19 @@ DEFAULT_BATCH_SIZE = 16
 ASR_MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
 
 TARGET_SAMPLE_RATE = 16_000
+
+# Language codes (ISO 639-1, 2-letter format)
+DA = "da"
+
+# Max words per text segment for chunking
+MAX_WORDS = 12
+
+# Maximum total audio duration (seconds) per batch for transcription
+MAX_DURATION = 60.0
+
+# Audio validation duration bounds
+MIN_DURATION_SECONDS = 0.1
+MAX_DURATION_SECONDS = 3600.0
+
+# Default data directory
+DATA_DIR = "./data"

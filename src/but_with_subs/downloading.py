@@ -11,6 +11,7 @@ from pathlib import Path
 
 import yt_dlp
 
+from .constants import DATA_DIR
 from .data_models import DownloadProgress, File
 from .logging_config import logger
 
@@ -49,7 +50,7 @@ def download(
     data_dir.mkdir(parents=True, exist_ok=True)
 
     ydl_opts: dict[str, t.Any] = {
-        "paths": dict(home="./data"),
+        "paths": dict(home=DATA_DIR),
         "format": "bestvideo*+bestaudio*",
         "noplaylist": True,
         "quiet": True,

@@ -13,7 +13,7 @@ import click
 from but_with_subs import configure_logging
 from but_with_subs.audio_extraction import extract_audio
 
-logger = logging.getLogger(__package__)
+logger = logging.getLogger("but_with_subs")
 
 configure_logging()
 

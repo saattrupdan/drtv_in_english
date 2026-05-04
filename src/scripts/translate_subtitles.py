@@ -74,9 +74,8 @@ def main(
     logger.info(f"Parsing file: {path}")
     chunks = parse_vtt_file(path)
 
-    logger.info(
-        f"Translating {len([c for c in chunks if c.text])} text segments to {target_lang}"
-    )
+    text_count = len([c for c in chunks if c.text])
+    logger.info(f"Translating {text_count} text segments to {target_lang}")
     translator = Translator(model_id=model)
     translated_chunks = translator.translate_chunks(chunks, target_lang, batch_size)
 

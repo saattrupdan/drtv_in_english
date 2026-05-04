@@ -30,7 +30,10 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
 
     with ProgressHook() as hook:
         speech_timestamps = model(
-            dict(waveform=torch.from_numpy(audio).unsqueeze(dim=0), sample_rate=TARGET_SAMPLE_RATE),
+            dict(
+                waveform=torch.from_numpy(audio).unsqueeze(dim=0),
+                sample_rate=TARGET_SAMPLE_RATE,
+            ),
             hook=hook,
         ).speaker_diarization
 
@@ -40,7 +43,9 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
         end_s = turn.end
         if end_s - start_s < MIN_CHUNK_LENGTH_SECONDS:
             continue
-        chunk_audio = audio[int(start_s * TARGET_SAMPLE_RATE) : int(end_s * TARGET_SAMPLE_RATE)]
+        chunk_audio = audio[
+            int(start_s * TARGET_SAMPLE_RATE) : int(end_s * TARGET_SAMPLE_RATE)
+        ]
         chunk = Chunk(
             start_time=start_s,
             end_time=end_s,
