@@ -978,12 +978,10 @@ class TestScriptInvocation:
             AttributeError: 'tuple' object has no attribute 'start_time'
         when generate_subtitles() tried to sort chunks by start_time.
 
-        We simulate the exact pattern from transcribe_audio.py: iterating over
-        the translate_chunks generator and collecting results, then passing them
-        to generate_subtitles().
+        We simulate the exact pattern from transcribe_audio.py (FIXED version):
+        iterating over the translate_chunks generator and collecting results,
+        then passing them to generate_subtitles().
         """
-        # Simulate the script's translation loop pattern
-        # translate_chunks is a generator that yields Chunk objects
         def mock_translate_chunks_generator(
             chunks: list[Chunk], language: str, batch_size: int
         ):
@@ -992,7 +990,6 @@ class TestScriptInvocation:
                 chunk.text = f"[EN] {chunk.text}"
                 yield chunk
 
-        # The exact pattern from transcribe_audio.py lines 124-136 (FIXED version)
         translated_chunks: list[Chunk] = []
         for result in mock_translate_chunks_generator(
             chunks=mock_audio_chunks, language="en", batch_size=2
@@ -1000,16 +997,13 @@ class TestScriptInvocation:
             if isinstance(result, tuple):
                 current, total = result
             else:
-                translated_chunks.append(result)  # FIXED: was "translated_chunks = result"
+                translated_chunks.append(result)
 
-        # The key assertion: translated_chunks must be a list of Chunks
         assert isinstance(translated_chunks, list)
         assert len(translated_chunks) == len(mock_audio_chunks)
         assert all(isinstance(c, Chunk) for c in translated_chunks)
         assert all(c.text is not None for c in translated_chunks)
 
-        # This would fail with the old bug because sorted() would get a Chunk/tuple
-        # instead of a list, raising: AttributeError: 'tuple' object has no attribute 'start_time'
         audio_path = tmp_path / "output.mp3"
         audio_path.write_bytes(b"fake audio")
         vtt_path = generate_subtitles(translated_chunks, audio_path)
