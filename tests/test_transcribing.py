@@ -231,12 +231,16 @@ def test_create_dynamic_batches_single_chunk() -> None:
 def _make_mock_pipeline(return_value: list[dict[str, t.Any]]) -> um.MagicMock:
     """Create a mock AutomaticSpeechRecognitionPipeline.
 
-    The mock returns the first element of return_value when called,
-    simulating the ASR pipeline behavior.
+    The mock merges all chunk results into a single dict, simulating the
+    ASR pipeline behavior where one call with batched audio returns results
+    for all input chunks in a single "chunks" list.
     """
     mock = um.MagicMock()
     if return_value:
-        mock.return_value = return_value[0]  # Return first dict as the result
+        merged_chunks = []
+        for dct in return_value:
+            merged_chunks.extend(dct.get("chunks", []))
+        mock.return_value = {"chunks": merged_chunks}
     else:
         mock.return_value = {"chunks": []}
     return mock

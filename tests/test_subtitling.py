@@ -22,9 +22,9 @@ from but_with_subs.subtitling import (
     _assign_speaker_colors,
     _detect_overlapping_speakers,
     _escape_vtt_text,
-    _format_vtt_timestamp,
     generate_subtitles,
 )
+from but_with_subs.vtt import format_vtt_timestamp
 
 # =============================================================================
 # Fixtures
@@ -105,51 +105,51 @@ def temp_audio_file() -> Path:
 
 
 # =============================================================================
-# Unit Tests: _format_vtt_timestamp
+# Unit Tests: format_vtt_timestamp
 # =============================================================================
 
 
 class TestFormatVttTimestamp:
-    """Unit tests for _format_vtt_timestamp function."""
+    """Unit tests for format_vtt_timestamp function."""
 
     def test_zero_seconds(self) -> None:
         """Test formatting zero seconds."""
-        result = _format_vtt_timestamp(0.0)
+        result = format_vtt_timestamp(0.0)
         assert result == "00:00:00.000"
 
     def test_fractional_seconds(self) -> None:
         """Test formatting fractional seconds with milliseconds."""
-        result = _format_vtt_timestamp(0.123)
+        result = format_vtt_timestamp(0.123)
         assert result == "00:00:00.123"
 
     def test_one_second(self) -> None:
         """Test formatting exactly one second."""
-        result = _format_vtt_timestamp(1.0)
+        result = format_vtt_timestamp(1.0)
         assert result == "00:00:01.000"
 
     def test_minutes_and_seconds(self) -> None:
         """Test formatting minutes and seconds."""
-        result = _format_vtt_timestamp(125.0)
+        result = format_vtt_timestamp(125.0)
         assert result == "00:02:05.000"
 
     def test_hours_minutes_seconds(self) -> None:
         """Test formatting hours, minutes, and seconds."""
-        result = _format_vtt_timestamp(3661.0)
+        result = format_vtt_timestamp(3661.0)
         assert result == "01:01:01.000"
 
     def test_large_seconds(self) -> None:
         """Test formatting large number of seconds."""
-        result = _format_vtt_timestamp(7265.5)
+        result = format_vtt_timestamp(7265.5)
         assert result == "02:01:05.500"
 
     def test_rounding_milliseconds(self) -> None:
         """Test that milliseconds are properly rounded."""
-        result = _format_vtt_timestamp(1.9999)
+        result = format_vtt_timestamp(1.9999)
         assert result == "00:00:02.000"
 
     def test_999_milliseconds(self) -> None:
         """Test 999 milliseconds formatting."""
-        result = _format_vtt_timestamp(0.999)
+        result = format_vtt_timestamp(0.999)
         assert result == "00:00:00.999"
 
 

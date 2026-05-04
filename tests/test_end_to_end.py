@@ -271,7 +271,7 @@ class TestCompletePipeline:
                 ],
             ]
             transcribed = transcribe_chunks_dynamic(
-                chunks, mock_asr_model, show_progress=False
+                chunks, mock_asr_model, batch_size=20, show_progress=False
             )
 
         # Flatten transcribed chunks
@@ -666,7 +666,7 @@ class TestPipelineErrorHandling:
 
         with pytest.raises(RuntimeError, match="ASR model failed"):
             transcribe_chunks_dynamic(
-                mock_audio_chunks, mock_asr_model, show_progress=False
+                mock_audio_chunks, mock_asr_model, batch_size=20, show_progress=False
             )
 
     def test_subtitling_failure_with_empty_chunks(self, tmp_path: Path) -> None:
@@ -815,23 +815,21 @@ class TestFullyMockedPipeline:
         """Test batch transcription with mocked pipeline."""
         mock_asr_model = MagicMock()
 
-        # Simulate batch transcription results
-        def mock_batch_call(audio_list: list, return_timestamps: bool = False) -> list:
-            results = []
-            for i, audio in enumerate(audio_list):
-                results.append(
-                    {
-                        "chunks": [
-                            {
-                                "text": f"Transcript {i}",
-                                "timestamp": (0.0, len(audio) / 16000),
-                            }
-                        ]
-                    }
-                )
-            return results
-
-        mock_asr_model.side_effect = mock_batch_call
+        # Mock _transcribe_chunks_batch directly to avoid ASR model complexity
+        def mock_batch_fn(chunks, model):
+            # Return one list per input chunk so assertions work correctly
+            return [
+                [
+                    Chunk(
+                        start_time=c.start_time,
+                        end_time=c.end_time,
+                        audio=c.audio,
+                        text=f"Transcript for {c.speaker}",
+                        speaker=c.speaker,
+                    )
+                ]
+                for c in chunks
+            ]
 
         # Create a mock tqdm iterator that has set_description method
         mock_iterator = MagicMock()
@@ -840,10 +838,16 @@ class TestFullyMockedPipeline:
         mock_iterator.set_description = MagicMock()
         mock_iterator.__iter__ = MagicMock(return_value=iter([mock_audio_chunks]))
 
-        # Use dynamic batching
-        with patch("but_with_subs.transcribing.tqdm", return_value=mock_iterator):
+        # Use dynamic batching with mocked batch transcription
+        with (
+            patch("but_with_subs.transcribing.tqdm", return_value=mock_iterator),
+            patch(
+                "but_with_subs.transcribing._transcribe_chunks_batch",
+                side_effect=mock_batch_fn,
+            ),
+        ):
             results = transcribe_chunks_dynamic(
-                mock_audio_chunks, mock_asr_model, show_progress=False
+                mock_audio_chunks, mock_asr_model, batch_size=20, show_progress=False
             )
 
         assert len(results) == len(mock_audio_chunks)

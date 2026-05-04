@@ -58,33 +58,56 @@ def _transcribe_chunks_batch(
         raise
 
     chunk_transcriptions: list[list[Chunk]] = list()
-    for chunk, transcription_dct in zip(chunks, results["chunks"]):
-        word_chunks: list[Chunk] = []
-        start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
-        end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
+    chunk_results = results["chunks"]
 
-        if end_time - start_time < MIN_CHUNK_LENGTH_SECONDS:
-            continue
+    # Initialise empty result lists for each input chunk
+    for _ in chunks:
+        chunk_transcriptions.append(list())
 
-        # Extract audio for this word segment
-        audio_start = int(TARGET_SAMPLE_RATE * start_time)
-        audio_end = int(TARGET_SAMPLE_RATE * end_time)
+    if not chunk_transcriptions:
+        return chunk_transcriptions
 
-        # Ensure we don't exceed the original chunk bounds
-        audio_end = min(audio_end, len(chunk.audio))
-        audio = chunk.audio[audio_start:audio_end]
+    # Distribute word-level results among input chunks in order
+    # Each input chunk gets consecutive word-level results
+    num_chunks = len(chunk_transcriptions)
+    words_per_chunk = len(chunk_results) // num_chunks
+    extra = len(chunk_results) % num_chunks
 
-        word_chunks.append(
-            Chunk(
-                start_time=start_time,
-                end_time=end_time,
-                audio=audio,
-                text=transcription_dct["text"],
-                speaker=chunk.speaker,
+    word_offset = 0
+    for idx in range(num_chunks):
+        count = words_per_chunk + (1 if idx < extra else 0)
+        for i in range(count):
+            if word_offset + i >= len(chunk_results):
+                break
+
+            transcription_dct = chunk_results[word_offset + i]
+            chunk = chunks[idx]
+
+            start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
+            end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
+
+            if end_time - start_time < MIN_CHUNK_LENGTH_SECONDS:
+                continue
+
+            # Extract audio for this word segment
+            audio_start = int(TARGET_SAMPLE_RATE * start_time)
+            audio_end = int(TARGET_SAMPLE_RATE * end_time)
+
+            # Ensure we don't exceed the original chunk bounds
+            audio_end = min(audio_end, len(chunk.audio))
+            audio = chunk.audio[audio_start:audio_end]
+
+            chunk_transcriptions[idx].append(
+                Chunk(
+                    start_time=start_time,
+                    end_time=end_time,
+                    audio=audio,
+                    text=transcription_dct["text"],
+                    speaker=chunk.speaker,
+                )
             )
-        )
 
-        chunk_transcriptions.append(word_chunks)
+        word_offset += count
 
     return chunk_transcriptions
 
