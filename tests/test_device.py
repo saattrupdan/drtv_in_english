@@ -12,15 +12,13 @@ from but_with_subs.device import get_device
 
 
 @pytest.fixture(autouse=True)
-def clear_device_cache():
+def clear_device_cache() -> None:
     """Clear the cached device result before each test.
 
     get_device() uses @cache, so a previous test that ran on this machine
     (which has MPS) would have cached 'mps'. Without clearing, all
     subsequent tests would return the cached value regardless of mocks.
     """
-    from but_with_subs.device import get_device
-
     get_device.cache_clear()
     yield
 

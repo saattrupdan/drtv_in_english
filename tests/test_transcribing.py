@@ -234,6 +234,9 @@ def _make_mock_pipeline(return_value: list[dict[str, t.Any]]) -> um.MagicMock:
     The mock merges all chunk results into a single dict, simulating the
     ASR pipeline behavior where one call with batched audio returns results
     for all input chunks in a single "chunks" list.
+
+    Returns:
+        A MagicMock configured as a mock pipeline.
     """
     mock = um.MagicMock()
     if return_value:
