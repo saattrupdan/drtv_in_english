@@ -471,9 +471,7 @@ class TestGenerateSubtitles:
         assert "Hello world" in content
         assert "(Alice)" in content
 
-    def test_generate_subtitles_uses_min_duration(
-        self, temp_audio_file: Path
-    ) -> None:
+    def test_generate_subtitles_uses_min_duration(self, temp_audio_file: Path) -> None:
         """Chunks shorter than MIN_CHUNK_DISPLAY_LENGTH_SECONDS are extended."""
         chunks = [
             Chunk(
@@ -491,9 +489,7 @@ class TestGenerateSubtitles:
             or "00:00:00.000 --> 00:00:00.600" in content
         )
 
-    def test_generate_subtitles_sorts_by_time(
-        self, temp_audio_file: Path
-    ) -> None:
+    def test_generate_subtitles_sorts_by_time(self, temp_audio_file: Path) -> None:
         """Test that chunks are sorted by start time in output."""
         chunks = [
             Chunk(
@@ -742,9 +738,7 @@ class TestErrorHandling:
         with pytest.raises(ValueError, match="Transcriptions list must not be empty"):
             generate_subtitles([], temp_audio_file)
 
-    def test_nonexistent_audio_file_raises_error(
-        self, sample_chunks: Chunk
-    ) -> None:
+    def test_nonexistent_audio_file_raises_error(self, sample_chunks: Chunk) -> None:
         """Test that non-existent audio file raises FileNotFoundError."""
         nonexistent_path = Path("/nonexistent/path/audio.mp3")
         with pytest.raises(FileNotFoundError, match="Audio file not found"):

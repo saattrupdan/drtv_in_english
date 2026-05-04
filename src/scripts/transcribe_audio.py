@@ -48,15 +48,21 @@ MODEL_ID = "CoRal-project/roest-v3-wav2vec2-315m"
     type=int,
     default=32,
     show_default=True,
-    help="Maximum number of chunks per batch. Higher values increase throughput but require more GPU memory.",
+    help=(
+        "Maximum number of chunks per batch. "
+        "Higher values increase throughput but require more GPU memory."
+    ),
 )
 @click.option(
     "--max-duration",
     type=float,
     default=60.0,
     show_default=True,
-    help="Maximum total audio duration (seconds) per batch. Default: 60.0. "
-    "Lower values reduce padding waste for varied-length chunks but increase batch count.",
+    help=(
+        "Maximum total audio duration (seconds) per batch. Default: 60.0. "
+        "Lower values reduce padding waste for varied-length chunks "
+        "but increase batch count."
+    ),
 )
 def main(
     audio_path: str, language: str | None, batch_size: int, max_duration: float

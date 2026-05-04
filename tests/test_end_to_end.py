@@ -872,9 +872,7 @@ class TestFullyMockedPipeline:
         mock_asr_model = MagicMock()
 
         # Simulate batch transcription results
-        def mock_batch_call(
-            audio_list: list, return_timestamps: bool = False
-        ) -> list:
+        def mock_batch_call(audio_list: list, return_timestamps: bool = False) -> list:
             results = []
             for i, audio in enumerate(audio_list):
                 results.append(
