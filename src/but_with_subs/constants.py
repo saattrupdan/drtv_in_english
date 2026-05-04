@@ -14,3 +14,7 @@ OVERLAPPING_SPEAKER_COLORS = [
     "#009E73",  # Bluish green - colorblind safe
     "#CC79A7",  # Reddish purple - high contrast
 ]
+
+DEFAULT_TRANSLATION_MODEL = "alirezamsh/small100"
+DEFAULT_TARGET_LANGUAGE = "eng"
+DEFAULT_BATCH_SIZE = 16
