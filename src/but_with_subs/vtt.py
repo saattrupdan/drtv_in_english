@@ -34,8 +34,8 @@ def parse_vtt_file(path: Path) -> list[Chunk]:
     )
 
     for match in cue_pattern.finditer(content):
-        start_time = _parse_vtt_timestamp(match.group(4))
-        end_time = _parse_vtt_timestamp(match.group(5))
+        start_time = parse_vtt_timestamp(match.group(4))
+        end_time = parse_vtt_timestamp(match.group(5))
         text = match.group(6).strip()
 
         # Extract speaker from (Speaker) format (group 2) or <v Speaker> format (group
@@ -122,17 +122,3 @@ def format_vtt_timestamp(seconds: float) -> str:
     ms = remainder % 1_000
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
 
-
-def _parse_vtt_timestamp(timestamp: str) -> float:
-    """Parse WebVTT timestamp to seconds.
-
-    Args:
-        timestamp:
-            Timestamp string in HH:MM:SS.mmm format.
-
-    Returns:
-        Time in seconds.
-    """
-    h, m, s = timestamp.split(":")
-    s, ms = s.split(".")
-    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
