@@ -11,7 +11,10 @@ from .constants import MIN_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 from .logging_config import logger
 
-nltk.download("punkt_tab", quiet=True)
+try:
+    nltk.data.find("tokenizers/punkt_tab")
+except LookupError:
+    nltk.download("punkt_tab", quiet=True)
 
 PUNCTUATION_PATTERN = rf"[{string.punctuation}]"
 
