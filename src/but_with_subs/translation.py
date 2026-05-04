@@ -94,14 +94,14 @@ def _translate_batch(
     """
     if len(texts) == 1:
         encoded = tokenizer(texts[0], return_tensors="pt").to(model.device)
-        generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
-        return [tokenizer.batch_decode(generated, skip_special_tokens=True)[0]]
+        generated = model.generate(**encoded)
+        return [tokenizer.batch_decode(generated.sequences, skip_special_tokens=True)[0]]
 
     encoded = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(
         model.device
     )
-    generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
-    return tokenizer.batch_decode(generated, skip_special_tokens=True)
+    generated = model.generate(**encoded)
+    return tokenizer.batch_decode(generated.sequences, skip_special_tokens=True)
 
 
 def translate_single(
@@ -118,5 +118,5 @@ def translate_single(
         Translated text.
     """
     encoded = tokenizer(text, return_tensors="pt").to(model.device)
-    generated = model.generate(**encoded)  # ty: ignore[invalid-argument-type]
-    return tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+    generated = model.generate(**encoded)
+    return tokenizer.batch_decode(generated.sequences, skip_special_tokens=True)[0]
