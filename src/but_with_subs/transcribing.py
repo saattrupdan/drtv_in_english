@@ -52,37 +52,37 @@ def _transcribe_chunks_batch(
     # Run batch inference
     try:
         with bnb.no_terminal_output():
-            results = t.cast(list[dict], model(batched_audio, return_timestamps="word"))
+            results = t.cast(dict, model(batched_audio, return_timestamps="word"))
     except Exception as e:
         logger.error(f"Batch transcription failed: {e}")
         raise
 
     chunk_transcriptions: list[list[Chunk]] = list()
-    for chunk, result in zip(chunks, results):
+    for chunk, transcription_dct in zip(chunks, results["chunks"]):
         word_chunks: list[Chunk] = []
-        for transcription_dct in result["chunks"]:
-            start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
-            end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
+        start_time = float(transcription_dct["timestamp"][0]) + chunk.start_time
+        end_time = float(transcription_dct["timestamp"][1]) + chunk.start_time
 
-            if end_time - start_time < MIN_CHUNK_LENGTH_SECONDS:
-                continue
+        if end_time - start_time < MIN_CHUNK_LENGTH_SECONDS:
+            continue
 
-            # Extract audio for this word segment
-            audio_start = int(TARGET_SAMPLE_RATE * start_time)
-            audio_end = int(TARGET_SAMPLE_RATE * end_time)
-            # Ensure we don't exceed the original chunk bounds
-            audio_end = min(audio_end, len(chunk.audio))
-            audio = chunk.audio[audio_start:audio_end]
+        # Extract audio for this word segment
+        audio_start = int(TARGET_SAMPLE_RATE * start_time)
+        audio_end = int(TARGET_SAMPLE_RATE * end_time)
 
-            word_chunks.append(
-                Chunk(
-                    start_time=start_time,
-                    end_time=end_time,
-                    audio=audio,
-                    text=transcription_dct["text"],
-                    speaker=chunk.speaker,
-                )
+        # Ensure we don't exceed the original chunk bounds
+        audio_end = min(audio_end, len(chunk.audio))
+        audio = chunk.audio[audio_start:audio_end]
+
+        word_chunks.append(
+            Chunk(
+                start_time=start_time,
+                end_time=end_time,
+                audio=audio,
+                text=transcription_dct["text"],
+                speaker=chunk.speaker,
             )
+        )
 
         chunk_transcriptions.append(word_chunks)
 
