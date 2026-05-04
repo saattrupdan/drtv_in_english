@@ -21,7 +21,7 @@ from transformers import pipeline
 from but_with_subs import configure_logging
 from but_with_subs.audio_chunking import chunk_by_audio
 from but_with_subs.audio_loading import load_audio
-from but_with_subs.constants import ASR_MODEL_ID, MAX_DURATION, MAX_WORDS
+from but_with_subs.constants import ASR_MODEL_ID, MAX_WORDS
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
 from but_with_subs.subtitling import generate_subtitles
@@ -58,7 +58,7 @@ configure_logging()
 @click.option(
     "--max-duration",
     type=float,
-    default=MAX_DURATION,
+    default=60,
     show_default=True,
     help=(
         "Maximum total audio duration (seconds) per batch. "
@@ -67,28 +67,14 @@ configure_logging()
     ),
 )
 def main(audio_path: str, language: str, batch_size: int, max_duration: float) -> None:
-    """Transcribe an audio file using Wav2Vec2 and silence-based chunking.
-
-    Loads the audio file, splits it into chunks based on silence breaks,
-    transcribes each chunk using a Wav2Vec2 ASR pipeline with dynamic batching,
-    translates the transcribed text, and outputs subtitle files.
-
-    The dynamic batching strategy groups chunks intelligently to minimise
-    padding waste while maintaining high throughput through batch processing.
-
-    Args:
-        audio_path:
-            Path to the input WAV audio file.
-        language:
-            Target language code for translation (e.g., 'en' for English).
-        batch_size:
-            Maximum number of chunks per batch.
-        max_duration:
-            Maximum total audio duration per batch in seconds.
-    """
+    """Transcribe an audio file using Wav2Vec2 and silence-based chunking."""
     path = Path(audio_path)
     if not path.is_file():
         logger.error(f"File not found: {audio_path}")
+        sys.exit(1)
+
+    if not path.suffix == ".wav":
+        logger.error(f"The file must be a wav file, but received {path.suffix}")
         sys.exit(1)
 
     logger.info(f"Loading the {ASR_MODEL_ID} model...")
