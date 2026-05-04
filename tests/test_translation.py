@@ -358,6 +358,43 @@ class TestTranslator:
         assert result[0].text is None
         assert result[1].text == "translated"
 
+    def test_translate_chunks_all_none_text_logs_warning_and_returns_original(self, caplog):
+        """Test that translate_chunks logs warning and returns original when all chunks have None text.
+        
+        This tests lines 95-96 in translation.py where a warning is logged and
+        the original chunks are returned when no chunks have text.
+        """
+        chunks = [
+            Chunk(
+                start_time=0.0,
+                end_time=1.0,
+                audio=np.zeros(16000, dtype=np.float32),
+                text=None,
+                speaker=None,
+            ),
+            Chunk(
+                start_time=1.0,
+                end_time=2.0,
+                audio=np.zeros(16000, dtype=np.float32),
+                text=None,
+                speaker=None,
+            ),
+        ]
+
+        with patch("but_with_subs.translation.pipeline"):
+            translator = Translator()
+            
+            with caplog.at_level("WARNING"):
+                result = translator.translate_chunks(chunks, "dan", "eng")
+
+        # Verify warning was logged
+        assert any("No chunks with text to translate" in record.message for record in caplog.records)
+        
+        # Verify original chunks are returned unchanged
+        assert result is chunks
+        assert len(result) == 2
+        assert all(c.text is None for c in result)
+
     def test_translate_batch_processing(self):
         """Test that batch processing works correctly."""
         mock_pipeline = MagicMock()

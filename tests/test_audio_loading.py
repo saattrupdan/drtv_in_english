@@ -552,6 +552,19 @@ class TestWithMocking:
             with pytest.raises(ValueError, match="Error reading audio file"):
                 load_audio(path=temp_wav_file)
 
+    def test_load_audio_no_data_raises_value_error(self, temp_wav_file: Path) -> None:
+        """Test that load_audio raises ValueError when file contains no data.
+        
+        This tests line 39 in audio_loading.py where ValueError is raised
+        when scipy.io.wavfile.read returns an empty array.
+        """
+        with patch("scipy.io.wavfile.read") as mock_read:
+            # Mock scipy.io.wavfile.read to return an empty array
+            mock_read.return_value = (16000, np.array([], dtype=np.int16))
+
+            with pytest.raises(ValueError, match="Audio file.*contains no data"):
+                load_audio(path=temp_wav_file)
+
 
 # =============================================================================
 # Integration Tests
