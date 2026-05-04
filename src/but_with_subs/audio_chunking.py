@@ -1,18 +1,16 @@
 """Audio chunking functionality for splitting audio into segments."""
 
-import logging
+import typing as t
 
 import numpy as np
 import torch
-
 from pyannote.audio import Pipeline
-from pyannote.audio.core.inference import ProgressHook
+from pyannote.audio.pipelines.utils.hook import ProgressHook
 
 from .constants import MIN_CHUNK_LENGTH_SECONDS
 from .data_models import Chunk
 from .device import get_device
-
-logger = logging.getLogger(__package__)
+from .logging_config import logger
 
 
 def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
@@ -25,7 +23,9 @@ def chunk_by_audio(audio: np.ndarray) -> list[Chunk]:
     Returns:
         List of audio chunks.
     """
-    model = Pipeline.from_pretrained()
+    model = t.cast(
+        Pipeline, Pipeline.from_pretrained("pyannote/speaker-diarization-community-1")
+    )
     model.to(get_device())
 
     with ProgressHook() as hook:
