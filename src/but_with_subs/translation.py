@@ -1,9 +1,9 @@
 """Translation module for translating subtitles between languages.
 
 Uses transformer models for high-quality translation, with support for
-batch processing to optimize quality and throughput.
+batch processing to optimise quality and throughput.
 
-Prioritizes translation quality by processing chunks in batches rather
+Prioritises translation quality by processing chunks in batches rather
 than one at a time, as batch processing provides more context to the model.
 """
 
@@ -12,10 +12,12 @@ from pathlib import Path
 
 import bits_and_bobs as bnb
 import numpy as np
-from transformers import pipeline
+from transformers import M2M100ForConditionalGeneration
 
 from .data_models import Chunk
+from .device import get_device
 from .logging_config import logger
+from .tokenization_small100 import SMALL100Tokenizer
 
 # Default model for translation - small100 supports 100+ languages
 DEFAULT_TRANSLATION_MODEL = "alirezamsh/small100"
@@ -30,35 +32,68 @@ class Translator:
         """Initialize the translator.
 
         Args:
-            model_id: HuggingFace model ID for translation.
-            device: Device to run model on (-1 for CPU, 0+ for GPU).
-                   If None, automatically selects best available device.
+            model_id:
+                HuggingFace model ID for translation.
+            device (optional):
+                Device to run model on (-1 for CPU, 0+ for GPU).
+                If None, automatically selects best available device.
         """
         logger.info(f"Loading translation model: {model_id}")
 
+        device_idx = device if device is not None else get_device()
+        device_name = "cpu" if device_idx == -1 else f"cuda:{device_idx}"
+
         with bnb.no_terminal_output():
-            self._pipeline = pipeline(
-                task="translation",
-                model=model_id,
-                device=device if device is not None else -1,
-            )  # type: ignore[no-matching-overload]
+            self._model = M2M100ForConditionalGeneration.from_pretrained(model_id)
+            self._tokenizer = SMALL100Tokenizer.from_pretrained(model_id)
+            self._model = self._model.to(device_name)
 
         logger.info(f"Translation model loaded: {model_id}")
+
+    def _translate_batch(self, texts: list[str], tgt_lang: str) -> list[str]:
+        """Translate a batch of texts.
+
+        Args:
+            texts:
+                List of source texts to translate.
+            tgt_lang:
+                Target language code.
+
+        Returns:
+            List of translated texts.
+        """
+        self._tokenizer.tgt_lang = tgt_lang
+        if len(texts) == 1:
+            encoded = self._tokenizer(texts[0], return_tensors="pt").to(
+                self._model.device
+            )
+            generated = self._model.generate(**encoded)
+            return [
+                self._tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+            ]
+
+        encoded = self._tokenizer(
+            texts, return_tensors="pt", padding=True, truncation=True
+        ).to(self._model.device)
+        generated = self._model.generate(**encoded)
+        return self._tokenizer.batch_decode(generated, skip_special_tokens=True)
 
     def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
         """Translate a single text segment.
 
         Args:
-            text: Text to translate.
-            source_lang: Source language code (e.g., "dan" for Danish).
-            target_lang: Target language code (e.g., "eng" for English).
+            text:
+                Text to translate.
+            source_lang:
+                Source language code (e.g., "dan" for Danish).
+            target_lang:
+                Target language code (e.g., "eng" for English).
 
         Returns:
             Translated text.
         """
         try:
-            result = self._pipeline(text, src_lang=source_lang, tgt_lang=target_lang)
-            return result[0]["translation_text"]
+            return self._translate_batch([text], target_lang)[0]
         except Exception as e:
             logger.error(f"Translation failed: {e}")
             raise
@@ -76,10 +111,14 @@ class Translator:
         context to the model compared to chunk-by-chunk translation.
 
         Args:
-            chunks: List of chunks with text to translate.
-            source_lang: Source language code.
-            target_lang: Target language code.
-            batch_size: Number of texts to translate in parallel.
+            chunks:
+                List of chunks with text to translate.
+            source_lang:
+                Source language code.
+            target_lang:
+                Target language code.
+            batch_size (optional):
+                Number of texts to translate in parallel.
 
         Returns:
             New list of chunks with translated text.
@@ -87,7 +126,7 @@ class Translator:
         if not chunks:
             return []
 
-        chunks_with_text = [c for c in chunks if c.text]
+        chunks_with_text: list[Chunk] = [c for c in chunks if c.text is not None]
         if not chunks_with_text:
             logger.warning("No chunks with text to translate")
             return chunks
@@ -97,27 +136,23 @@ class Translator:
             f"from {source_lang} to {target_lang}"
         )
 
-        texts = [c.text for c in chunks_with_text]
+        texts: list[str] = [c.text for c in chunks_with_text]
         translated_texts: list[str] = []
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
             try:
-                batch_results = self._pipeline(
-                    batch, src_lang=source_lang, tgt_lang=target_lang
-                )
-                translated_texts.extend([r["translation_text"] for r in batch_results])
+                translated_texts.extend(self._translate_batch(batch, target_lang))
             except Exception as e:
                 logger.error(f"Batch translation failed: {e}")
                 for segment_text in batch:
                     try:
-                        result = self._pipeline(
-                            segment_text, src_lang=source_lang, tgt_lang=target_lang
+                        translated_texts.append(
+                            self._translate_batch([segment_text], target_lang)[0]
                         )
-                        translated_texts.append(result[0]["translation_text"])
                     except Exception as e2:
                         logger.error(f"Individual translation failed: {e2}")
-                        translated_texts.append(segment_text)  # type: ignore[invalid-argument-type]
+                        translated_texts.append(segment_text)
 
         translated_chunks: list[Chunk] = []
         text_idx = 0
@@ -149,12 +184,17 @@ def translate_subtitles(
     """Translate a subtitle file from one language to another.
 
     Args:
-        input_path: Path to input .vtt subtitle file.
-        output_path: Path for output .vtt file. If None, uses input path
-                    with "_translated" suffix before extension.
-        source_lang: Source language code (default: "dan" for Danish).
-        target_lang: Target language code (default: "eng" for English).
-        model_id: HuggingFace model ID for translation.
+        input_path:
+            Path to input .vtt subtitle file.
+        output_path (optional):
+            Path for output .vtt file. If None, uses input path
+            with "_translated" suffix before extension.
+        source_lang (optional):
+            Source language code. Defaults to "dan".
+        target_lang (optional):
+            Target language code. Defaults to "eng".
+        model_id (optional):
+            HuggingFace model ID for translation.
 
     Returns:
         Path to the translated subtitle file.
@@ -188,7 +228,8 @@ def _parse_vtt_file(path: Path) -> list[Chunk]:
     """Parse a WebVTT file into Chunk objects.
 
     Args:
-        path: Path to .vtt file.
+        path:
+            Path to .vtt file.
 
     Returns:
         List of Chunk objects.
@@ -244,8 +285,10 @@ def _write_vtt_file(chunks: list[Chunk], path: Path) -> None:
     """Write chunks to a WebVTT file.
 
     Args:
-        chunks: List of Chunk objects.
-        path: Output file path.
+        chunks:
+            List of Chunk objects.
+        path:
+            Output file path.
     """
     with path.open(mode="w", encoding="utf-8") as f:
         f.write("WEBVTT\n\n")
@@ -267,7 +310,8 @@ def _parse_vtt_timestamp(timestamp: str) -> float:
     """Parse WebVTT timestamp to seconds.
 
     Args:
-        timestamp: Timestamp string in HH:MM:SS.mmm format.
+        timestamp:
+            Timestamp string in HH:MM:SS.mmm format.
 
     Returns:
         Time in seconds.
@@ -278,7 +322,11 @@ def _parse_vtt_timestamp(timestamp: str) -> float:
 
 
 def _format_vtt_timestamp(seconds: float) -> str:
-    """Format seconds into WebVTT HH:MM:SS.mmm timestamp."""
+    """Format seconds into WebVTT HH:MM:SS.mmm timestamp.
+
+    Returns:
+        Formatted timestamp string.
+    """
     total_ms = round(seconds * 1000)
     hours = total_ms // 3_600_000
     remainder = total_ms % 3_600_000

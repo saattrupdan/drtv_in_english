@@ -36,7 +36,7 @@ def _transcribe_chunks_batch(
     max_length = max(len(chunk.audio) for chunk in chunks)
 
     # Pad all chunks to the same length
-    padded_audio_list = []
+    padded_audio_list: list[np.ndarray] = []
     for chunk in chunks:
         audio_length = len(chunk.audio)
         if audio_length < max_length:
@@ -46,13 +46,13 @@ def _transcribe_chunks_batch(
             padded_audio = chunk.audio
         padded_audio_list.append(padded_audio)
 
+    # Stack arrays into a single ndarray which the type stub accepts.
+    batched_audio: np.ndarray = np.stack(padded_audio_list, axis=0)
+
     # Run batch inference
     try:
         with bnb.no_terminal_output():
-            results = t.cast(
-                list[dict],
-                model(padded_audio_list, return_timestamps="word"),  # type: ignore[invalid-argument-type]
-            )
+            results = t.cast(list[dict], model(batched_audio, return_timestamps="word"))
     except Exception as e:
         logger.error(f"Batch transcription failed: {e}")
         raise
@@ -94,13 +94,16 @@ def create_dynamic_batches(
 ) -> Generator[list[Chunk], None, None]:
     """Create dynamic batches from audio chunks for efficient transcription.
 
-    Groups chunks of similar duration to minimize padding waste during batch
+    Groups chunks of similar duration to minimise padding waste during batch
     transcription. Yields batches respecting both size and duration limits.
 
     Args:
-        chunks: List of audio chunks to batch.
-        batch_size: Maximum chunks per batch. Defaults to 20.
-        max_duration: Maximum total duration (seconds) per batch. Defaults to 60.
+        chunks:
+            List of audio chunks to batch.
+        batch_size (optional):
+            Maximum chunks per batch. Defaults to 20.
+        max_duration (optional):
+            Maximum total duration (seconds) per batch. Defaults to 60.
 
     Yields:
         Lists of chunks ready for batch transcription.
@@ -110,7 +113,7 @@ def create_dynamic_batches(
 
     # Sort chunks by duration (ascending) to group similar-length chunks together
     # This minimises padding waste within each batch
-    sorted_chunks = sorted(chunks, key=lambda c: c.end_time - c.start_time)
+    sorted_chunks: list[Chunk] = sorted(chunks, key=lambda c: c.end_time - c.start_time)
 
     current_batch: list[Chunk] = []
     current_duration = 0.0
@@ -151,11 +154,16 @@ def transcribe_chunks_dynamic(
     Groups chunks by duration to minimise padding waste during batch transcription.
 
     Args:
-        chunks: List of audio chunks to transcribe.
-        model: The ASR pipeline to use for transcription.
-        batch_size: Maximum chunks per batch. Defaults to 20.
-        max_duration: Maximum total duration (seconds) per batch. Defaults to 60.
-        show_progress: Whether to display a progress bar. Defaults to True.
+        chunks:
+            List of audio chunks to transcribe.
+        model:
+            The ASR pipeline to use for transcription.
+        batch_size (optional):
+            Maximum chunks per batch. Defaults to 20.
+        max_duration (optional):
+            Maximum total duration (seconds) per batch. Defaults to 60.
+        show_progress (optional):
+            Whether to display a progress bar. Defaults to True.
 
     Returns:
         List of lists containing word-level transcribed chunks for each input.
@@ -164,7 +172,9 @@ def transcribe_chunks_dynamic(
         return list()
 
     # Create batches using the dynamic batching strategy
-    batches = list(create_dynamic_batches(chunks, batch_size, max_duration))
+    batches: list[list[Chunk]] = list(
+        create_dynamic_batches(chunks, batch_size, max_duration)
+    )
     total_batches = len(batches)
 
     logger.info(
