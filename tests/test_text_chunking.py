@@ -2,6 +2,7 @@
 
 import logging
 import re
+import sys
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -1279,3 +1280,68 @@ class TestAdditionalEdgeCases:
         # Should preserve the content
         assert any("one" in seg for seg in result)
         assert any("four" in seg for seg in result)
+
+
+# =============================================================================
+# Tests for Module-Level NLTK Initialization
+# =============================================================================
+
+
+class TestNltkInitialization:
+    """Tests for module-level nltk.data.find / nltk.download behavior."""
+
+    def test_except_lookup_error_branch_covered(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that the except LookupError branch is covered.
+
+        The module-level code tries to find punkt_tab and downloads it if
+        missing. By removing the module from sys.modules and patching
+        nltk.data.find to raise LookupError before re-importing, we
+        exercise the except block in-process.
+        """
+        import nltk
+
+        # Store the original nltk.data.find so we can restore it
+        original_find = nltk.data.find
+
+        # Track whether nltk.download was called
+        download_called = False
+
+        def mock_download(package: str, *args: tuple, **kwargs: dict) -> None:
+            nonlocal download_called
+            download_called = True
+
+        # Patch nltk.download first so it won't actually download
+        monkeypatch.setattr(nltk, "download", mock_download)
+
+        # Build a closure that raises LookupError on the first call
+        # (when the module-level code runs) and delegates to the real
+        # find afterwards (for nltk.sent_tokenize internals).
+        call_count = 0
+
+        def mock_find(path: str, *args: tuple, **kwargs: dict) -> object:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise LookupError(f"{path!r} not found")
+            return original_find(path, *args, **kwargs)
+
+        monkeypatch.setattr(nltk.data, "find", mock_find)
+
+        # Remove the module from sys.modules so it gets re-imported
+        for key in list(sys.modules.keys()):
+            if key.startswith("but_with_subs"):
+                del sys.modules[key]
+
+        # Re-import the module — this triggers the try/except at module level
+        from but_with_subs import text_chunking  # noqa: F811
+
+        # Verify the except branch ran
+        assert download_called is True, (
+            "The except LookupError branch was not executed"
+        )
+
+        # The module should still be functional
+        result = text_chunking._split_text(text="Hello world.", max_words=10)
+        assert isinstance(result, list)
