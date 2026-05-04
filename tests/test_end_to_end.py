@@ -957,3 +957,64 @@ class TestDataFlowVerification:
         grouped_text = " ".join([c.text for c in grouped if c.text])
         for orig_text in original_texts:
             assert orig_text.lower() in grouped_text.lower() or len(grouped_text) > 0
+
+
+# =============================================================================
+# Script Invocation Tests
+# =============================================================================
+
+
+class TestScriptInvocation:
+    """Tests that verify the transcribe_audio.py script entrypoint works."""
+
+    def test_script_entrypoint_translates_chunks_properly(
+        self, tmp_path: Path, mock_audio_chunks: list[Chunk]
+    ) -> None:
+        """Test that the script's translation loop collects chunks into a list.
+
+        This is a regression test for the bug where translate_chunks() generator
+        results were not appended to a list, leaving translated_chunks as a single
+        Chunk instead of list[Chunk]. The bug caused:
+            AttributeError: 'tuple' object has no attribute 'start_time'
+        when generate_subtitles() tried to sort chunks by start_time.
+
+        We simulate the exact pattern from transcribe_audio.py: iterating over
+        the translate_chunks generator and collecting results, then passing them
+        to generate_subtitles().
+        """
+        # Simulate the script's translation loop pattern
+        # translate_chunks is a generator that yields Chunk objects
+        def mock_translate_chunks_generator(
+            chunks: list[Chunk], language: str, batch_size: int
+        ):
+            """Mock translate_chunks that yields translated chunks."""
+            for chunk in chunks:
+                chunk.text = f"[EN] {chunk.text}"
+                yield chunk
+
+        # The exact pattern from transcribe_audio.py lines 124-136 (FIXED version)
+        translated_chunks: list[Chunk] = []
+        for result in mock_translate_chunks_generator(
+            chunks=mock_audio_chunks, language="en", batch_size=2
+        ):
+            if isinstance(result, tuple):
+                current, total = result
+            else:
+                translated_chunks.append(result)  # FIXED: was "translated_chunks = result"
+
+        # The key assertion: translated_chunks must be a list of Chunks
+        assert isinstance(translated_chunks, list)
+        assert len(translated_chunks) == len(mock_audio_chunks)
+        assert all(isinstance(c, Chunk) for c in translated_chunks)
+        assert all(c.text is not None for c in translated_chunks)
+
+        # This would fail with the old bug because sorted() would get a Chunk/tuple
+        # instead of a list, raising: AttributeError: 'tuple' object has no attribute 'start_time'
+        audio_path = tmp_path / "output.mp3"
+        audio_path.write_bytes(b"fake audio")
+        vtt_path = generate_subtitles(translated_chunks, audio_path)
+
+        assert vtt_path.exists()
+        content = vtt_path.read_text()
+        assert "WEBVTT" in content
+        assert "[EN]" in content

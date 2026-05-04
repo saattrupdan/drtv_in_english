@@ -117,6 +117,7 @@ node_modules/
 # Data directory (top-level contents)
 data/*
 !data/.gitkeep
+!data/test.wav
 
 # Worktrees
 .worktrees
