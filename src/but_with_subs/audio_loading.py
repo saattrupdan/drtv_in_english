@@ -30,11 +30,10 @@ def _trim_silence(audio: np.ndarray, sample_rate: int, threshold_db: float = -40
     if len(non_silent) == 0:
         return audio  # entirely silent, return unchanged
 
-    # Keep min_silence_secs of buffer at each end
-    buffer_frames = int(min_silence_secs / 0.01)  # 10 ms frames
-    start = max(0, non_silent[0] - buffer_frames)
-    end = min(len(audio), non_silent[-1] + buffer_frames + 1)
-    # .copy() ensures contiguous memory layout (no negative strides)
+    # Convert min_silence_secs to buffer in SAMPLES (not frame indices)
+    buffer_samples = int(min_silence_secs * sample_rate)
+    start = max(0, non_silent[0] * hop_size - buffer_samples)
+    end = min(len(audio), non_silent[-1] * hop_size + frame_size + buffer_samples)
     return np.ascontiguousarray(audio[start:end], dtype=np.float32)
 
 
@@ -66,7 +65,14 @@ def _normalize_loudness(audio: np.ndarray) -> np.ndarray:
 
 
 def _high_pass_filter(audio: np.ndarray, sample_rate: int, cutoff_hz: float = 80.0) -> np.ndarray:
-    """Apply a high-pass Butterworth filter to remove low-frequency rumble."""
+    """Apply a high-pass Butterworth filter to remove low-frequency rumble.
+
+    Skips filtering for very short audio (< 100ms) where filtfilt
+    would fail due to insufficient signal length.
+    """
+    if audio.size < sample_rate // 10:  # Less than 100ms of audio
+        return np.ascontiguousarray(audio, dtype=np.float32)
+
     nyquist = sample_rate / 2.0
     normalized_cutoff = cutoff_hz / nyquist
     b, a = scipy.signal.butter(N=2, Wn=normalized_cutoff, btype='high')
@@ -143,10 +149,11 @@ def _resample_to_16k_mono(audio: np.ndarray, original_sr: int) -> np.ndarray:
 
     Returns:
         Resampled audio array at 16 kHz.
-
     """
     if original_sr == TARGET_SAMPLE_RATE:
         return np.ascontiguousarray(audio, dtype=np.float32)
+
+    logger.info(f"Resampling audio from {original_sr:,} Hz to 16,000 Hz...")
 
     # Ensure contiguous float32 array for safe torch conversion
     audio = np.ascontiguousarray(audio, dtype=np.float32)
