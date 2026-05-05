@@ -517,10 +517,12 @@ class TestPipelineErrorHandling:
         mock_model = MagicMock()
         mock_model.side_effect = RuntimeError("ASR model failed")
 
-        with pytest.raises(RuntimeError, match="ASR model failed"):
-            transcribing.transcribe_audio(
+        with patch("but_with_subs.transcribing.vad_segment_audio", return_value=[(0.0, 1.0, mock_audio)]):
+            results = transcribing.transcribe_audio(
                 audio=mock_audio, model=mock_model, show_progress=False
             )
+            # Errors are caught per-segment and logged, returning empty results
+            assert results == []
 
     def test_subtitling_failure_with_empty_chunks(self, tmp_path: Path) -> None:
         """Test handling of empty chunk list for subtitling."""
