@@ -16,6 +16,8 @@ from .constants import MIN_CHUNK_LENGTH_SECONDS, TARGET_SAMPLE_RATE
 from .data_models import Chunk
 from .device import get_device
 from .logging_config import logger
+from pyannote.audio.pipelines import VoiceActivityDetection
+from pyannote.audio.pipelines.utils.hook import ProgressHook
 
 
 def _merge_segments(segments: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -36,7 +38,7 @@ def _merge_segments(segments: list[tuple[float, float]]) -> list[tuple[float, fl
             merged[-1][1] = max(merged[-1][1], end)
         else:
             merged.append([start, end])
-    return [tuple(s) for s in merged]
+    return [(s[0], s[1]) for s in merged]
 
 
 def vad_segment_audio(
@@ -59,9 +61,6 @@ def vad_segment_audio(
     Returns:
         List of (start, end, audio_slice) tuples for non-silent regions.
     """
-    from pyannote.audio.pipelines import VoiceActivityDetection
-    from pyannote.audio.pipelines.utils.hook import ProgressHook
-
     vad = VoiceActivityDetection(segmentation_threshold=0.5)
     vad.to(get_device())
 
@@ -146,7 +145,8 @@ def transcribe_audio(
                     result = t.cast(dict, model(seg_audio, return_timestamps="word"))
             except Exception as e:
                 logger.error(
-                    f"Transcription failed for segment [{seg_start:.2f}-{seg_end:.2f}]: {e}"
+                    f"Transcription failed for segment "
+                    f"[{seg_start:.2f}-{seg_end:.2f}]: {e}"
                 )
                 pbar.update(1)
                 continue
