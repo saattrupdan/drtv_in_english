@@ -9,6 +9,8 @@ import typing as t
 import bits_and_bobs as bnb
 import numpy as np
 import torch
+from pyannote.audio.pipelines import VoiceActivityDetection
+from pyannote.audio.pipelines.utils.hook import ProgressHook
 from tqdm.auto import tqdm
 from transformers import AutomaticSpeechRecognitionPipeline
 
@@ -16,8 +18,6 @@ from .constants import MIN_CHUNK_LENGTH_SECONDS, TARGET_SAMPLE_RATE
 from .data_models import Chunk
 from .device import get_device
 from .logging_config import logger
-from pyannote.audio.pipelines import VoiceActivityDetection
-from pyannote.audio.pipelines.utils.hook import ProgressHook
 
 
 def _merge_segments(segments: list[tuple[float, float]]) -> list[tuple[float, float]]:
