@@ -1,7 +1,9 @@
 """Text chunking functionality for splitting transcriptions into segments."""
 
+import difflib
 import re
 import string
+import typing as t
 
 import nltk
 import numpy as np
@@ -17,6 +19,48 @@ except LookupError:
     nltk.download("punkt_tab", quiet=True)
 
 PUNCTUATION_PATTERN = rf"[{string.punctuation}]"
+
+
+def _find_matching_chunks(
+    target: str,
+    word_chunks: list[Chunk],
+    max_distance: int = 2,
+) -> list[Chunk]:
+    """Find word chunks whose cleaned text closely matches target.
+
+    Uses SequenceMatcher ratio for fuzzy matching.
+    Falls back to exact match if no fuzzy match is found.
+
+    Args:
+        target: The target word or phrase to match.
+        word_chunks: List of candidate word chunks.
+        max_distance: Maximum Levenshtein distance for consideration.
+
+    Returns:
+        List of matching word chunks, sorted by similarity score descending.
+    """
+    cleaned_target = re.sub(PUNCTUATION_PATTERN, "", target).strip().lower()
+    candidates: list[tuple[float, Chunk]] = []
+    for wc in word_chunks:
+        if wc.text is None:
+            continue
+        cleaned_wc = re.sub(PUNCTUATION_PATTERN, "", wc.text).strip().lower()
+        ratio = difflib.SequenceMatcher(None, cleaned_target, cleaned_wc).ratio()
+        if ratio >= 0.85:  # 85% similarity threshold
+            candidates.append((ratio, wc))
+
+    # Sort by similarity descending
+    candidates.sort(key=lambda x: x[0], reverse=True)
+
+    if candidates and candidates[0][0] >= 0.95:
+        return [candidates[0][1]]  # strong match
+    elif candidates:
+        logger.debug(
+            f"Fuzzy match for {cleaned_target!r}: best={candidates[0][1].text!r} "
+            f"(ratio={candidates[0][0]:.2f})"
+        )
+        return [candidates[0][1]]
+    return []
 
 
 def group_word_chunks(
@@ -57,13 +101,7 @@ def group_word_chunks(
 
         # Get the starting time of the segment
         first_word = segment_without_punctuation.split()[0].lower()
-        first_word_candidates = [
-            word_chunk
-            for word_chunk in word_chunks
-            if word_chunk.text is not None
-            and re.sub(PUNCTUATION_PATTERN, "", word_chunk.text).strip().lower()
-            == first_word.strip()
-        ]
+        first_word_candidates = _find_matching_chunks(first_word, word_chunks)
         if not first_word_candidates:
             logger.warning(
                 f"Could not find transcription for {first_word!r}. Skipping."
@@ -73,14 +111,9 @@ def group_word_chunks(
 
         # Get the ending time of the segment
         last_word = segment_without_punctuation.split(" ")[-1].lower()
-        last_word_candidates = [
-            word_chunk
-            for word_chunk in word_chunks
-            if word_chunk.text is not None
-            and re.sub(PUNCTUATION_PATTERN, "", word_chunk.text).strip().lower()
-            == last_word.strip()
-            and word_chunk.end_time > segment_start
-        ]
+        last_word_candidates = _find_matching_chunks(last_word, word_chunks)
+        # Also enforce temporal ordering: must be after segment_start
+        last_word_candidates = [c for c in last_word_candidates if c.end_time > segment_start]
         if not last_word_candidates:
             logger.warning(f"Could not find transcription for {last_word!r}. Skipping.")
             continue
@@ -139,7 +172,11 @@ def _split_text(*, text: str, max_words: int) -> list[str]:
         if len(segment.split()) <= max_words:
             punctuation_segments.append(segment)
             continue
-        punctuation_segments.extend(segment.split(",;:-"))
+        # Use regex to split on any of the punctuation characters
+        # Handles comma, semicolon, colon, dash, en-dash, em-dash
+        punctuation_segments.extend(
+            [s.strip() for s in re.split(r'[,;:\-\u2013\u2014]', segment) if s.strip()]
+        )
 
     # Fall back to word segmentation
     word_segments: list[str] = list()
