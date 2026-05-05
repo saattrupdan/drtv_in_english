@@ -61,7 +61,8 @@ def vad_segment_audio(
     Returns:
         List of (start, end, audio_slice) tuples for non-silent regions.
     """
-    vad = VoiceActivityDetection(segmentation_threshold=0.5)
+    vad = VoiceActivityDetection()
+    vad.segmentation.threshold = 0.5
     vad.to(get_device())
 
     waveform = torch.from_numpy(audio).unsqueeze(dim=0).float()
