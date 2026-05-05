@@ -555,8 +555,11 @@ class TestEdgeCases:
         audio = load_audio(path=file_path)
 
         assert audio is not None
-        # After normalization, extreme values should be close to 1.0
-        assert np.allclose(audio, 1.0, atol=0.01)
+        # After peak normalization + RMS normalization to -16 dBFS,
+        # a constant signal is normalized to approximately 0.14 (target RMS)
+        assert np.allclose(audio, 0.14, atol=0.02)
+        assert np.all(audio >= -1.0)
+        assert np.all(audio <= 1.0)
 
     def test_multichannel_audio_handling(self, tmp_path: Path) -> None:
         """Test handling of multi-channel (e.g., 5.1) audio."""
