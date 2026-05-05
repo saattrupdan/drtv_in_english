@@ -146,7 +146,7 @@ def transcribe_audio(
             except Exception as e:
                 logger.error(f"Transcription failed for segment [{seg_start:.2f}-{seg_end:.2f}]: {e}")
                 pbar.update(1)
-                raise
+                continue
 
             for transcription_dct in result["chunks"]:
                 local_start = float(transcription_dct["timestamp"][0])
