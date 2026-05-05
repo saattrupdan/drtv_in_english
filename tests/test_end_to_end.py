@@ -517,7 +517,10 @@ class TestPipelineErrorHandling:
         mock_model = MagicMock()
         mock_model.side_effect = RuntimeError("ASR model failed")
 
-        with patch("but_with_subs.transcribing.vad_segment_audio", return_value=[(0.0, 1.0, mock_audio)]):
+        with patch(
+            "but_with_subs.transcribing.vad_segment_audio",
+            return_value=[(0.0, 1.0, mock_audio)],
+        ):
             results = transcribing.transcribe_audio(
                 audio=mock_audio, model=mock_model, show_progress=False
             )

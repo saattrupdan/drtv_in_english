@@ -18,9 +18,7 @@ from .device import get_device
 from .logging_config import logger
 
 
-def _merge_segments(
-    segments: list[tuple[float, float]],
-) -> list[tuple[float, float]]:
+def _merge_segments(segments: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Merge overlapping or adjacent segments.
 
     Args:
@@ -69,10 +67,7 @@ def vad_segment_audio(
 
     waveform = torch.from_numpy(audio).unsqueeze(dim=0).float()
     with ProgressHook() as hook:
-        speech_prob = vad(
-            {"waveform": waveform, "sample_rate": sample_rate},
-            hook=hook,
-        )
+        speech_prob = vad({"waveform": waveform, "sample_rate": sample_rate}, hook=hook)
 
     # speech_prob is a SegmentSequence with (segment, probability)
     active_segments = [
@@ -95,7 +90,11 @@ def vad_segment_audio(
             audio_start = int((seg_start + offset) * sample_rate)
             audio_end = int((seg_start + chunk_end) * sample_rate)
             pieces.append(
-                (seg_start + offset, seg_start + chunk_end, audio[audio_start:audio_end])
+                (
+                    seg_start + offset,
+                    seg_start + chunk_end,
+                    audio[audio_start:audio_end],
+                )
             )
             offset += segment_duration - overlap  # overlap for continuity
 
@@ -135,7 +134,9 @@ def transcribe_audio(
     word_chunks: list[Chunk] = list()
     total_steps = len(vad_segments)
 
-    with tqdm(total=total_steps, desc="Transcribing", disable=not show_progress) as pbar:
+    with tqdm(
+        total=total_steps, desc="Transcribing", disable=not show_progress
+    ) as pbar:
         for seg_start, seg_end, seg_audio in vad_segments:
             if seg_audio.size == 0:
                 pbar.update(1)
@@ -144,7 +145,9 @@ def transcribe_audio(
                 with bnb.no_terminal_output():
                     result = t.cast(dict, model(seg_audio, return_timestamps="word"))
             except Exception as e:
-                logger.error(f"Transcription failed for segment [{seg_start:.2f}-{seg_end:.2f}]: {e}")
+                logger.error(
+                    f"Transcription failed for segment [{seg_start:.2f}-{seg_end:.2f}]: {e}"
+                )
                 pbar.update(1)
                 continue
 

@@ -6,23 +6,30 @@ import numpy as np
 import scipy.io.wavfile
 import scipy.signal
 import torch
-
 import torchaudio
 
 from .constants import TARGET_SAMPLE_RATE
 from .logging_config import logger
 
 
-def _trim_silence(audio: np.ndarray, sample_rate: int, threshold_db: float = -40.0, min_silence_secs: float = 0.3) -> np.ndarray:
+def _trim_silence(
+    audio: np.ndarray,
+    sample_rate: int,
+    threshold_db: float = -40.0,
+    min_silence_secs: float = 0.3,
+) -> np.ndarray:
     """Remove leading and trailing silence.
 
     Uses RMS energy in 20 ms frames. Frames below threshold_db are
     considered silent.  min_silence_secs controls how much silence
     is kept at each end (to avoid chopping words).
+
+    Returns:
+        Numpy array with leading/trailing silence removed.
     """
     frame_size = int(0.02 * sample_rate)  # 20 ms frames
     hop_size = frame_size // 2
-    rms = np.sqrt(np.convolve(audio ** 2, np.ones(frame_size), mode='valid') / frame_size)
+    rms = np.sqrt(np.convolve(audio**2, np.ones(frame_size), mode="valid") / frame_size)
     rms = rms[::hop_size]  # hop-aligned sub-samples
     threshold_linear = 10 ** (threshold_db / 20.0)
     non_silent = np.where(rms > threshold_linear)[0]
@@ -41,6 +48,9 @@ def _normalize_loudness(audio: np.ndarray) -> np.ndarray:
     """Peak-normalize AND RMS-normalize audio to a target loudness.
 
     wav2vec2 was trained on audio with approximately -16 dBFS RMS.
+
+    Returns:
+        Normalized numpy array (float32).
     """
     # Ensure we're working with float32
     audio = np.asarray(audio, dtype=np.float32)
@@ -51,7 +61,7 @@ def _normalize_loudness(audio: np.ndarray) -> np.ndarray:
         audio = audio / peak
 
     # RMS normalization to approx -16 dBFS (~0.14 linear)
-    rms = float(np.sqrt(np.mean(audio ** 2)))
+    rms = float(np.sqrt(np.mean(audio**2)))
     if rms > 0:
         target_rms = 0.14
         audio = audio * (target_rms / rms)
@@ -64,18 +74,23 @@ def _normalize_loudness(audio: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(audio, dtype=np.float32)
 
 
-def _high_pass_filter(audio: np.ndarray, sample_rate: int, cutoff_hz: float = 80.0) -> np.ndarray:
+def _high_pass_filter(
+    audio: np.ndarray, sample_rate: int, cutoff_hz: float = 80.0
+) -> np.ndarray:
     """Apply a high-pass Butterworth filter to remove low-frequency rumble.
 
     Skips filtering for very short audio (< 100ms) where filtfilt
     would fail due to insufficient signal length.
+
+    Returns:
+        Filtered numpy array (float32).
     """
     if audio.size < sample_rate // 10:  # Less than 100ms of audio
         return np.ascontiguousarray(audio, dtype=np.float32)
 
     nyquist = sample_rate / 2.0
     normalized_cutoff = cutoff_hz / nyquist
-    b, a = scipy.signal.butter(N=2, Wn=normalized_cutoff, btype='high')
+    b, a = scipy.signal.butter(N=2, Wn=normalized_cutoff, btype="high")
     # filtfilt gives zero-phase filtering; result may be float64, cast back to float32
     result = scipy.signal.filtfilt(b, a, audio)
     return result.astype(np.float32)
@@ -161,9 +176,7 @@ def _resample_to_16k_mono(audio: np.ndarray, original_sr: int) -> np.ndarray:
     # torchaudio expects shape (channels, samples)
     audio_tensor = torch.from_numpy(audio).float()
     resampled = torchaudio.functional.resample(
-        audio_tensor,
-        orig_freq=int(original_sr),
-        new_freq=TARGET_SAMPLE_RATE,
+        audio_tensor, orig_freq=int(original_sr), new_freq=TARGET_SAMPLE_RATE
     )
     return resampled.squeeze(0).numpy()
 

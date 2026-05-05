@@ -551,7 +551,9 @@ class TestEdgeCases:
         duration = 1.0
         # Use a sine wave at max amplitude (realistic audio with extreme values)
         t = np.linspace(0, duration, sample_rate, endpoint=False)
-        audio_data = (np.sin(2 * np.pi * 440 * t) * np.iinfo(np.int16).max).astype(np.int16)
+        audio_data = (np.sin(2 * np.pi * 440 * t) * np.iinfo(np.int16).max).astype(
+            np.int16
+        )
         file_path = tmp_path / "extreme_audio.wav"
         scipy.io.wavfile.write(filename=file_path, rate=sample_rate, data=audio_data)
 
@@ -562,7 +564,7 @@ class TestEdgeCases:
         # a sine wave should have values within [-1, 1] and RMS near 0.14
         assert np.all(audio >= -1.0)
         assert np.all(audio <= 1.0)
-        rms = float(np.sqrt(np.mean(audio ** 2)))
+        rms = float(np.sqrt(np.mean(audio**2)))
         assert np.isclose(rms, 0.14, atol=0.02)
 
     def test_multichannel_audio_handling(self, tmp_path: Path) -> None:

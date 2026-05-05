@@ -3,7 +3,6 @@
 import difflib
 import re
 import string
-import typing as t
 
 import nltk
 import numpy as np
@@ -22,9 +21,7 @@ PUNCTUATION_PATTERN = rf"[{string.punctuation}]"
 
 
 def _find_matching_chunks(
-    target: str,
-    word_chunks: list[Chunk],
-    max_distance: int = 2,
+    target: str, word_chunks: list[Chunk], max_distance: int = 2
 ) -> list[Chunk]:
     """Find word chunks whose cleaned text closely matches target.
 
@@ -113,7 +110,9 @@ def group_word_chunks(
         last_word = segment_without_punctuation.split(" ")[-1].lower()
         last_word_candidates = _find_matching_chunks(last_word, word_chunks)
         # Also enforce temporal ordering: must be after segment_start
-        last_word_candidates = [c for c in last_word_candidates if c.end_time > segment_start]
+        last_word_candidates = [
+            c for c in last_word_candidates if c.end_time > segment_start
+        ]
         if not last_word_candidates:
             logger.warning(f"Could not find transcription for {last_word!r}. Skipping.")
             continue
@@ -175,7 +174,7 @@ def _split_text(*, text: str, max_words: int) -> list[str]:
         # Use regex to split on any of the punctuation characters
         # Handles comma, semicolon, colon, dash, en-dash, em-dash
         punctuation_segments.extend(
-            [s.strip() for s in re.split(r'[,;:\-\u2013\u2014]', segment) if s.strip()]
+            [s.strip() for s in re.split(r"[,;:\-\u2013\u2014]", segment) if s.strip()]
         )
 
     # Fall back to word segmentation
