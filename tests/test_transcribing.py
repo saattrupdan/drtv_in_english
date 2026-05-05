@@ -238,14 +238,16 @@ def test_progress_bar_disabled_when_show_progress_false(mock_audio: np.ndarray) 
 # ---------------------------------------------------------------------------
 
 
-def test_transcribe_audio_raises_on_pipeline_error(mock_audio: np.ndarray) -> None:
-    """Test that pipeline errors are propagated."""
+def test_transcribe_audio_handles_pipeline_error(mock_audio: np.ndarray) -> None:
+    """Test that pipeline errors are logged and return empty results."""
     mock_model = um.MagicMock()
     mock_model.side_effect = RuntimeError("Pipeline failed")
 
     with um.patch("but_with_subs.transcribing.vad_segment_audio", return_value=[(0.0, 2.0, mock_audio)]):
-        with pytest.raises(RuntimeError, match="Pipeline failed"):
-            transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
+        results = transcribe_audio(audio=mock_audio, model=mock_model, show_progress=False)
+
+    # Errors are caught per-segment and logged, returning empty results
+    assert results == []
 
 
 def test_transcribe_audio_all_segments_same_duration(mock_audio: np.ndarray) -> None:
