@@ -189,6 +189,7 @@ def _request_correction(
             ],
             response_format={"type": "json_object"},
             temperature=0.3,
+            timeout=30.0,
         )
         raw = response.choices[0].message.content
         if raw is None:
@@ -206,4 +207,7 @@ def _request_correction(
 
     except (json.JSONDecodeError, ValidationError, KeyError) as exc:
         logger.warning(f"LLM JSON parse failed for chunk {chunk_index}: {exc}")
+        return fallback
+    except openai.OpenAIError as exc:
+        logger.warning(f"LLM API call failed for chunk {chunk_index}: {exc}")
         return fallback
