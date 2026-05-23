@@ -26,6 +26,7 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "torch>=2.0.0",
     "torchaudio>=2.0.0",
+    "torchcodec>=0.4.0",
     "tqdm>=4.67.3",
     "transformers>=4.0.0",
     "yt-dlp>=2026.3.17",
@@ -145,8 +146,16 @@ testpaths = [
   "src/but_with_subs",
 ]
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.uv.sources]
 kenlm = { url = "https://github.com/kpu/kenlm/archive/master.zip" }
+torch = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+torchaudio = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+torchcodec = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 
 [build-system]
 requires = ["hatchling"]
