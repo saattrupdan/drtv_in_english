@@ -15,8 +15,8 @@ recognition is currently Danish-first (`CoRal-project/roest-v3-wav2vec2-315m`).
 
 - **Python 3.12** package managed with **uv** (`pyproject.toml`, `uv.lock`).
 - **PyTorch + Hugging Face transformers** for ASR (`wav2vec2`) and translation
-  (`alirezamsh/small100`, an M2M100 variant; ships with a custom tokenizer in
-  `tokenization_small100.py`).
+  (`alirezamsh/small100` is replaced by an OpenAI-compatible LLM client).
+- **OpenAI SDK** for LLM-based correction and translation (`openai>=1.50`).
 - **pyannote.audio 4.x** for VAD and speaker diarization
   (`speaker-diarization-community-1`).
 - **punctfix** for restoring punctuation after ASR.
@@ -56,16 +56,14 @@ src/
     audio_chunking.py     # Diarization-based chunking (pyannote)
     transcribing.py       # VAD-segment + wav2vec2 ASR → word-level chunks
     text_chunking.py      # Group word-level chunks into readable subtitle lines
-    translation.py        # Batched small100 translation of Chunks
-    tokenization_small100.py  # Vendored tokenizer for the small100 model
+    llm.py                # LLM-based correct_and_translate() + build_client()
     subtitling.py         # generate_subtitles() — writes WebVTT, colours overlapping speakers
     vtt.py                # WebVTT timestamp formatting
   scripts/                # CLI entry points (Click); imported via `from but_with_subs import ...`
     download_video.py
     extract_audio.py
     chunk_audio.py
-    transcribe_audio.py   # ASR + grouping + translation on an existing .wav
-    translate_string.py
+    transcribe_audio.py   # ASR + grouping + LLM correct-and-translate on an existing .wav
     run_pipeline.py       # End-to-end: URL → download → extract → transcribe → translate → .vtt
     fix_dot_env_file.py   # Used by `make install` to provision .env
   frontend/               # Vue 3 SPA
@@ -122,11 +120,11 @@ The CLI path also composes two earlier per-stage scripts:
   5. `group_word_chunks(word_chunks, punctuation_model, max_words=MAX_WORDS)` in
      `text_chunking.py` — joins words into readable subtitle segments and restores
      punctuation.
-  6. `translate_chunks(chunks, target_lang, batch_size=16)` in `translation.py` —
-     batched small100 translation; yields per-chunk progress tuples then translated
-     `Chunk`s.
-  7. `generate_subtitles(...)` in `subtitling.py` writes two `.vtt` files: `.da.vtt`
-     (source) and `.<lang>.vtt` (translated), colour-coding overlapping speakers.
+  6. `correct_and_translate(chunks, target_language, client, model)` in `llm.py` —
+     LLM-based ASR correction and translation with sliding context window; returns
+     updated Chunk objects.
+  7. `generate_subtitles(...)` in `subtitling.py` writes a single `.vtt` file
+     (`.<lang>.vtt`), colour-coding overlapping speakers.
 
 **`run_pipeline.py`** glues these together: download → `extract_audio(video_path)` →
 transcribe + translate → write `.vtt`s → delete the intermediate `.wav` in a `finally`
@@ -139,7 +137,7 @@ block (the source video stays in `./data/`).
    end-to-end path; the API's `lifespan` shows how models are loaded once and the
    pipeline shows how they're stitched together.
 3. `src/but_with_subs/constants.py` — model IDs and tunables (`ASR_MODEL_ID`,
-   `TRANSLATION_MODEL`, `TARGET_SAMPLE_RATE`, `MAX_WORDS`, `DATA_DIR`).
+   `TARGET_SAMPLE_RATE`, `MAX_WORDS`, `DATA_DIR`).
 4. `src/but_with_subs/data_models.py` — every shared Pydantic / data type.
 5. `src/but_with_subs/database.py` — `FileRecord` schema and `upsert_file` semantics
    (partial updates).
@@ -160,9 +158,9 @@ block (the source video stays in `./data/`).
   to `/api/media/<filename>` against the `/media` static mount. If you add fields with
   paths, rewrite them here too — the browser can't read absolute container paths.
 - **Models load once at startup.** `lifespan` builds the ASR pipeline, `PunctFixer`,
-  M2M100 + SMALL100 tokenizer, and database engine into `app.state.app_state`. Don't
-  re-instantiate them per request, and don't import `pipeline.run_pipeline` in a way
-  that forces eager model loading.
+  LLM client, and database engine into `app.state.app_state`. Don't re-instantiate
+  them per request, and don't import `pipeline.run_pipeline` in a way that forces
+  eager model loading.
 - **Database.** `database.build_engine()` reads `DATABASE_URL`
   (`postgresql+psycopg://…` in Docker, sqlite fallback elsewhere). `psycopg[binary]`
   is the driver. `upsert_file` does **partial** updates — `None` arguments don't
@@ -174,10 +172,11 @@ block (the source video stays in `./data/`).
   (`instantiate()` for threshold params, calling `.apply()` instead of `__call__`).
   See commits `90e0d59`, `220cdf7`, `27b43ef`. Check current pyannote.audio docs before
   changing `transcribing.py:vad_segment_audio` or `audio_chunking.py`.
-- **Heavy model downloads** on first run (wav2vec2 ~315M, small100, pyannote
-  diarization, pyannote VAD). Tests mock `vad_segment_audio` to avoid this — preserve
-  that pattern (see commit `b6b9d2c`). Some models (pyannote diarization-community-1)
-  require accepting the Hugging Face license + a HF token.
+- **Heavy model downloads** on first run (wav2vec2 ~315M, pyannote diarization,
+  pyannote VAD). Tests mock `vad_segment_audio` to avoid this — preserve that
+  pattern (see commit `b6b9d2c`). Some models (pyannote diarization-community-1)
+  require accepting the Hugging Face license + a HF token. The LLM client is
+  API-based and requires no local model download.
 - **Audio is float32, mono, 16 kHz, contiguous** by the time it hits ASR. The
   preprocessing/normalisation invariants in `audio_loading.py` matter — see fixes in
   commits `6a5378a`, `b078600`.

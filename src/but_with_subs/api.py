@@ -3,29 +3,27 @@
 import collections.abc as c
 import contextlib
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 import bits_and_bobs as bnb
+import openai
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from punctfix.inference import PunctFixer
 from pydantic import BaseModel
 from sqlalchemy.engine import Engine
-from transformers import (
-    AutomaticSpeechRecognitionPipeline,
-    M2M100ForConditionalGeneration,
-    pipeline,
-)
+from transformers import AutomaticSpeechRecognitionPipeline, pipeline
 
-from .constants import ASR_MODEL_ID, DATA_DIR, TRANSLATION_MODEL
+from .constants import ASR_MODEL_ID, DATA_DIR
 from .data_models import ProgressEvent
 from .database import build_engine, init_db
 from .device import get_device
+from .llm import build_client
 from .logging_config import configure_logging, logger
 from .pipeline import run_pipeline
-from .tokenization_small100 import SMALL100Tokenizer
 
 
 @dataclass
@@ -35,8 +33,8 @@ class AppState:
     engine: Engine
     asr_model: AutomaticSpeechRecognitionPipeline
     punctuation_model: PunctFixer
-    translation_model: M2M100ForConditionalGeneration
-    translation_tokenizer: SMALL100Tokenizer
+    llm_client: openai.OpenAI
+    llm_model: str
 
 
 class ProcessRequest(BaseModel):
@@ -68,22 +66,16 @@ async def lifespan(app: FastAPI) -> c.AsyncIterator[None]:
     with bnb.no_terminal_output():
         punctuation_model = PunctFixer(language="da")
 
-    logger.info(f"Loading translation model: {TRANSLATION_MODEL}")
-    with bnb.no_terminal_output():
-        translation_model = M2M100ForConditionalGeneration.from_pretrained(
-            TRANSLATION_MODEL
-        )
-        translation_tokenizer = SMALL100Tokenizer.from_pretrained(
-            TRANSLATION_MODEL, tgt_lang="en"
-        )
-        translation_model = translation_model.to(device)  # ty: ignore[invalid-argument-type]
+    logger.info("Building LLM client")
+    llm_client = build_client()
+    llm_model = os.environ["LLM_MODEL"]
 
     app.state.app_state = AppState(
         engine=engine,
         asr_model=asr_model,
         punctuation_model=punctuation_model,
-        translation_model=translation_model,
-        translation_tokenizer=translation_tokenizer,
+        llm_client=llm_client,
+        llm_model=llm_model,
     )
     logger.info("API ready")
     try:
@@ -117,9 +109,6 @@ def process(req: ProcessRequest, request: Request) -> StreamingResponse:
     """
     state: AppState = request.app.state.app_state
 
-    if req.language:
-        state.translation_tokenizer.set_tgt_lang_special_tokens(req.language)
-
     def stream() -> c.Iterator[bytes]:
         try:
             for event in run_pipeline(
@@ -127,8 +116,8 @@ def process(req: ProcessRequest, request: Request) -> StreamingResponse:
                 language=req.language,
                 asr_model=state.asr_model,
                 punctuation_model=state.punctuation_model,
-                translation_model=state.translation_model,
-                translation_tokenizer=state.translation_tokenizer,
+                llm_client=state.llm_client,
+                llm_model=state.llm_model,
                 engine=state.engine,
             ):
                 if event.result is not None:

@@ -6,15 +6,14 @@ rather than constructed here, so the API can load them once at startup.
 """
 
 import collections.abc as c
+import typing as t
 from pathlib import Path
 
+import openai
 from punctfix.inference import PunctFixer
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
-from transformers import (
-    AutomaticSpeechRecognitionPipeline,
-    M2M100ForConditionalGeneration,
-)
+from transformers import AutomaticSpeechRecognitionPipeline, pipeline
 
 from .audio_extraction import extract_audio
 from .audio_loading import load_audio
@@ -22,12 +21,11 @@ from .constants import MAX_WORDS
 from .data_models import Chunk, DownloadProgress, ProgressEvent, VideoWithSubs
 from .database import upsert_file
 from .downloading import download
+from .llm import correct_and_translate
 from .logging_config import logger
 from .subtitling import generate_subtitles
 from .text_chunking import group_word_chunks
-from .tokenization_small100 import SMALL100Tokenizer
 from .transcribing import transcribe_audio
-from .translation import _translate_batch
 
 # Stage boundaries on the 0-100 progress scale.
 DOWNLOAD_END = 50.0
@@ -41,8 +39,8 @@ def run_pipeline(
     language: str | None,
     asr_model: AutomaticSpeechRecognitionPipeline,
     punctuation_model: PunctFixer,
-    translation_model: M2M100ForConditionalGeneration | None,
-    translation_tokenizer: SMALL100Tokenizer | None,
+    llm_client: openai.OpenAI | None = None,
+    llm_model: str = "gpt-4o-mini",
     engine: Engine,
 ) -> c.Iterator[ProgressEvent]:
     """Process ``url`` through download → transcribe → (translate) → subtitle.
@@ -55,8 +53,8 @@ def run_pipeline(
         language: Optional ISO-639-1 code; when set, transcripts are translated.
         asr_model: Pre-loaded ASR pipeline.
         punctuation_model: Pre-loaded punctuation model.
-        translation_model: Pre-loaded M2M100 translation model.
-        translation_tokenizer: Tokenizer matching ``translation_model``.
+        llm_client: Pre-built OpenAI client for correct-and-translate.
+        llm_model: Model name for the LLM API call.
         engine: SQLModel engine for persisting the file record.
 
     Yields:
@@ -125,19 +123,33 @@ def run_pipeline(
     logger.info(f"Grouped into {len(chunks)} text segments")
 
     # --- Translate (optional) --------------------------------------------
-    if language and translation_model is not None and translation_tokenizer is not None:
+    if language and llm_client is not None:
         yield ProgressEvent(
             stage="transcribing",
             percentage=TRANSCRIBE_END,
             message=f"Translating to {language}…",
         )
-        translated_texts = _translate_batch(
-            translation_model,
-            translation_tokenizer,
-            [chunk.text or "" for chunk in chunks],
+
+        llm_events: list[ProgressEvent] = []
+
+        def _on_progress(ratio: float) -> None:
+            pct = TRANSCRIBE_END + ratio * (SUBTITLE_END - TRANSCRIBE_END)
+            llm_events.append(
+                ProgressEvent(
+                    stage="transcribing",
+                    percentage=pct,
+                    message=f"Correcting + translating to {language}…",
+                )
+            )
+
+        chunks = correct_and_translate(
+            chunks,
+            target_language=language,
+            client=llm_client,
+            model=llm_model,
+            on_progress=_on_progress,
         )
-        for chunk, text in zip(chunks, translated_texts):
-            chunk.text = text
+        yield from llm_events
 
     # --- Subtitles --------------------------------------------------------
     yield ProgressEvent(
