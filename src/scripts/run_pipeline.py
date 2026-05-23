@@ -19,7 +19,7 @@ from punctfix.inference import PunctFixer
 from tqdm.auto import tqdm
 from transformers import pipeline
 
-from but_with_subs import configure_logging, download
+from but_with_subs import configure_logging, download, load_diarization_pipeline
 from but_with_subs.audio_extraction import extract_audio
 from but_with_subs.audio_loading import load_audio
 from but_with_subs.constants import ASR_MODEL_ID, MAX_WORDS
@@ -28,7 +28,7 @@ from but_with_subs.device import get_device
 from but_with_subs.llm import build_client
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
-from but_with_subs.transcribing import transcribe_audio
+from but_with_subs.transcribing import assign_speakers, transcribe_audio
 
 logger = logging.getLogger("but_with_subs")
 
@@ -78,8 +78,22 @@ def main(url: str, language: str) -> None:
         logger.info("Loading the audio file...")
         audio = load_audio(path=audio_path)
 
+        logger.info("Loading the diarisation pipeline...")
+        with bnb.no_terminal_output():
+            diarization_model = load_diarization_pipeline()
+
         word_chunks = transcribe_audio(audio=audio, model=model, show_progress=True)
         logger.info(f"Generated {len(word_chunks)} word-level segments")
+
+        # Assign speakers via diarisation
+        from but_with_subs.audio_chunking import diarize
+
+        turns = diarize(audio, diarization_model)
+        word_chunks = assign_speakers(word_chunks, turns)
+        logger.info(
+            f"Assigned speakers to {sum(1 for c in word_chunks if c.speaker is not None)} "
+            f"of {len(word_chunks)} chunks"
+        )
 
         chunks: list[Chunk] = group_word_chunks(
             word_chunks=word_chunks,

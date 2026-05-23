@@ -12,11 +12,13 @@ import openai
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pyannote.audio import Pipeline
 from punctfix.inference import PunctFixer
 from pydantic import BaseModel
 from sqlalchemy.engine import Engine
 from transformers import AutomaticSpeechRecognitionPipeline, pipeline
 
+from .audio_chunking import load_diarization_pipeline
 from .constants import ASR_MODEL_ID, DATA_DIR
 from .data_models import ProgressEvent
 from .database import build_engine, init_db
@@ -35,6 +37,7 @@ class AppState:
     punctuation_model: PunctFixer
     llm_client: openai.OpenAI
     llm_model: str
+    diarization_model: Pipeline
 
 
 class ProcessRequest(BaseModel):
@@ -70,12 +73,17 @@ async def lifespan(app: FastAPI) -> c.AsyncIterator[None]:
     llm_client = build_client()
     llm_model = os.environ["LLM_MODEL"]
 
+    logger.info("Loading diarisation pipeline")
+    with bnb.no_terminal_output():
+        diarization_model = load_diarization_pipeline()
+
     app.state.app_state = AppState(
         engine=engine,
         asr_model=asr_model,
         punctuation_model=punctuation_model,
         llm_client=llm_client,
         llm_model=llm_model,
+        diarization_model=diarization_model,
     )
     logger.info("API ready")
     try:
@@ -119,6 +127,7 @@ def process(req: ProcessRequest, request: Request) -> StreamingResponse:
                 llm_client=state.llm_client,
                 llm_model=state.llm_model,
                 engine=state.engine,
+                diarization_model=state.diarization_model,
             ):
                 if event.result is not None:
                     event.result.video_path = _to_media_url(event.result.video_path)
