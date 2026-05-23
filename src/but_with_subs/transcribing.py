@@ -4,6 +4,7 @@ This module provides functions to transcribe audio into word-level text segments
 using a pretrained ASR pipeline from the Hugging Face transformers library.
 """
 
+import collections.abc as c
 import typing as t
 
 import bits_and_bobs as bnb
@@ -112,6 +113,7 @@ def transcribe_audio(
     model: AutomaticSpeechRecognitionPipeline,
     min_chunk_length: float = MIN_CHUNK_LENGTH_SECONDS,
     show_progress: bool = True,
+    on_progress: c.Callable[[float], None] | None = None,
 ) -> list[Chunk]:
     """Transcribe audio with VAD pre-segmentation.
 
@@ -130,6 +132,9 @@ def transcribe_audio(
             are excluded. Defaults to ``MIN_CHUNK_LENGTH_SECONDS`` (0.05 s).
         show_progress (optional):
             Whether to display a progress bar. Defaults to ``True``.
+        on_progress (optional):
+            Callback invoked after each VAD segment finishes, receiving a
+            float in ``[0, 1]`` indicating completion ratio.
 
     Returns:
         List of word-level transcribed ``Chunk`` objects.
@@ -185,6 +190,8 @@ def transcribe_audio(
                     )
                 )
             pbar.update(1)
+            if on_progress is not None and total_steps > 0:
+                on_progress(pbar.n / total_steps)
 
     logger.info(f"Completed transcription of {len(word_chunks)} word segments")
 

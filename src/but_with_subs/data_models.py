@@ -31,6 +31,34 @@ class File(BaseModel):
     audio_path: Path | None
 
 
+class VideoWithSubs(BaseModel):
+    """Final output of the processing pipeline."""
+
+    video_path: str
+    subtitles_path: str
+
+
+class ProgressEvent(BaseModel):
+    """Streaming progress update emitted by the processing pipeline.
+
+    Attributes:
+        stage:
+            Coarse pipeline stage (``downloading``, ``transcribing``,
+            ``subtitling``, ``completed``, ``error``).
+        percentage:
+            Overall progress as a float in ``[0, 100]``.
+        message:
+            Optional human-readable status message.
+        result:
+            Populated only on the final ``completed`` event.
+    """
+
+    stage: str
+    percentage: float
+    message: str | None = None
+    result: VideoWithSubs | None = None
+
+
 class DownloadProgress(BaseModel):
     """Model representing download progress.
 
