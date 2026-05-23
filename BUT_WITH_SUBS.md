@@ -179,7 +179,7 @@ URL and does the following:
   merged
    - `subtitles_path (str)`: The absolute path to the generated subtitles file
 
-### Phase 8: Integrate UI with API
+### Phase 8: Integrate UI with API ✅
 
 When the submission is triggered, the frontend should make a POST request to the API
 endpoint `/process` with the URL as the request body. The frontend should then display

@@ -1,46 +1,110 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
 
-type Stage = "idle" | "processing" | "ready" | "playing";
+type Stage = "idle" | "processing" | "ready" | "playing" | "error";
+
+interface VideoWithSubs {
+  video_path: string;
+  subtitles_path: string;
+}
+
+interface ProgressEvent {
+  stage: string;
+  percentage: number;
+  message?: string | null;
+  result?: VideoWithSubs | null;
+}
 
 const stage = ref<Stage>("idle");
 const url = ref("");
 const progress = ref(0);
+const progressMessage = ref<string | null>(null);
+const errorMessage = ref<string | null>(null);
 const showToast = ref(false);
 const isDragOver = ref(false);
 const selectedFileName = ref<string | null>(null);
+const videoSrc = ref<string | null>(null);
+const subtitlesSrc = ref<string | null>(null);
 
 const fileInput = useTemplateRef<HTMLInputElement>("fileInput");
 const videoEl = useTemplateRef<HTMLVideoElement>("videoEl");
 
-let progressTimer: number | null = null;
 let toastTimer: number | null = null;
+let abortController: AbortController | null = null;
 
 const canSubmit = computed(
   () => url.value.trim().length > 0 || selectedFileName.value !== null,
 );
 
 const progressLabel = computed(() => {
+  if (progressMessage.value) return progressMessage.value;
   if (progress.value < 50) return "Downloading video…";
   if (progress.value < 100) return "Transcribing audio…";
   return "Done";
 });
 
-function startProcessing() {
+async function startProcessing() {
   if (!canSubmit.value) return;
   stage.value = "processing";
   progress.value = 0;
-  progressTimer = window.setInterval(() => {
-    const step = progress.value < 50 ? 1.2 : 0.9;
-    progress.value = Math.min(100, progress.value + step);
-    if (progress.value >= 100) {
-      if (progressTimer !== null) {
-        window.clearInterval(progressTimer);
-        progressTimer = null;
-      }
-      onComplete();
+  progressMessage.value = null;
+  errorMessage.value = null;
+  videoSrc.value = null;
+  subtitlesSrc.value = null;
+
+  abortController = new AbortController();
+  try {
+    const response = await fetch("/api/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: url.value.trim() }),
+      signal: abortController.signal,
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`Request failed (${response.status})`);
     }
-  }, 80);
+    await consumeStream(response.body);
+  } catch (err) {
+    if ((err as Error).name === "AbortError") return;
+    stage.value = "error";
+    errorMessage.value = (err as Error).message || "Something went wrong.";
+  }
+}
+
+async function consumeStream(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line.length === 0) continue;
+      handleEvent(JSON.parse(line) as ProgressEvent);
+    }
+  }
+  const tail = buffer.trim();
+  if (tail.length > 0) handleEvent(JSON.parse(tail) as ProgressEvent);
+}
+
+function handleEvent(event: ProgressEvent) {
+  if (event.stage === "error") {
+    stage.value = "error";
+    errorMessage.value = event.message || "Pipeline failed.";
+    return;
+  }
+  progress.value = Math.max(progress.value, event.percentage);
+  progressMessage.value = event.message ?? null;
+  if (event.stage === "completed" && event.result) {
+    videoSrc.value = event.result.video_path;
+    subtitlesSrc.value = event.result.subtitles_path;
+    onComplete();
+  }
 }
 
 function onComplete() {
@@ -52,7 +116,7 @@ function onComplete() {
 }
 
 function onSubmit() {
-  startProcessing();
+  void startProcessing();
 }
 
 function onFilePicked(event: Event) {
@@ -91,9 +155,9 @@ function clearFile() {
 }
 
 function goHome() {
-  if (progressTimer !== null) {
-    window.clearInterval(progressTimer);
-    progressTimer = null;
+  if (abortController !== null) {
+    abortController.abort();
+    abortController = null;
   }
   if (toastTimer !== null) {
     window.clearTimeout(toastTimer);
@@ -102,6 +166,10 @@ function goHome() {
   stage.value = "idle";
   url.value = "";
   progress.value = 0;
+  progressMessage.value = null;
+  errorMessage.value = null;
+  videoSrc.value = null;
+  subtitlesSrc.value = null;
   showToast.value = false;
   selectedFileName.value = null;
   if (fileInput.value) fileInput.value.value = "";
@@ -135,7 +203,7 @@ watch(url, (val) => {
 });
 
 onBeforeUnmount(() => {
-  if (progressTimer !== null) window.clearInterval(progressTimer);
+  if (abortController !== null) abortController.abort();
   if (toastTimer !== null) window.clearTimeout(toastTimer);
   document.removeEventListener("fullscreenchange", onFullscreenChange);
 });
@@ -240,7 +308,7 @@ onBeforeUnmount(() => {
 
       <!-- READY / PLAYING -->
       <section
-        v-else
+        v-else-if="stage === 'ready' || stage === 'playing'"
         class="card card--player"
         :class="{ 'card--playing': stage === 'playing' }"
       >
@@ -259,12 +327,29 @@ onBeforeUnmount(() => {
           class="video"
           controls
           playsinline
+          :src="videoSrc ?? undefined"
           @play="onVideoPlay"
-        ></video>
+        >
+          <track
+            v-if="subtitlesSrc"
+            kind="subtitles"
+            :src="subtitlesSrc"
+            label="Subtitles"
+            default
+          />
+        </video>
 
         <button class="ghost-button home-button" @click="goHome">
           ← Process another video
         </button>
+      </section>
+
+      <!-- ERROR -->
+      <section v-else-if="stage === 'error'" class="card card--center">
+        <div class="error-block">
+          <p class="error-message">{{ errorMessage }}</p>
+          <button class="ghost-button" @click="goHome">← Try again</button>
+        </div>
       </section>
     </main>
 
@@ -557,6 +642,20 @@ onBeforeUnmount(() => {
 
 .home-button {
   align-self: flex-start;
+}
+
+.error-block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  text-align: center;
+}
+
+.error-message {
+  color: #ef4444;
+  margin: 0;
+  font-size: 14px;
 }
 
 .toast {

@@ -4,10 +4,12 @@ import collections.abc as c
 import contextlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import bits_and_bobs as bnb
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from punctfix.inference import PunctFixer
 from pydantic import BaseModel
 from sqlalchemy.engine import Engine
@@ -17,7 +19,7 @@ from transformers import (
     pipeline,
 )
 
-from .constants import ASR_MODEL_ID, TRANSLATION_MODEL
+from .constants import ASR_MODEL_ID, DATA_DIR, TRANSLATION_MODEL
 from .data_models import ProgressEvent
 from .database import build_engine, init_db
 from .device import get_device
@@ -129,6 +131,11 @@ def process(req: ProcessRequest, request: Request) -> StreamingResponse:
                 translation_tokenizer=state.translation_tokenizer,
                 engine=state.engine,
             ):
+                if event.result is not None:
+                    event.result.video_path = _to_media_url(event.result.video_path)
+                    event.result.subtitles_path = _to_media_url(
+                        event.result.subtitles_path
+                    )
                 yield _encode(event)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Pipeline failed")
@@ -137,6 +144,16 @@ def process(req: ProcessRequest, request: Request) -> StreamingResponse:
             )
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+def _to_media_url(path: str) -> str:
+    """Convert an absolute filesystem path under ``DATA_DIR`` to a browser URL.
+
+    Returns:
+        A URL of the form ``/api/media/<filename>`` that the proxy maps to
+        the static media mount on this app.
+    """
+    return f"/api/media/{Path(path).name}"
 
 
 def _encode(event: ProgressEvent) -> bytes:
@@ -150,3 +167,7 @@ def _encode(event: ProgressEvent) -> bytes:
 
 app = FastAPI(title="but_with_subs", lifespan=lifespan)
 app.include_router(router)
+
+_data_dir = Path(DATA_DIR)
+_data_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(_data_dir)), name="media")
