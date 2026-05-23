@@ -45,7 +45,7 @@ def translate_string(text: str, target_lang: str) -> None:
 
     logger.info(f"Translating to {target_lang}")
     translated = translate_single(model, tokenizer, text)
-    print(translated)
+    logger.info(translated)
 
 
 if __name__ == "__main__":

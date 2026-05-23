@@ -11,6 +11,7 @@ import numpy as np
 import torch
 from pyannote.audio.pipelines import VoiceActivityDetection
 from pyannote.audio.pipelines.utils.hook import ProgressHook
+from pyannote.pipeline import Pipeline
 from tqdm.auto import tqdm
 from transformers import AutomaticSpeechRecognitionPipeline
 
@@ -61,18 +62,23 @@ def vad_segment_audio(
     Returns:
         List of (start, end, audio_slice) tuples for non-silent regions.
     """
-    vad = VoiceActivityDetection()
-    vad = vad.instantiate({"onset": 0.5, "offset": 0.3})
+    vad: Pipeline = VoiceActivityDetection().instantiate(
+        {
+            "onset": 0.5,
+            "offset": 0.3,
+            "min_duration_on": 0.0,
+            "min_duration_off": 0.0,
+        }
+    )
     vad.to(get_device())
 
     waveform = torch.from_numpy(audio).unsqueeze(dim=0).float()
     with ProgressHook() as hook:
-        speech_prob = vad({"waveform": waveform, "sample_rate": sample_rate}, hook=hook)
+        speech = vad.apply(
+            file={"waveform": waveform, "sample_rate": sample_rate}, hook=hook
+        )
 
-    # speech_prob is a SegmentSequence with (segment, probability)
-    active_segments = [
-        (seg.start, seg.end) for seg, prob in speech_prob.itersegments() if prob > 0.5
-    ]
+    active_segments = [(seg.start, seg.end) for seg in speech.itersegments()]
 
     if not active_segments:
         return [(0.0, len(audio) / sample_rate, audio)]  # fallback: entire audio
