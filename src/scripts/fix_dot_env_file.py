@@ -12,7 +12,12 @@ from but_with_subs import configure_logging
 
 configure_logging()
 
-DESIRED_ENVIRONMENT_VARIABLES = {}
+DESIRED_ENVIRONMENT_VARIABLES = {
+    "HF_TOKEN": (
+        "Enter your HuggingFace token (https://huggingface.co/settings/tokens), "
+        "used to authenticate model downloads: "
+    ),
+}
 
 
 @click.command()
