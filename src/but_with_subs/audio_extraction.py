@@ -25,6 +25,9 @@ def extract_audio(video_path: Path) -> Path:
 
     """
     output_path = video_path.with_suffix(suffix=".wav")
+    if output_path.exists():
+        logger.info(f"Audio already extracted at '{output_path}', skipping ffmpeg")
+        return output_path
     logger.info(f"Extracting audio from '{video_path}' to '{output_path}'")
     command: list[str] = [
         "ffmpeg",
