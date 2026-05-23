@@ -25,7 +25,6 @@ from but_with_subs.audio_loading import load_audio, validate_audio
 from but_with_subs.data_models import Chunk
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
-from but_with_subs.transcribing import assign_speakers
 
 # =============================================================================
 # Fixtures
@@ -120,9 +119,6 @@ def mock_punctfixer() -> Mock:
     mock = Mock()
     mock.punctuate = Mock(side_effect=lambda text: text + ".")
     return mock
-
-
-
 
 
 # =============================================================================
@@ -672,5 +668,3 @@ class TestDataFlowVerification:
         grouped_text = " ".join([c.text for c in grouped if c.text])
         for orig_text in original_texts:
             assert orig_text.lower() in grouped_text.lower() or len(grouped_text) > 0
-
-

@@ -293,11 +293,7 @@ onBeforeUnmount(() => {
             </select>
           </div>
 
-          <button
-            type="submit"
-            class="primary-button"
-            :disabled="!canSubmit"
-          >
+          <button type="submit" class="primary-button" :disabled="!canSubmit">
             Watch with Subs
           </button>
         </form>
@@ -311,10 +307,7 @@ onBeforeUnmount(() => {
             <span class="progress-percent">{{ Math.floor(progress) }}%</span>
           </div>
           <div class="progress-track">
-            <div
-              class="progress-fill"
-              :style="{ width: `${progress}%` }"
-            ></div>
+            <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
           </div>
         </div>
       </section>
@@ -325,7 +318,10 @@ onBeforeUnmount(() => {
         class="card card--player"
         :class="{ 'card--playing': stage === 'playing' }"
       >
-        <div v-if="stage === 'ready'" class="progress-wrapper progress-wrapper--top">
+        <div
+          v-if="stage === 'ready'"
+          class="progress-wrapper progress-wrapper--top"
+        >
           <div class="progress-meta">
             <span class="progress-label">Done</span>
             <span class="progress-percent">100%</span>

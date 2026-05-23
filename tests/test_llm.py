@@ -8,15 +8,12 @@ conditions.
 import json
 import unittest.mock as um
 
+import numpy as np
 import openai
 import pytest
 
 from but_with_subs.data_models import Chunk
-from but_with_subs.llm import (
-    CorrectedChunk,
-    build_client,
-    correct_and_translate,
-)
+from but_with_subs.llm import CorrectedChunk, build_client, correct_and_translate
 
 
 def _make_chunk(
@@ -36,8 +33,6 @@ def _make_chunk(
     Returns:
         A Chunk instance with default audio data.
     """
-    import numpy as np
-
     return Chunk(
         start_time=start_time,
         end_time=end_time,
@@ -85,9 +80,7 @@ def test_build_client_returns_openai_client() -> None:
     }
     with um.patch.dict("os.environ", env, clear=True):
         # Patch the OpenAI constructor to avoid actual network calls
-        with um.patch.object(
-            openai.OpenAI, "__init__", return_value=None
-        ) as mock_init:
+        with um.patch.object(openai.OpenAI, "__init__", return_value=None) as mock_init:
             build_client()
             # Verify constructor was called with correct args
             mock_init.assert_called_once_with(
@@ -120,9 +113,7 @@ def test_corrected_chunk_rejects_empty_text() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_client(
-    responses: list[str] | None = None,
-) -> openai.OpenAI:
+def _make_mock_client(responses: list[str] | None = None) -> openai.OpenAI:
     """Create a mock OpenAI client with pre-configured responses.
 
     Args:
@@ -163,9 +154,7 @@ def test_correct_and_translate_context_window() -> None:
     )
 
     chunks = [_make_chunk(f"Danish text {i}") for i in range(5)]
-    result = correct_and_translate(
-        chunks, "en", client=mock_client, context_window=2
-    )
+    result = correct_and_translate(chunks, "en", client=mock_client, context_window=2)
 
     # Verify each chunk was translated
     for i, chunk in enumerate(result):
@@ -181,8 +170,6 @@ def test_correct_and_translate_malformed_json_preserves_original() -> None:
     Verifies that when the LLM returns invalid JSON, the original chunk text
     is preserved and a warning is logged.
     """
-    import logging
-
     mock_client = _make_mock_client(
         responses=[
             "not valid json",  # malformed
@@ -272,9 +259,7 @@ def test_correct_and_translate_preserves_chunk_metadata() -> None:
     Verifies that start_time, end_time, and speaker are carried through the
     translation process unchanged.
     """
-    mock_client = _make_mock_client(
-        responses=[json.dumps({"text": "Translated text"})]
-    )
+    mock_client = _make_mock_client(responses=[json.dumps({"text": "Translated text"})])
 
     original_start = 5.5
     original_end = 8.5
@@ -286,9 +271,7 @@ def test_correct_and_translate_preserves_chunk_metadata() -> None:
         speaker=original_speaker,
     )
 
-    result = correct_and_translate(
-        [chunk], "en", client=mock_client, context_window=0
-    )
+    result = correct_and_translate([chunk], "en", client=mock_client, context_window=0)
 
     assert result[0].start_time == original_start
     assert result[0].end_time == original_end
@@ -303,13 +286,8 @@ def test_correct_and_translate_handles_none_text() -> None:
     (None) text preserved.
     """
     mock_client = _make_mock_client(
-        responses=[
-            json.dumps({"text": "Translated"}),
-            json.dumps({"text": "Second"}),
-        ]
+        responses=[json.dumps({"text": "Translated"}), json.dumps({"text": "Second"})]
     )
-
-    import numpy as np
 
     chunks = [
         _make_chunk("Has text"),
@@ -324,9 +302,7 @@ def test_correct_and_translate_handles_none_text() -> None:
 
     # For None text, the LLM will receive "[no text]" as the chunk text
     # and should return a translation
-    result = correct_and_translate(
-        chunks, "en", client=mock_client, context_window=0
-    )
+    result = correct_and_translate(chunks, "en", client=mock_client, context_window=0)
 
     assert result[0].text == "Translated"
     assert result[1].text == "Second"

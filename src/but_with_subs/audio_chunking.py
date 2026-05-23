@@ -22,10 +22,7 @@ def load_diarization_pipeline() -> Pipeline:
     return model
 
 
-def diarize(
-    audio: np.ndarray,
-    model: Pipeline,
-) -> list[tuple[float, float, str]]:
+def diarize(audio: np.ndarray, model: Pipeline) -> list[tuple[float, float, str]]:
     """Run speaker diarisation on the given audio array.
 
     Args:

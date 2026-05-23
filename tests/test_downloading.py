@@ -13,42 +13,26 @@ import pytest
 from but_with_subs.data_models import DownloadProgress, File
 from but_with_subs.downloading import _noop_progress, _parse_progress_info, download
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
-
-def _make_path_mock(name: str, suffix: str, is_file: bool = True) -> um.Mock:
-    """Create a mock Path for use in tests.
+def _make_ydl_mock(requested_downloads: list[dict[str, str]] | None = None) -> um.Mock:
+    """Create a mock yt-dlp instance whose ``extract_info`` returns the given files.
 
     Args:
-        name:
-            The file name to use for identification.
-        suffix:
-            The file extension (e.g. ".mp4").
-        is_file:
-            Whether the mock should report as a file.
+        requested_downloads (optional):
+            List of dicts representing files that yt-dlp would report as
+            having downloaded. Each dict should have a ``filepath`` key.
+            Defaults to None, which yields an empty list.
 
     Returns:
-        A mock Path with the specified properties.
+        A configured ``MagicMock`` suitable for patching ``yt_dlp.YoutubeDL``.
     """
-    mock_path = um.Mock(spec=pathlib.Path)
-    mock_path.name = name
-    mock_path.suffix = suffix
-    mock_path.is_file.return_value = is_file
-    return mock_path
-
-
-def _get_download_result() -> File:
-    """Call download and return the File result.
-
-    This is a helper that wraps download() calls so we don't need to
-    iterate over a generator.
-
-    Returns:
-        The File model returned by download().
-    """
-    return download(url="https://example.com/video")
+    mock_ydl_instance = um.MagicMock()
+    mock_ydl_instance.__enter__.return_value = mock_ydl_instance
+    mock_ydl_instance.__exit__.return_value = False
+    mock_ydl_instance.extract_info.return_value = {
+        "requested_downloads": requested_downloads or []
+    }
+    return mock_ydl_instance
 
 
 # ---------------------------------------------------------------------------
@@ -109,16 +93,13 @@ def test_download_creates_data_dir() -> None:
     Mocks yt-dlp to return immediately and verifies that Path.mkdir
     is called with the correct arguments.
     """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
+    mock_ydl_instance = _make_ydl_mock()
 
     with (
         um.patch("but_with_subs.downloading.Path.mkdir") as mock_mkdir,
         um.patch(
             "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
         ),
-        um.patch("but_with_subs.downloading.Path.iterdir", return_value=iter([])),
     ):
         download(url="https://example.com/video")
 
@@ -126,127 +107,78 @@ def test_download_creates_data_dir() -> None:
 
 
 def test_download_returns_file_with_paths() -> None:
-    """Test that download returns a File with correct video and audio paths.
+    """Test that download returns a File with correct video and audio paths."""
+    mock_ydl_instance = _make_ydl_mock(
+        requested_downloads=[
+            {"filepath": "/tmp/video.mp4"},
+            {"filepath": "/tmp/audio.mp3"},
+        ]
+    )
 
-    Mocks yt-dlp to succeed and provides fake scanned files in the data
-    directory so the scanning logic finds both a video and an audio file.
-    """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
-
-    fake_video = _make_path_mock("video", ".mp4")
-    fake_audio = _make_path_mock("audio", ".mp3")
-
-    with (
-        um.patch(
-            "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
-        ),
-        um.patch(
-            "but_with_subs.downloading.Path.iterdir",
-            return_value=iter([fake_video, fake_audio]),
-        ),
-        um.patch("builtins.sorted", side_effect=lambda x: list(x)),
+    with um.patch(
+        "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
     ):
         result = download(url="https://example.com/video")
 
     assert result.url == "https://example.com/video"
-    assert result.video_path == fake_video
-    assert result.audio_path == fake_audio
+    assert result.video_path == pathlib.Path("/tmp/video.mp4")
+    assert result.audio_path == pathlib.Path("/tmp/audio.mp3")
 
 
 def test_download_progress_hook_called() -> None:
-    """Test that download calls the progress_hook callback during download.
-
-    Passes a mock progress_hook to download() and verifies it gets
-    invoked during the download process.
-    """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
+    """Test that download forwards progress_hook through to yt-dlp's hook list."""
+    mock_ydl_instance = _make_ydl_mock(
+        requested_downloads=[{"filepath": "/tmp/video.mp4"}]
+    )
 
     progress_calls: list[DownloadProgress] = []
 
     def _record_progress(progress: DownloadProgress) -> None:
-        """Record progress updates."""
         progress_calls.append(progress)
 
-    fake_video = _make_path_mock("video", ".mp4")
-
-    with (
-        um.patch(
-            "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
-        ),
-        um.patch(
-            "but_with_subs.downloading.Path.iterdir", return_value=iter([fake_video])
-        ),
-        um.patch("builtins.sorted", side_effect=lambda x: list(x)),
-    ):
+    with um.patch(
+        "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
+    ) as mock_youtube_dl:
         result = download(
             url="https://example.com/video", progress_hook=_record_progress
         )
 
     assert isinstance(result, File)
     assert result.url == "https://example.com/video"
-    # The progress_hook is called by yt-dlp's internal hooks during download
-    # Since we mock YoutubeDL, we can't easily trigger the internal hooks,
-    # but we verify the hook is properly passed through
-    assert callable(_record_progress)
+    ydl_opts = mock_youtube_dl.call_args.args[0]
+    assert "progress_hooks" in ydl_opts
+    assert len(ydl_opts["progress_hooks"]) == 1
 
 
 def test_download_with_no_video() -> None:
-    """Test that download returns File with video_path=None when no video found.
+    """Test that download returns File with video_path=None when no video found."""
+    mock_ydl_instance = _make_ydl_mock(
+        requested_downloads=[{"filepath": "/tmp/audio.mp3"}]
+    )
 
-    Mocks the data directory scan to only contain an audio file, verifying
-    that video_path is None in the returned File.
-    """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
-
-    fake_audio = _make_path_mock("audio", ".mp3")
-
-    with (
-        um.patch(
-            "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
-        ),
-        um.patch(
-            "but_with_subs.downloading.Path.iterdir", return_value=iter([fake_audio])
-        ),
-        um.patch("builtins.sorted", side_effect=lambda x: list(x)),
+    with um.patch(
+        "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
     ):
         result = download(url="https://example.com/video")
 
     assert result.url == "https://example.com/video"
     assert result.video_path is None
-    assert result.audio_path == fake_audio
+    assert result.audio_path == pathlib.Path("/tmp/audio.mp3")
 
 
 def test_download_with_no_audio() -> None:
-    """Test that download returns File with audio_path=None when no audio found.
+    """Test that download returns File with audio_path=None when no audio found."""
+    mock_ydl_instance = _make_ydl_mock(
+        requested_downloads=[{"filepath": "/tmp/video.mp4"}]
+    )
 
-    Mocks the data directory scan to only contain a video file, verifying
-    that audio_path is None in the returned File.
-    """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
-
-    fake_video = _make_path_mock("video", ".mp4")
-
-    with (
-        um.patch(
-            "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
-        ),
-        um.patch(
-            "but_with_subs.downloading.Path.iterdir", return_value=iter([fake_video])
-        ),
-        um.patch("builtins.sorted", side_effect=lambda x: list(x)),
+    with um.patch(
+        "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
     ):
         result = download(url="https://example.com/video")
 
     assert result.url == "https://example.com/video"
-    assert result.video_path == fake_video
+    assert result.video_path == pathlib.Path("/tmp/video.mp4")
     assert result.audio_path is None
 
 
@@ -400,22 +332,15 @@ def test_parse_progress_info_multiple_updates() -> None:
 
 
 def test_download_handles_network_error() -> None:
-    """Test that download handles network errors gracefully.
-
-    Simulates a socket error during download and verifies the exception
-    is properly raised.
-    """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
-    mock_ydl_instance.download.side_effect = socket.error("Network error")
+    """Test that download propagates network errors raised by yt-dlp."""
+    mock_ydl_instance = _make_ydl_mock()
+    mock_ydl_instance.extract_info.side_effect = socket.error("Network error")
 
     with (
         um.patch(
             "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
         ),
         um.patch("but_with_subs.downloading.Path.mkdir"),
-        um.patch("but_with_subs.downloading.Path.iterdir", return_value=iter([])),
     ):
         with pytest.raises(socket.error):
             download(url="https://example.com/video")
@@ -438,21 +363,15 @@ def test_download_handles_permission_error() -> None:
 
 
 def test_download_handles_disk_full_error() -> None:
-    """Test that download handles disk full errors.
-
-    Simulates a OSError with errno ENOSPC (no space left on device).
-    """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
-    mock_ydl_instance.download.side_effect = OSError(28, "No space left on device")
+    """Test that download propagates OSError with ENOSPC from yt-dlp."""
+    mock_ydl_instance = _make_ydl_mock()
+    mock_ydl_instance.extract_info.side_effect = OSError(28, "No space left on device")
 
     with (
         um.patch(
             "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
         ),
         um.patch("but_with_subs.downloading.Path.mkdir"),
-        um.patch("but_with_subs.downloading.Path.iterdir", return_value=iter([])),
     ):
         with pytest.raises(OSError) as exc_info:
             download(url="https://example.com/video")
@@ -505,26 +424,20 @@ def test_download_with_retry_on_transient_error() -> None:
 
         raise last_exception  # type: ignore
 
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
-    mock_ydl_instance.download.side_effect = [
+    mock_ydl_instance = _make_ydl_mock(
+        requested_downloads=[{"filepath": "/tmp/video.mp4"}]
+    )
+    mock_ydl_instance.extract_info.side_effect = [
         socket.error("Transient error"),
         socket.error("Transient error"),
-        None,  # Success on third attempt
+        {"requested_downloads": [{"filepath": "/tmp/video.mp4"}]},
     ]
-
-    fake_video = _make_path_mock("video", ".mp4")
 
     with (
         um.patch(
             "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
         ),
         um.patch("but_with_subs.downloading.Path.mkdir"),
-        um.patch(
-            "but_with_subs.downloading.Path.iterdir", return_value=iter([fake_video])
-        ),
-        um.patch("builtins.sorted", side_effect=lambda x: list(x)),
     ):
         result = _download_with_retry(url="https://example.com/video", max_retries=3)
 
@@ -572,16 +485,13 @@ def test_retry_exponential_backoff_simulation() -> None:
 
 
 def test_download_multiple_files_sequential() -> None:
-    """Test downloading multiple files sequentially.
-
-    Demonstrates how to download multiple URLs in sequence.
-    """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
-
-    fake_video = _make_path_mock("video", ".mp4")
-    fake_audio = _make_path_mock("audio", ".mp3")
+    """Test downloading multiple files sequentially."""
+    mock_ydl_instance = _make_ydl_mock(
+        requested_downloads=[
+            {"filepath": "/tmp/video.mp4"},
+            {"filepath": "/tmp/audio.mp3"},
+        ]
+    )
 
     urls = [
         "https://example.com/video1",
@@ -596,11 +506,6 @@ def test_download_multiple_files_sequential() -> None:
             "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
         ),
         um.patch("but_with_subs.downloading.Path.mkdir"),
-        um.patch(
-            "but_with_subs.downloading.Path.iterdir",
-            return_value=iter([fake_video, fake_audio]),
-        ),
-        um.patch("builtins.sorted", side_effect=lambda x: list(x)),
     ):
         for url in urls:
             result = download(url=url)
@@ -613,33 +518,22 @@ def test_download_multiple_files_sequential() -> None:
 
 
 def test_download_with_multiple_formats() -> None:
-    """Test download that produces multiple file formats.
+    """Test that the first video and the first audio entry are selected."""
+    mock_ydl_instance = _make_ydl_mock(
+        requested_downloads=[
+            {"filepath": "/tmp/video_mp4.mp4"},
+            {"filepath": "/tmp/video_webm.webm"},
+            {"filepath": "/tmp/audio.mp3"},
+        ]
+    )
 
-    Simulates a download that produces video in multiple formats.
-    """
-    mock_ydl_instance = um.Mock()
-    mock_ydl_instance.__enter__ = um.Mock(return_value=mock_ydl_instance)
-    mock_ydl_instance.__exit__ = um.Mock(return_value=False)
-
-    fake_video_mp4 = _make_path_mock("video_mp4", ".mp4")
-    fake_video_webm = _make_path_mock("video_webm", ".webm")
-    fake_audio = _make_path_mock("audio", ".mp3")
-
-    with (
-        um.patch(
-            "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
-        ),
-        um.patch(
-            "but_with_subs.downloading.Path.iterdir",
-            return_value=iter([fake_video_mp4, fake_video_webm, fake_audio]),
-        ),
-        um.patch("builtins.sorted", side_effect=lambda x: list(x)),
+    with um.patch(
+        "but_with_subs.downloading.yt_dlp.YoutubeDL", return_value=mock_ydl_instance
     ):
         result = download(url="https://example.com/video")
 
-    # Should find the first video file (sorted order)
-    assert result.video_path == fake_video_mp4
-    assert result.audio_path == fake_audio
+    assert result.video_path == pathlib.Path("/tmp/video_mp4.mp4")
+    assert result.audio_path == pathlib.Path("/tmp/audio.mp3")
 
 
 # ---------------------------------------------------------------------------

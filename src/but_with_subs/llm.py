@@ -5,17 +5,16 @@ corrects ASR errors and translates into the target language in a single
 pass, using a sliding window of surrounding chunks for context.
 
 Environment variables (read by build_client):
-    LLM_BASE_URL  – OpenAI-compatible endpoint (e.g. https://api.openai.com/v1)
-    LLM_API_KEY   – API key
-    LLM_MODEL     – Model name (e.g. gpt-4o-mini, qwen2.5-7b-instruct)
+    LLM_BASE_URL  -- OpenAI-compatible endpoint (e.g. https://api.openai.com/v1)
+    LLM_API_KEY   -- API key
+    LLM_MODEL     -- Model name (e.g. gpt-4o-mini, qwen2.5-7b-instruct)
 """
 
 from __future__ import annotations
 
+import collections.abc as c
 import json
-import logging
 import os
-import typing as t
 
 import openai
 from pydantic import BaseModel, ValidationError
@@ -23,11 +22,9 @@ from pydantic import BaseModel, ValidationError
 from .data_models import Chunk
 from .logging_config import logger
 
-_OPENAI_CLIENT: openai.OpenAI | None = None
-
 
 class CorrectedChunk(BaseModel):
-    """Structured output from the LLM: corrected + translated text for one chunk."""
+    """Structured output from the LLM: corrected and translated text for one chunk."""
 
     text: str
 
@@ -36,10 +33,13 @@ def build_client() -> openai.OpenAI:
     """Build an OpenAI-compatible client from environment variables.
 
     Reads LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL from the environment.
-    Raises ValueError if any required variable is missing.
 
     Returns:
         An OpenAI client configured with the correct base URL and API key.
+
+    Raises:
+        ValueError:
+            If any of LLM_BASE_URL, LLM_API_KEY, or LLM_MODEL is missing.
     """
     base_url = os.environ.get("LLM_BASE_URL")
     if not base_url:
@@ -63,7 +63,7 @@ def correct_and_translate(
     client: openai.OpenAI,
     model: str = "gpt-4o-mini",
     context_window: int = 6,
-    on_progress: t.Callable[[float], None] | None = None,
+    on_progress: c.Callable[[float], None] | None = None,
 ) -> list[Chunk]:
     """Rewrite each chunk's text so it is both ASR-corrected and translated.
 
@@ -79,17 +79,18 @@ def correct_and_translate(
             ISO-639-1 target language code (e.g. ``"en"``).
         client:
             Pre-built OpenAI client.
-        model:
-            Model name for the API call.
-        context_window:
+        model (optional):
+            Model name for the API call. Defaults to ``"gpt-4o-mini"``.
+        context_window (optional):
             Number of adjacent chunks to include before and after the target
-            chunk (default 6). The full request window is
-            ``2 * context_window + 1`` chunks.
-        on_progress:
-            Optional callback invoked with a float 0..1 after each chunk.
+            chunk. The full request window is ``2 * context_window + 1``
+            chunks. Defaults to 6.
+        on_progress (optional):
+            Callback invoked with a float in ``[0, 1]`` after each chunk.
+            Defaults to None.
 
     Returns:
-        A new list of Chunk objects with corrected + translated text.
+        A new list of Chunk objects with corrected and translated text.
     """
     if not chunks:
         return []
@@ -97,7 +98,6 @@ def correct_and_translate(
     n = len(chunks)
     result: list[Chunk] = []
 
-    # System prompt shared by every request.
     system_prompt = (
         "You are an expert translator and editor of Danish TV subtitles. "
         "The source text was transcribed by an ASR model and may contain errors "
@@ -111,23 +111,18 @@ def correct_and_translate(
     )
 
     for i, chunk in enumerate(chunks):
-        # Build the window: context_window before, current, context_window after.
         window_start = max(0, i - context_window)
-        window_end = min(n, i + context_window + 1)  # inclusive end index
+        window_end = min(n, i + context_window + 1)
         window = chunks[window_start:window_end]
 
-        # Build the numbered list for the LLM.
         numbered = ""
         for j, wc in enumerate(window):
             start = f"{wc.start_time:.3f}" if wc.start_time else "0.0"
             end = f"{wc.end_time:.3f}" if wc.end_time else "0.0"
             text = wc.text or "[no text]"
-            numbered += (
-                f"{window_start + j}: [{start} -> {end}] {text}\n"
-            )
+            numbered += f"{window_start + j}: [{start} -> {end}] {text}\n"
 
-        # Identify the centre chunk index within the window.
-        centre_offset = i - window_start  # index of the target chunk in the window
+        centre_offset = i - window_start
 
         user_prompt = (
             f"Target language: {target_language}\n\n"
@@ -138,42 +133,77 @@ def correct_and_translate(
             f"corrected and translated text for chunk {centre_offset}."
         )
 
-        # API call with JSON mode.
-        try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.3,
-            )
-            raw = response.choices[0].message.content
-            if raw is None:
-                raise ValueError("Empty response")
+        corrected_text = _request_correction(
+            client=client,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            fallback=chunk.text or "",
+            chunk_index=i,
+        )
 
-            parsed: dict[str, str] = json.loads(raw)
-            corrected_text = parsed.get("text", "")
-            if not corrected_text:
-                raise ValueError("Empty text field")
-
-            # Validate with Pydantic.
-            CorrectedChunk.model_validate({"text": corrected_text})
-
-        except (json.JSONDecodeError, ValidationError, ValueError, KeyError) as exc:
-            logger.warning(
-                f"LLM JSON parse failed for chunk {i} (text={chunk.text!r}): {exc}"
-            )
-            corrected_text = chunk.text or ""
-
-        # Build the new chunk (copy, don't mutate).
         new_chunk = chunk.model_copy()
         new_chunk.text = corrected_text
         result.append(new_chunk)
 
-        # Progress callback.
         if on_progress is not None:
             on_progress((i + 1) / n)
 
     return result
+
+
+def _request_correction(
+    *,
+    client: openai.OpenAI,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    fallback: str,
+    chunk_index: int,
+) -> str:
+    """Call the LLM for one chunk and return its corrected text or a fallback.
+
+    Args:
+        client:
+            Pre-built OpenAI client.
+        model:
+            Model name for the API call.
+        system_prompt:
+            System message describing the correction and translation task.
+        user_prompt:
+            User message containing the windowed chunks.
+        fallback:
+            Text to return if the LLM response is malformed or empty.
+        chunk_index:
+            Zero-based index of the chunk being processed, used in log messages.
+
+    Returns:
+        The corrected and translated text, or ``fallback`` on parse failure.
+    """
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+        )
+        raw = response.choices[0].message.content
+        if raw is None:
+            logger.warning(f"LLM returned no content for chunk {chunk_index}")
+            return fallback
+
+        parsed: dict[str, str] = json.loads(raw)
+        corrected_text = parsed.get("text", "")
+        if not corrected_text:
+            logger.warning(f"LLM returned empty text for chunk {chunk_index}")
+            return fallback
+
+        CorrectedChunk.model_validate({"text": corrected_text})
+        return corrected_text
+
+    except (json.JSONDecodeError, ValidationError, KeyError) as exc:
+        logger.warning(f"LLM JSON parse failed for chunk {chunk_index}: {exc}")
+        return fallback
