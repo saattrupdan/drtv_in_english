@@ -199,7 +199,7 @@ ensure that the NGINX config in `docker-compose.nginx.conf` is set up properly t
 the streaming of the API responses, and also in terms of timeouts, as the processing can
 take a long time (maybe have the timeout be 1 hour).
 
-### Phase 10: Documentation
+### Phase 10: Documentation ✅
 
 Update the readme with the following sections:
 

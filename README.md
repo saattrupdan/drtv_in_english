@@ -1,12 +1,12 @@
 <!-- This disables the "First line in file should be a top level heading" rule -->
 <!-- markdownlint-disable MD041 -->
-<img
- src="/but-with-subs-logo.jpg"
- width="239"
- height="175"
- align="right"
- alt="But with subs logo"
-/>
+<p align="center">
+  <img
+    src="./public/but-with-subs-logo.jpg"
+    width="240"
+    alt="But with subs logo"
+  />
+</p>
 
 # But With Subs
 
@@ -22,148 +22,93 @@ Developer:
 
 - Dan Saattrup Smart (<dan.smart@alexandra.dk>)
 
-## Setup
+## Quick Start
 
-### Installation
-
-1. Run `make install`, which sets up a virtual environment and all Python dependencies
-   therein.
-2. Run `source .venv/bin/activate` to activate the virtual environment.
-
-### Adding and Removing Packages
-
-To install new PyPI packages, run:
+The fastest way to run the full app — frontend, backend, postgres, and the
+nginx reverse proxy — is via Docker Compose:
 
 ```bash
-uv add <package-name>
+docker compose up --build --remove-orphans
 ```
 
-To remove them again, run:
+Once the containers are healthy, open <http://localhost> in your browser,
+paste a video URL, and click **Watch with Subs**.
 
-```bash
-uv remove <package-name>
+## Local Development
+
+For iterating on the code without Docker, run the frontend and backend
+separately.
+
+1. Install everything:
+
+   ```bash
+   make install
+   ```
+
+2. Start the frontend dev server:
+
+   ```bash
+   npm run dev
+   ```
+
+3. In a second terminal, start the backend with hot reload:
+
+   ```bash
+   uv run fastapi dev src/but_with_subs/api.py
+   ```
+
+The Vite dev server proxies `/api/*` to the backend on port 8000, so the
+frontend at <http://localhost:5173> talks to the API exactly the way it
+does behind nginx in production.
+
+## Workflow
+
+When a user submits a URL, the request fans out across the stack:
+
+```text
+ ┌───────────┐   POST /api/process    ┌──────────────┐
+ │ Frontend  │ ─────────────────────► │   FastAPI    │
+ │ (Vue 3)   │ ◄───────── NDJSON ──── │   backend    │
+ └─────┬─────┘   progress events      └──────┬───────┘
+       │                                     │
+       │  /api/media/<file>                  │ upsert
+       │  (video + .vtt)                     ▼
+       │                              ┌──────────────┐
+       └─────────────────────────────►│  Postgres    │
+                                      └──────────────┘
 ```
 
-To show all installed packages, run:
+The backend pipeline is a single generator that yields
+`ProgressEvent` objects as it works through five stages:
 
-```bash
-uv pip list
+```text
+ download ──► extract audio ──► VAD + transcribe ──► (translate?) ──► subtitle
+   0–50%           │                 50–95%             95%             100%
+                   └─► upsert FileRecord(url, video_path, audio_path)
+                                                                       │
+                                                       upsert subtitles_path
 ```
 
-## All Built-in Commands
+The final event carries a `VideoWithSubs` payload with browser-facing
+URLs (`/api/media/<filename>`); the frontend wires those into the
+`<video>` element and a `<track kind="subtitles">`.
 
-The project includes the following convenience commands:
+## Stack
 
-- `make install`: Install the project and its dependencies in a virtual environment.
-- `make install-pre-commit`: Install pre-commit hooks for linting, formatting and type
-  checking.
-- `make check`: Lint and format the code using `ruff`, and type check using `pyrefly`.
-- `make test`: Run tests using `pytest` and update the coverage badge in the readme.
-- `make docker`: Build a Docker image and run the Docker container.
-- `make tree`: Show the project structure as a tree.
-
-## A Word on Modules and Scripts
-
-In the `src` directory there are two subdirectories, `but_with_subs`
-and `scripts`. This is a brief explanation of the differences between the two.
-
-### Modules
-
-All Python files in the `but_with_subs` directory are _modules_
-internal to the project package. Examples here could be a general data loading script,
-a definition of a model, or a training function. Think of modules as all the building
-blocks of a project.
-
-When a module is importing functions/classes from other modules we use the _relative
-import_ notation - here's an example:
-
-```python
-from .other_module import some_function
-```
-
-### Scripts
-
-Python files in the `scripts` folder are scripts, which are short code snippets that
-are _external_ to the project package, and which is meant to actually run the code. As
-such, _only_ scripts will be called from the terminal. An analogy here is that the
-internal `numpy` code are all modules, but the Python code you write where you import
-some `numpy` functions and actually run them, that a script.
-
-When importing module functions/classes when you're in a script, you do it like you
-would normally import from any other package:
-
-```python
-from but_with_subs import some_function
-```
-
-Note that this is also how we import functions/classes in tests, since each test Python
-file is also a Python script, rather than a module.
-
-## Usage
-
-### Configuration
-
-Translation and transcription are driven by command-line flags, not environment variables.
-The primary entry point is `src/scripts/translate_string.py`. Example:
-
-```bash
-uv run python src/scripts/translate_string.py \
-    --text "Hello, world!" \
-    --language "French" \
-    --llm-model "gpt-oss-20b" \
-    --llm-api-key "your-llm-api-key" \
-    --api-key "your-translation-api-key" \
-    --api-base "http://localhost:8080"
-```
-
-All flags are:
-
-| Flag | Description | Required | Default |
-| --- | --- | --- | --- |
-| `--text` | Text to translate | Yes | — |
-| `--language` | Target language | Yes | — |
-| `--llm-model` | The LLM model to use (e.g., `"gpt-oss-20b"`) | Yes | — |
-| `--llm-api-key` | The LLM API key | Yes | — |
-| `--llm-api-base` | The LLM API base URL | No | — |
-| `--api-key` | The translation API key | Yes | — |
-| `--api-base` | The translation API base URL | No | `"http://localhost:8080"` |
-
-### Other Scripts
-
-Additional scripts are available in `src/scripts/`:
-
-| Script | Description |
+| Layer | Tech |
 | --- | --- |
-| `download_video.py` | Download a video from a URL |
-| `extract_audio.py` | Extract audio from a video file |
-| `chunk_audio.py` | Split an audio file into chunks |
-| `transcribe_audio.py` | Transcribe audio to text |
-| `translate_string.py` | Translate a text string via an LLM |
+| Frontend | Vue 3, Vite, TypeScript |
+| Backend | FastAPI, SQLModel, Pydantic |
+| Database | Postgres 18.3 |
+| ML | `transformers` (Wav2Vec2 ASR), `pyannote.audio` (VAD), `punctfix`, `M2M100` translation |
+| Media | `yt-dlp`, `ffmpeg` |
+| Infra | Docker Compose, nginx reverse proxy |
 
-## Features
+Heavy ML models are loaded once at FastAPI startup via the `lifespan`
+context and shared across requests.
 
-### Docker Setup
+## Contribute
 
-A Dockerfile is included in the new repositories, which by default runs
-`src/scripts/main.py`. You can build the Docker image and run the Docker container by
-running `make docker`.
-
-### Automatic Test Coverage Calculation
-
-Run `make test` to test your code, which also updates the "coverage badge" in the
-README, showing you how much of your code base that is currently being tested.
-
-### Continuous Integration
-
-Github CI pipelines are included in the repo, running all the tests in the `tests`
-directory, as well as building online documentation, if Github Pages has been enabled
-for the repository (can be enabled on Github in the repository settings).
-
-### Code Spaces
-
-Code Spaces is a new feature on Github, that allows you to develop on a project
-completely in the cloud, without having to do any local setup at all. This repo comes
-included with a configuration file for running code spaces on Github. When hosted on
-`saattrupdan/but_with_subs` then simply press the `<> Code` button
-and add a code space to get started, which will open a VSCode window directly in your
-browser.
+Contributions are very welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+for the workflow, coding conventions, and the Contributor Covenant
+[code of conduct](./CODE_OF_CONDUCT.md).
