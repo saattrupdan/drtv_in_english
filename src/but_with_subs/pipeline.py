@@ -56,22 +56,22 @@ def _diarize(
 def run_pipeline(
     *,
     url: str,
-    language: str | None,
+    language: str,
     asr_model: AutomaticSpeechRecognitionPipeline,
     punctuation_model: PunctFixer,
-    llm_client: openai.OpenAI | None = None,
-    llm_model: str = "gpt-4o-mini",
+    llm_client: openai.OpenAI,
+    llm_model: str,
     engine: Engine,
     diarization_model: Pipeline | None = None,
 ) -> c.Iterator[ProgressEvent]:
-    """Process ``url`` through download → transcribe → (translate) → subtitle.
+    """Process ``url`` through download → transcribe → translate → subtitle.
 
     Yields progress events on a 0-100 scale and finishes with a ``completed``
     event carrying the final :class:`VideoWithSubs` payload.
 
     Args:
         url: Source media URL.
-        language: Optional ISO-639-1 code; when set, transcripts are translated.
+        language: ISO-639-1 code; transcripts are always translated.
         asr_model: Pre-loaded ASR pipeline.
         punctuation_model: Pre-loaded punctuation model.
         llm_client: Pre-built OpenAI client for correct-and-translate.
@@ -158,40 +158,40 @@ def run_pipeline(
     )
     logger.info(f"Grouped into {len(chunks)} text segments")
 
-    # --- Translate (optional) --------------------------------------------
-    if language and llm_client is not None:
-        yield ProgressEvent(
-            stage="transcribing",
-            percentage=TRANSCRIBE_END,
-            message=f"Translating to {language}…",
-        )
+    # --- Translate -------------------------------------------------------
+    yield ProgressEvent(
+        stage="transcribing",
+        percentage=TRANSCRIBE_END,
+        message=f"Translating to {language}…",
+    )
 
-        llm_events: list[ProgressEvent] = []
+    llm_events: list[ProgressEvent] = []
 
-        def _on_progress(ratio: float) -> None:
-            pct = TRANSCRIBE_END + ratio * (SUBTITLE_END - TRANSCRIBE_END)
-            llm_events.append(
-                ProgressEvent(
-                    stage="transcribing",
-                    percentage=pct,
-                    message=f"Correcting + translating to {language}…",
-                )
+    def _on_progress(ratio: float) -> None:
+        pct = TRANSCRIBE_END + ratio * (SUBTITLE_END - TRANSCRIBE_END)
+        llm_events.append(
+            ProgressEvent(
+                stage="transcribing",
+                percentage=pct,
+                message=f"Correcting + translating to {language}…",
             )
-
-        chunks = correct_and_translate(
-            chunks,
-            target_language=language,
-            client=llm_client,
-            model=llm_model,
-            on_progress=_on_progress,
         )
-        yield from llm_events
+
+    chunks = correct_and_translate(
+        chunks,
+        target_language=language,
+        client=llm_client,
+        model=llm_model,
+        on_progress=_on_progress,
+    )
+    yield from llm_events
 
     # --- Subtitles --------------------------------------------------------
     yield ProgressEvent(
         stage="subtitling", percentage=TRANSCRIBE_END, message="Generating subtitles…"
     )
-    subtitles_path = generate_subtitles(chunks=chunks, audio_path=audio_path)
+    subtitles_path = audio_path.with_suffix(f".{language}.vtt")
+    generate_subtitles(chunks=chunks, audio_path=audio_path, output_path=subtitles_path)
 
     with Session(engine) as session:
         upsert_file(session=session, url=url, subtitles_path=subtitles_path.resolve())

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
 
+const LANGUAGES = ["en", "de", "es", "fr", "ja", "ko", "nl", "pt", "sv", "da"];
+
 type Stage = "idle" | "processing" | "ready" | "playing" | "error";
 
 interface VideoWithSubs {
@@ -17,6 +19,7 @@ interface ProgressEvent {
 
 const stage = ref<Stage>("idle");
 const url = ref("");
+const language = ref("en");
 const progress = ref(0);
 const progressMessage = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
@@ -57,7 +60,7 @@ async function startProcessing() {
     const response = await fetch("/api/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: url.value.trim() }),
+      body: JSON.stringify({ url: url.value.trim(), language: language.value }),
       signal: abortController.signal,
     });
     if (!response.ok || !response.body) {
@@ -165,6 +168,7 @@ function goHome() {
   }
   stage.value = "idle";
   url.value = "";
+  language.value = "en";
   progress.value = 0;
   progressMessage.value = null;
   errorMessage.value = null;
@@ -278,6 +282,15 @@ onBeforeUnmount(() => {
                 ×
               </button>
             </div>
+          </div>
+
+          <div class="language-selector">
+            <label for="language-select">Subtitle language:</label>
+            <select id="language-select" v-model="language">
+              <option v-for="lang in LANGUAGES" :key="lang" :value="lang">
+                {{ lang }}
+              </option>
+            </select>
           </div>
 
           <button
@@ -540,6 +553,32 @@ onBeforeUnmount(() => {
 
 .file-chip-clear:hover {
   color: var(--text);
+}
+
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.language-selector label {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.language-selector select {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.language-selector select:hover {
+  border-color: var(--accent);
 }
 
 .primary-button {

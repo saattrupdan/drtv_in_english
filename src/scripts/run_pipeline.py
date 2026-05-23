@@ -42,8 +42,7 @@ configure_logging()
 @click.option(
     "--language",
     type=str,
-    default="en",
-    show_default=True,
+    required=True,
     help="Target language for translation (e.g. 'en' for English).",
 )
 def main(url: str, language: str) -> None:

@@ -122,21 +122,7 @@ def mock_punctfixer() -> Mock:
     return mock
 
 
-def _mock_translate_subtitles(
-    vtt_path: Path, source_lang: str, target_lang: str
-) -> Path:
-    """Mock translation that reads VTT and writes translated version.
 
-    This replaces the real translation module to avoid requiring ML models
-    and network access in tests.
-
-    Returns:
-        Path to the translated VTT file.
-    """
-    translated_path = vtt_path.with_stem(vtt_path.stem + "_translated")
-    content = vtt_path.read_text()
-    translated_path.write_text(content)
-    return translated_path
 
 
 # =============================================================================
@@ -201,15 +187,6 @@ class TestCompletePipeline:
         assert vtt_path.exists()
         vtt_content = vtt_path.read_text()
         assert "WEBVTT" in vtt_content
-
-        # Step 5: Translate subtitles
-        translated_vtt_path = _mock_translate_subtitles(
-            vtt_path, source_lang="dan", target_lang="eng"
-        )
-
-        assert translated_vtt_path.exists()
-        translated_content = translated_vtt_path.read_text()
-        assert "WEBVTT" in translated_content
 
 
 class TestPipelineDataIntegrity:
@@ -314,14 +291,6 @@ class TestModuleInteractions:
         vtt_content = vtt_path.read_text()
         assert "Hej verden" in vtt_content
 
-        # Mock translation and verify integration
-        translated_path = _mock_translate_subtitles(vtt_path, "dan", "eng")
-
-        # Verify translation worked
-        assert translated_path.exists()
-        translated_content = translated_path.read_text()
-        assert "Hej verden" in translated_content
-
 
 # =============================================================================
 # Real-World Scenario Tests
@@ -377,12 +346,6 @@ class TestRealWorldScenarios:
         assert "Host" in content
         assert "Guest" in content
 
-        # Translate
-        translated = _mock_translate_subtitles(vtt_path, "dan", "eng")
-
-        translated_content = translated.read_text()
-        assert "Velkommen til podcasten" in translated_content
-
     def test_long_form_content_scenario(self, tmp_path: Path) -> None:
         """Test handling of long-form content with many segments."""
         # Simulate a long lecture or presentation
@@ -409,13 +372,6 @@ class TestRealWorldScenarios:
         # Verify all segments are present
         assert "1 (Lecturer)" in content
         assert f"{num_segments} (Lecturer)" in content
-
-        # Translate in batch
-        translated = _mock_translate_subtitles(vtt_path, "dan", "eng")
-
-        translated_content = translated.read_text()
-        assert "1 (Lecturer)" in translated_content
-        assert f"{num_segments} (Lecturer)" in translated_content
 
     def test_overlapping_speakers_scenario(self, tmp_path: Path) -> None:
         """Test handling of overlapping speakers in a conversation."""
@@ -498,14 +454,7 @@ class TestRealWorldScenarios:
         audio_path.write_bytes(b"fake")
         vtt_path = generate_subtitles(danish_chunks, audio_path)
 
-        # Translate to English
-        en_path = _mock_translate_subtitles(vtt_path, "dan", "eng")
-
-        # Translate to German
-        de_path = _mock_translate_subtitles(vtt_path, "dan", "deu")
-
-        assert en_path.exists()
-        assert de_path.exists()
+        assert vtt_path.exists()
 
 
 # =============================================================================
@@ -558,9 +507,9 @@ class TestPipelineErrorHandling:
 Test tekst
 """)
 
-        # The mock translation should succeed and produce an output file
-        result = _mock_translate_subtitles(vtt_path, "dan", "eng")
-        assert result.exists()
+        # Verify a single VTT file is produced
+        assert vtt_path.exists()
+        assert vtt_path.read_text().count("WEBVTT") == 1
 
     def test_missing_audio_file_handling(self, mock_word_chunks: list[Chunk]) -> None:
         """Test handling of missing audio files during subtitle generation."""
@@ -568,15 +517,6 @@ Test tekst
 
         with pytest.raises(FileNotFoundError, match="Audio file not found"):
             generate_subtitles(mock_word_chunks, non_existent_path)
-
-    def test_invalid_vtt_translation(self, tmp_path: Path) -> None:
-        """Test handling of invalid VTT files during translation."""
-        invalid_vtt = tmp_path / "invalid.vtt"
-        invalid_vtt.write_text("Not a valid VTT file")
-
-        # Should handle gracefully - produces a copy with _translated suffix
-        result = _mock_translate_subtitles(invalid_vtt, "dan", "eng")
-        assert result.exists()
 
 
 # =============================================================================
