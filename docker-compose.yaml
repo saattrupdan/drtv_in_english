@@ -14,6 +14,28 @@ services:
       backend:
         condition: service_healthy
 
+  model-cache-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      HF_HOME: /opt/hf-cache
+    volumes:
+      - model_cache:/opt/hf-cache
+    command:
+      - python
+      - -c
+      - |
+        from transformers import pipeline, M2M100ForConditionalGeneration
+        from punctfix.inference import PunctFixer
+        from but_with_subs.constants import ASR_MODEL_ID, TRANSLATION_MODEL
+        from but_with_subs.tokenization_small100 import SMALL100Tokenizer
+        pipeline(task='automatic-speech-recognition', model=ASR_MODEL_ID, device='cpu', num_beams=5)
+        PunctFixer(language='da')
+        M2M100ForConditionalGeneration.from_pretrained(TRANSLATION_MODEL)
+        SMALL100Tokenizer.from_pretrained(TRANSLATION_MODEL, tgt_lang='en')
+    restart: "no"
+
   backend:
     env_file:
       - .env
@@ -25,9 +47,12 @@ services:
       DATABASE_URL: postgresql+psycopg://but_with_subs:but_with_subs@postgres:5432/but_with_subs
     volumes:
       - backend_data:/project/data
+      - model_cache:/opt/hf-cache
     depends_on:
       postgres:
         condition: service_healthy
+      model-cache-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=3).status==200 else 1)"]
       interval: 10s
@@ -65,3 +90,4 @@ services:
 volumes:
   postgres_data:
   backend_data:
+  model_cache:
