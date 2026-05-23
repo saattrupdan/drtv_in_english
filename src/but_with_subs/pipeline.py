@@ -9,7 +9,9 @@ import collections.abc as c
 import typing as t
 from pathlib import Path
 
+import numpy as np
 import openai
+from pyannote.audio import Pipeline
 from punctfix.inference import PunctFixer
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
@@ -25,12 +27,30 @@ from .llm import correct_and_translate
 from .logging_config import logger
 from .subtitling import generate_subtitles
 from .text_chunking import group_word_chunks
-from .transcribing import transcribe_audio
+from .transcribing import assign_speakers, transcribe_audio
 
 # Stage boundaries on the 0-100 progress scale.
 DOWNLOAD_END = 50.0
 TRANSCRIBE_END = 95.0
 SUBTITLE_END = 100.0
+
+
+def _diarize(
+    audio: np.ndarray,
+    model: Pipeline,
+) -> list[tuple[float, float, str]]:
+    """Run diarisation on audio using the given Pipeline.
+
+    Args:
+        audio: Mono audio array at ``TARGET_SAMPLE_RATE``.
+        model: A pre-loaded diarisation Pipeline.
+
+    Returns:
+        List of ``(start, end, speaker)`` tuples.
+    """
+    from .audio_chunking import diarize
+
+    return diarize(audio, model)
 
 
 def run_pipeline(
@@ -42,6 +62,7 @@ def run_pipeline(
     llm_client: openai.OpenAI | None = None,
     llm_model: str = "gpt-4o-mini",
     engine: Engine,
+    diarization_model: Pipeline | None = None,
 ) -> c.Iterator[ProgressEvent]:
     """Process ``url`` through download → transcribe → (translate) → subtitle.
 
@@ -56,6 +77,7 @@ def run_pipeline(
         llm_client: Pre-built OpenAI client for correct-and-translate.
         llm_model: Model name for the LLM API call.
         engine: SQLModel engine for persisting the file record.
+        diarization_model: Optional pre-loaded diarisation Pipeline.
 
     Yields:
         :class:`ProgressEvent` objects describing pipeline progress.
@@ -114,6 +136,20 @@ def run_pipeline(
     )
     # Flush any progress events captured during the (synchronous) call.
     yield from transcribe_events
+
+    # --- Speaker Diarisation ----------------------------------------------
+    if diarization_model is not None:
+        yield ProgressEvent(
+            stage="transcribing",
+            percentage=TRANSCRIBE_END,
+            message="Running speaker diarisation…",
+        )
+        turns = _diarize(audio, diarization_model)
+        word_chunks = assign_speakers(word_chunks, turns)
+        logger.info(
+            f"Assigned speakers to {sum(1 for c in word_chunks if c.speaker is not None)} "
+            f"of {len(word_chunks)} chunks"
+        )
 
     chunks: list[Chunk] = group_word_chunks(
         word_chunks=word_chunks,

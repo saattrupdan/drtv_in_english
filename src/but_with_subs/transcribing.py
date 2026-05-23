@@ -196,3 +196,45 @@ def transcribe_audio(
     logger.info(f"Completed transcription of {len(word_chunks)} word segments")
 
     return word_chunks
+
+
+def assign_speakers(
+    word_chunks: list[Chunk],
+    turns: list[tuple[float, float, str]],
+) -> list[Chunk]:
+    """Assign speakers to word-level chunks based on temporal overlap.
+
+    Each chunk is assigned the speaker whose turn most strongly overlaps
+    the chunk's time range. If multiple turns overlap, the one with the
+    largest intersection is chosen.
+
+    Args:
+        word_chunks:
+            Word-level ``Chunk`` objects produced by :func:`transcribe_audio`.
+        turns:
+            Diarisation output from :func:`diarize`, i.e. a list of
+            ``(start, end, speaker)`` tuples.
+
+    Returns:
+            The same ``Chunk`` objects with ``.speaker`` populated.
+    """
+    if not turns:
+        return word_chunks
+
+    for chunk in word_chunks:
+        best_speaker: str | None = None
+        best_overlap: float = 0.0
+
+        for turn_start, turn_end, speaker in turns:
+            # Compute overlap between chunk and turn
+            overlap_start = max(chunk.start_time, turn_start)
+            overlap_end = min(chunk.end_time, turn_end)
+            overlap_duration = overlap_end - overlap_start
+
+            if overlap_duration > best_overlap:
+                best_overlap = overlap_duration
+                best_speaker = speaker
+
+        chunk.speaker = best_speaker
+
+    return word_chunks
