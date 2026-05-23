@@ -64,28 +64,27 @@ def download(
 
     logger.info(f"Starting download from {url}")
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[no-untyped-call]
-        ydl.download(url_list=[url])
+    video_suffixes = (".mp4", ".webm", ".mkv", ".avi", ".mov")
+    audio_suffixes = (".mp3", ".m4a", ".wav", ".flac", ".aac", ".ogg")
 
-    logger.info("Download completed, scanning for files in ./data/")
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[no-untyped-call]
+        info = ydl.extract_info(url, download=True)  # type: ignore[no-untyped-call]
+
+    downloaded_paths: list[Path] = []
+    for entry in info.get("requested_downloads") or []:
+        filepath = entry.get("filepath") or entry.get("_filename")
+        if filepath:
+            downloaded_paths.append(Path(filepath))
+    if not downloaded_paths:
+        downloaded_paths.append(Path(ydl.prepare_filename(info)))  # type: ignore[no-untyped-call]
 
     video_path: Path | None = None
     audio_path: Path | None = None
-
-    for item in sorted(data_dir.iterdir()):
-        if item.is_file() and item.suffix in (".mp4", ".webm", ".mkv", ".avi", ".mov"):
-            if video_path is None:
-                video_path = item
-        elif item.is_file() and item.suffix in (
-            ".mp3",
-            ".m4a",
-            ".wav",
-            ".flac",
-            ".aac",
-            ".ogg",
-        ):
-            if audio_path is None:
-                audio_path = item
+    for path in downloaded_paths:
+        if video_path is None and path.suffix in video_suffixes:
+            video_path = path
+        elif audio_path is None and path.suffix in audio_suffixes:
+            audio_path = path
 
     logger.info(f"Download results - video: {video_path}, audio: {audio_path}")
 
