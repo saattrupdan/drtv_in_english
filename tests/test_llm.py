@@ -86,7 +86,7 @@ def test_build_client_returns_openai_client() -> None:
             mock_init.assert_called_once_with(
                 base_url="https://api.openai.com/v1",
                 api_key="sk-test-key",
-                max_retries=3,
+                max_retries=0,
             )
 
 
@@ -143,37 +143,50 @@ def test_correct_and_translate_empty_chunks_returns_empty() -> None:
     assert result == []
 
 
-def test_correct_and_translate_context_window() -> None:
-    """Test that each chunk is sent with the configured context window.
+def _batch_response(translations: dict[int, str]) -> str:
+    """Build a JSON response of the form the LLM is asked to emit.
 
-    Verifies that the LLM receives a window of chunks before and after the
-    target chunk, with the correct size.
+    Args:
+        translations:
+            Mapping from chunk index to corrected text.
+
+    Returns:
+        A JSON-encoded ``{"translations": {...}}`` string.
+    """
+    return json.dumps({"translations": {str(k): v for k, v in translations.items()}})
+
+
+def test_correct_and_translate_batches_chunks() -> None:
+    """Test that chunks are batched and each batch produces one API call.
+
+    With 5 chunks and ``batch_size=2`` we expect 3 API calls (batches of
+    size 2, 2, 1), and the translations returned by the LLM are applied
+    to the corresponding chunks.
     """
     mock_client = _make_mock_client(
-        responses=[json.dumps({"text": f"Translated {i}"}) for i in range(5)]
+        responses=[
+            _batch_response({0: "Translated 0", 1: "Translated 1"}),
+            _batch_response({2: "Translated 2", 3: "Translated 3"}),
+            _batch_response({4: "Translated 4"}),
+        ]
     )
 
     chunks = [_make_chunk(f"Danish text {i}") for i in range(5)]
-    result = correct_and_translate(chunks, "en", client=mock_client, context_window=2)
+    result = correct_and_translate(
+        chunks, "en", client=mock_client, context_window=2, batch_size=2
+    )
 
-    # Verify each chunk was translated
     for i, chunk in enumerate(result):
         assert chunk.text == f"Translated {i}"
-
-    # Verify the chat API was called 5 times (once per chunk)
-    assert mock_client.chat.completions.create.call_count == 5
+    assert mock_client.chat.completions.create.call_count == 3
 
 
 def test_correct_and_translate_malformed_json_preserves_original() -> None:
-    """Test that malformed JSON from the LLM preserves the original text.
-
-    Verifies that when the LLM returns invalid JSON, the original chunk text
-    is preserved and a warning is logged.
-    """
+    """Test that malformed JSON for a batch preserves originals for that batch."""
     mock_client = _make_mock_client(
         responses=[
-            "not valid json",  # malformed
-            json.dumps({"text": "Good translation"}),
+            "not valid json",
+            _batch_response({1: "Good translation"}),
         ]
     )
 
@@ -181,85 +194,63 @@ def test_correct_and_translate_malformed_json_preserves_original() -> None:
 
     with um.patch("but_with_subs.llm.logger") as mock_logger:
         result = correct_and_translate(
-            chunks, "en", client=mock_client, context_window=0
+            chunks, "en", client=mock_client, context_window=0, batch_size=1
         )
 
-        # First chunk should preserve original text
         assert result[0].text == "Original text"
-        # Second chunk should be translated
         assert result[1].text == "Good translation"
-
-        # Verify warning was logged for the first chunk
         assert mock_logger.warning.called
 
 
-def test_correct_and_translate_empty_text_preserves_original() -> None:
-    """Test that empty 'text' field from LLM preserves original chunk text.
-
-    Verifies that when the LLM returns valid JSON with an empty 'text' field,
-    the original chunk text is preserved.
-    """
+def test_correct_and_translate_missing_id_preserves_original() -> None:
+    """Test that a chunk omitted from the LLM response falls back to its original."""
     mock_client = _make_mock_client(
-        responses=[
-            json.dumps({"text": ""}),  # empty text
-            json.dumps({"text": "Valid translation"}),
-        ]
+        responses=[_batch_response({1: "Valid translation"})],
     )
 
     chunks = [_make_chunk("Original text"), _make_chunk("Second text")]
 
-    with um.patch("but_with_subs.llm.logger") as mock_logger:
-        result = correct_and_translate(
-            chunks, "en", client=mock_client, context_window=0
-        )
+    result = correct_and_translate(
+        chunks, "en", client=mock_client, context_window=0, batch_size=2
+    )
 
-        # First chunk should preserve original text
-        assert result[0].text == "Original text"
-        # Second chunk should be translated
-        assert result[1].text == "Valid translation"
-
-        # Verify warning was logged for the first chunk
-        assert mock_logger.warning.called
+    assert result[0].text == "Original text"
+    assert result[1].text == "Valid translation"
 
 
 def test_correct_and_translate_progress_callback() -> None:
-    """Test that on_progress fires once per chunk with monotonically increasing ratios.
-
-    Verifies that the progress callback is invoked after each chunk with a ratio
-    that increases monotonically from 0 to 1.
-    """
+    """Test that on_progress fires once per batch with increasing ratios."""
     mock_client = _make_mock_client(
-        responses=[json.dumps({"text": f"Result {i}"}) for i in range(5)]
+        responses=[
+            _batch_response({0: "A", 1: "B"}),
+            _batch_response({2: "C", 3: "D"}),
+            _batch_response({4: "E"}),
+        ]
     )
 
     chunks = [_make_chunk(f"Text {i}") for i in range(5)]
     progress_values: list[float] = []
 
-    def _on_progress(ratio: float) -> None:
-        progress_values.append(ratio)
-
     correct_and_translate(
-        chunks, "en", client=mock_client, on_progress=_on_progress, context_window=0
+        chunks,
+        "en",
+        client=mock_client,
+        on_progress=progress_values.append,
+        context_window=0,
+        batch_size=2,
     )
 
-    # Verify progress was called 5 times
-    assert len(progress_values) == 5
-
-    # Verify monotonically increasing ratios
+    assert len(progress_values) == 3
     for i in range(1, len(progress_values)):
         assert progress_values[i] >= progress_values[i - 1]
-
-    # Verify the last ratio is 1.0
     assert progress_values[-1] == 1.0
 
 
 def test_correct_and_translate_preserves_chunk_metadata() -> None:
-    """Test that timing and speaker metadata are preserved through translation.
-
-    Verifies that start_time, end_time, and speaker are carried through the
-    translation process unchanged.
-    """
-    mock_client = _make_mock_client(responses=[json.dumps({"text": "Translated text"})])
+    """Test that timing and speaker metadata are preserved through translation."""
+    mock_client = _make_mock_client(
+        responses=[_batch_response({0: "Translated text"})]
+    )
 
     original_start = 5.5
     original_end = 8.5
@@ -271,7 +262,9 @@ def test_correct_and_translate_preserves_chunk_metadata() -> None:
         speaker=original_speaker,
     )
 
-    result = correct_and_translate([chunk], "en", client=mock_client, context_window=0)
+    result = correct_and_translate(
+        [chunk], "en", client=mock_client, context_window=0, batch_size=1
+    )
 
     assert result[0].start_time == original_start
     assert result[0].end_time == original_end
@@ -280,13 +273,9 @@ def test_correct_and_translate_preserves_chunk_metadata() -> None:
 
 
 def test_correct_and_translate_handles_none_text() -> None:
-    """Test that chunks with None text are handled gracefully.
-
-    Verifies that chunks without text are passed through with the original
-    (None) text preserved.
-    """
+    """Test that chunks with None text are handled gracefully."""
     mock_client = _make_mock_client(
-        responses=[json.dumps({"text": "Translated"}), json.dumps({"text": "Second"})]
+        responses=[_batch_response({0: "Translated", 1: "Second"})]
     )
 
     chunks = [
@@ -300,9 +289,9 @@ def test_correct_and_translate_handles_none_text() -> None:
         ),
     ]
 
-    # For None text, the LLM will receive "[no text]" as the chunk text
-    # and should return a translation
-    result = correct_and_translate(chunks, "en", client=mock_client, context_window=0)
+    result = correct_and_translate(
+        chunks, "en", client=mock_client, context_window=0, batch_size=2
+    )
 
     assert result[0].text == "Translated"
     assert result[1].text == "Second"
