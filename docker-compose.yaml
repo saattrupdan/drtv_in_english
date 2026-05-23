@@ -45,7 +45,7 @@ services:
       POSTGRES_PASSWORD: but_with_subs
       POSTGRES_DB: but_with_subs
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U but_with_subs -d but_with_subs"]
       interval: 5s
