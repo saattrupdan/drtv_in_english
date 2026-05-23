@@ -135,10 +135,12 @@ def _make_mock_client(
     mock_client.max_retries = 3
 
     if responses is not None:
-        mock_client.chat.completions.create.return_value = um.MagicMock()
-        mock_client.chat.completions.create.return_value.choices = [
-            um.MagicMock(message=um.MagicMock(content=resp)) for resp in responses
-        ]
+        mock_responses = []
+        for resp in responses:
+            mock_resp = um.MagicMock()
+            mock_resp.choices = [um.MagicMock(message=um.MagicMock(content=resp))]
+            mock_responses.append(mock_resp)
+        mock_client.chat.completions.create.side_effect = mock_responses
 
     return mock_client
 
@@ -307,12 +309,14 @@ def test_correct_and_translate_handles_none_text() -> None:
         ]
     )
 
+    import numpy as np
+
     chunks = [
         _make_chunk("Has text"),
         Chunk(
             start_time=1.0,
             end_time=2.0,
-            audio=[],  # type: ignore
+            audio=np.zeros(0, dtype=np.float32),
             text=None,
             speaker="Bob",
         ),

@@ -15,6 +15,7 @@ import warnings
 
 import bits_and_bobs as bnb
 import click
+from dotenv import load_dotenv
 from punctfix.inference import PunctFixer
 from tqdm.auto import tqdm
 from transformers import pipeline
@@ -25,10 +26,12 @@ from but_with_subs.audio_loading import load_audio
 from but_with_subs.constants import ASR_MODEL_ID, MAX_WORDS
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
-from but_with_subs.llm import build_client
+from but_with_subs.llm import build_client, correct_and_translate
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
 from but_with_subs.transcribing import assign_speakers, transcribe_audio
+
+load_dotenv()
 
 logger = logging.getLogger("but_with_subs")
 
@@ -106,6 +109,7 @@ def main(url: str, language: str) -> None:
         llm_model = os.environ["LLM_MODEL"]
 
         with tqdm(total=len(chunks), desc="Translating", unit="chunk") as pbar:
+
             def _on_progress(ratio: float) -> None:
                 pbar.n = int(ratio * len(chunks))
                 pbar.refresh()
@@ -120,9 +124,7 @@ def main(url: str, language: str) -> None:
 
         output_path = audio_path.with_suffix(f".{language}.vtt")
         generate_subtitles(
-            chunks=chunks,
-            audio_path=audio_path,
-            output_path=output_path,
+            chunks=chunks, audio_path=audio_path, output_path=output_path
         )
     finally:
         if audio_path.exists():

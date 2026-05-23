@@ -174,6 +174,6 @@ def correct_and_translate(
 
         # Progress callback.
         if on_progress is not None:
-            on_progress(i / n)
+            on_progress((i + 1) / n)
 
     return result
