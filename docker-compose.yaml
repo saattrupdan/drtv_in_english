@@ -19,6 +19,13 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://but_with_subs:but_with_subs@postgres:5432/but_with_subs
+    volumes:
+      - backend_data:/project/data
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   frontend:
     env_file:
@@ -29,3 +36,22 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+
+  postgres:
+    image: postgres:18.3-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: but_with_subs
+      POSTGRES_PASSWORD: but_with_subs
+      POSTGRES_DB: but_with_subs
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U but_with_subs -d but_with_subs"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  backend_data:

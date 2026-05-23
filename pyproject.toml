@@ -19,6 +19,7 @@ dependencies = [
     "punctfix>=0.11.1",
     "omegaconf>=2.3.0",
     "pyannote-audio>=4.0.4",
+    "psycopg[binary]>=3.2.0",
     "pyctcdecode>=0.5.0",
     "scipy>=1.17.1",
     "sentencepiece>=0.2.1",

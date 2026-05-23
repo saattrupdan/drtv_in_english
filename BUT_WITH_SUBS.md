@@ -190,7 +190,7 @@ When the progress is finished, the frontend receives the `VideoWithSubs` model d
 in Phase 6, and the values of these are then displayed in the HTML5 video element,
 defined in Phase 5.
 
-### Phase 9: Set up Docker
+### Phase 9: Set up Docker ✅
 
 Docker Compose is already set up, but you should add a postgres service (use
 `18.3-trixie` as the version) to the `docker-compose.yaml` file. You have to ensure that
