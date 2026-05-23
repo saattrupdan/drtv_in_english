@@ -218,7 +218,7 @@ def _request_batch(
             )
             return {}
 
-        parsed = json.loads(raw)
+        parsed = json.loads(_extract_json(raw))
         translations_raw = parsed.get("translations") or parsed
         if not isinstance(translations_raw, dict):
             logger.warning(
@@ -246,3 +246,25 @@ def _request_batch(
     except openai.OpenAIError as exc:
         logger.warning(f"LLM API call failed for batch {target_indices}: {exc}")
         return {}
+
+
+def _extract_json(raw: str) -> str:
+    """Extract the outermost JSON object from a model response.
+
+    Local models occasionally wrap JSON in code fences or add a preamble
+    even when asked for a strict JSON object. This trims to the first
+    ``{`` and the matching final ``}`` so ``json.loads`` succeeds.
+
+    Args:
+        raw:
+            Raw text returned by the LLM.
+
+    Returns:
+        A substring that should parse as JSON. May still be invalid if
+        the model returned no braces at all -- the caller catches that.
+    """
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return raw
+    return raw[start : end + 1]
