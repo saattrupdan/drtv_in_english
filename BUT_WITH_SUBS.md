@@ -108,7 +108,7 @@ translated into the target language before subtitle generation. The translation 
 after transcription and before subtitling, replacing the original text in each
 `Transcription` model with its translated counterpart.
 
-### Phase 6: Creating UI
+### Phase 6: Creating UI ✅
 
 The UI should look very professional and sleek, and should include the title "... But
 With Subs" and logo (found in `./public/but-with-subs-logo.jpg`) and the favicon (found
@@ -145,7 +145,7 @@ download and transcription process. The video player should just play an empty v
 
 There should also be a button in the UI to go back to home, to process another video.
 
-### Phase 7: API
+### Phase 7: API ✅
 
 The API should be a FastAPI app that exposes the POST endpoint `/process` that takes a
 URL and does the following:
