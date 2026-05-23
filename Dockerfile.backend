@@ -12,13 +12,30 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY . /project
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
 
+# Pre-download ML models into the HuggingFace cache so the running container
+# doesn't have to fetch them on first startup.
+ENV HF_HOME=/opt/hf-cache
+RUN python -c "\
+from transformers import pipeline, M2M100ForConditionalGeneration;\
+from punctfix.inference import PunctFixer;\
+from but_with_subs.constants import ASR_MODEL_ID, TRANSLATION_MODEL;\
+from but_with_subs.tokenization_small100 import SMALL100Tokenizer;\
+pipeline(task='automatic-speech-recognition', model=ASR_MODEL_ID, device='cpu', num_beams=5);\
+PunctFixer(language='da');\
+M2M100ForConditionalGeneration.from_pretrained(TRANSLATION_MODEL);\
+SMALL100Tokenizer.from_pretrained(TRANSLATION_MODEL, tgt_lang='en')"
+
 FROM python:3.12-slim-bookworm AS backend
 COPY --from=ghcr.io/astral-sh/uv:0.6.11 /uv /uvx /bin/
 ENV PATH="/root/.local/bin:/project/.venv/bin/:${PATH}"
+ENV HF_HOME=/opt/hf-cache
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /project
 COPY --from=builder /project /project
+COPY --from=builder /opt/hf-cache /opt/hf-cache
 EXPOSE 8000
+HEALTHCHECK --interval=10s --timeout=5s --start-period=5m --start-interval=5s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=3).status==200 else 1)"
 CMD ["uv", "run", "uvicorn", "but_with_subs.api:app", "--host", "0.0.0.0", "--port", "8000"]
