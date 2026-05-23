@@ -1,14 +1,15 @@
 """End-to-end pipeline: URL → subtitles.
 
 Downloads a video from a URL, extracts its audio, transcribes the audio,
-translates the transcript, writes ``.vtt`` subtitle files next to the
-video, and deletes the intermediate ``.wav`` audio file.
+corrects and translates the transcript via an LLM, writes ``.vtt`` subtitle
+files next to the video, and deletes the intermediate ``.wav`` audio file.
 
 Usage:
     uv run src/scripts/run_pipeline.py [URL] --language en
 """
 
 import logging
+import os
 import sys
 import warnings
 
@@ -24,10 +25,10 @@ from but_with_subs.audio_loading import load_audio
 from but_with_subs.constants import ASR_MODEL_ID, MAX_WORDS
 from but_with_subs.data_models import Chunk
 from but_with_subs.device import get_device
+from but_with_subs.llm import build_client
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
 from but_with_subs.transcribing import transcribe_audio
-from but_with_subs.translation import translate_chunks
 
 logger = logging.getLogger("but_with_subs")
 
@@ -87,28 +88,28 @@ def main(url: str, language: str) -> None:
         )
         logger.info(f"Grouped into {len(chunks)} text segments")
 
-        translated_chunks: list[Chunk] = []
-        with tqdm(total=len(chunks), desc="Translating", unit="chunk") as pbar:
-            for result in translate_chunks(chunks, language, batch_size=16):
-                if isinstance(result, tuple):
-                    current, _ = result
-                    pbar.n = current
-                    pbar.refresh()
-                else:
-                    translated_chunks.append(result)
-                    pbar.n = pbar.total
-                    pbar.refresh()
+        # Build LLM client for correct-and-translate.
+        llm_client = build_client()
+        llm_model = os.environ["LLM_MODEL"]
 
-        output_base = audio_path.with_suffix(".vtt")
+        with tqdm(total=len(chunks), desc="Translating", unit="chunk") as pbar:
+            def _on_progress(ratio: float) -> None:
+                pbar.n = int(ratio * len(chunks))
+                pbar.refresh()
+
+            chunks = correct_and_translate(
+                chunks,
+                target_language=language,
+                client=llm_client,
+                model=llm_model,
+                on_progress=_on_progress,
+            )
+
+        output_path = audio_path.with_suffix(f".{language}.vtt")
         generate_subtitles(
             chunks=chunks,
             audio_path=audio_path,
-            output_path=output_base.with_suffix(".da.vtt"),
-        )
-        generate_subtitles(
-            chunks=translated_chunks,
-            audio_path=audio_path,
-            output_path=output_base.with_suffix(f".{language}.vtt"),
+            output_path=output_path,
         )
     finally:
         if audio_path.exists():
