@@ -12,10 +12,7 @@ from but_with_subs import configure_logging
 
 configure_logging()
 
-DESIRED_ENVIRONMENT_VARIABLES = {
-    "GEMINI_API_KEY": "Enter your Gemini API key: ",
-    "OPENAI_API_KEY": "Enter your OpenAI API key: ",
-}
+DESIRED_ENVIRONMENT_VARIABLES = {}
 
 
 @click.command()
