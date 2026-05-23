@@ -190,7 +190,7 @@ When the progress is finished, the frontend receives the `VideoWithSubs` model d
 in Phase 6, and the values of these are then displayed in the HTML5 video element,
 defined in Phase 5.
 
-### Phase 8: Set up Docker
+### Phase 9: Set up Docker
 
 Docker Compose is already set up, but you should add a postgres service (use
 `18.3-trixie` as the version) to the `docker-compose.yaml` file. You have to ensure that
@@ -199,7 +199,7 @@ ensure that the NGINX config in `docker-compose.nginx.conf` is set up properly t
 the streaming of the API responses, and also in terms of timeouts, as the processing can
 take a long time (maybe have the timeout be 1 hour).
 
-### Phase 9: Documentation
+### Phase 10: Documentation
 
 Update the readme with the following sections:
 
@@ -214,7 +214,7 @@ Update the readme with the following sections:
 
 The readme should also feature the logo in `./public/but-with-subs-logo.jpg` at the top.
 
-### Phase 10: Backend tests
+### Phase 11: Backend tests
 
 Create tests for all the backend modules, and ensure they all pass with `make test`.
 Include both simple unit tests as well as full integration tests that test the entire
