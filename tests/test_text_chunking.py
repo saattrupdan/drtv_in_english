@@ -864,19 +864,28 @@ class TestGroupWordChunksEdgeCases:
 # =============================================================================
 
 
-class TestGroupWordChunksErrorHandling:
-    """Tests for error handling in group_word_chunks."""
 
-    def test_unfound_word_logs_warning(
+
+# =============================================================================
+# Tests for group_word_chunks() function - Error Handling
+# =============================================================================
+
+
+class TestGroupWordChunksErrorHandling:
+    """Tests for error handling in group_word_chunks with the sequential pointer approach."""
+
+    def test_word_alignment_exhausted_logs_warning(
         self,
         simple_word_chunks: list[Chunk],
         mock_punctuation_model_with_fixes: MagicMock,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Test that unfound words trigger warning logs."""
-        # Configure mock to return text with a word that doesn't exist
+        """Test that when segments require more words than available, a warning is logged."""
+        # Configure mock to return text that will be split into multiple segments,
+        # with total words exceeding the available chunks
+        # simple_word_chunks has 6 words; text creates 3 segments of 3 words each = 9 words needed
         mock_punctuation_model_with_fixes.punctuate = MagicMock(
-            return_value="nonexistent word."
+            return_value="Hello world this. is a test. of alignment exhaustion."
         )
 
         with caplog.at_level(logging.WARNING):
@@ -886,17 +895,19 @@ class TestGroupWordChunksErrorHandling:
                 max_words=10,
             )
 
-        # Function should handle missing words gracefully
-        assert isinstance(result, list)
+        # Should log a warning about alignment exhaustion
+        assert "Word/segment alignment exhausted" in caplog.text
 
-    def test_all_words_unfound_returns_empty(
+    def test_alignment_exhaustion_returns_partial_result(
         self,
         simple_word_chunks: list[Chunk],
         mock_punctuation_model_with_fixes: MagicMock,
     ) -> None:
-        """Test that when all words are unfound, empty list is returned."""
+        """Test that partial result is returned when alignment is exhausted."""
+        # 6 word chunks, but we ask for segments that need more
+        # Creates 3 segments of 3 words each = 9 words needed, but only 6 available
         mock_punctuation_model_with_fixes.punctuate = MagicMock(
-            return_value="completely nonexistent words here."
+            return_value="Hello world this. is a test. of alignment exhaustion."
         )
 
         result = group_word_chunks(
@@ -905,117 +916,177 @@ class TestGroupWordChunksErrorHandling:
             max_words=10,
         )
 
-        # Should return empty list when words can't be matched
+        # Should return whatever was successfully created before exhaustion
         assert isinstance(result, list)
+        # The first segment (3 words) should be created
+        assert len(result) >= 1
+        # After 6 words are consumed and no more chunks remain, we should stop
+        # 6 words total, first segment takes 3, second takes 3, then exhaustion
+        assert len(result) <= 2
 
-    def test_last_word_not_found_logs_warning(
+    def test_all_segments_skip_due_to_duration(
         self,
-        simple_word_chunks: list[Chunk],
+        word_chunks_short_duration: list[Chunk],
         mock_punctuation_model_with_fixes: MagicMock,
-        caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Test that when last word of segment can't be found, warning is logged."""
-        # Create a scenario where first word exists but last word doesn't
-        # This requires the segment to have a last word that doesn't match any chunk
+        """Test that when all segments are too short, empty list is returned."""
         mock_punctuation_model_with_fixes.punctuate = MagicMock(
-            return_value="hello nonexistent."
+            return_value="short chunk."
         )
 
-        with caplog.at_level(logging.WARNING):
-            result = group_word_chunks(
-                word_chunks=simple_word_chunks,
-                punctuation_model=mock_punctuation_model_with_fixes,
-                max_words=10,
-            )
+        result = group_word_chunks(
+            word_chunks=word_chunks_short_duration,
+            punctuation_model=mock_punctuation_model_with_fixes,
+            max_words=10,
+        )
 
-        # Should handle missing last word gracefully
-        assert isinstance(result, list)
+        # Should return empty list since duration < MIN_CHUNK_LENGTH_SECONDS
+        assert result == []
 
-    def test_no_word_chunks_in_segment_logs_warning(
-        self, caplog: pytest.LogCaptureFixture
+
+# =============================================================================
+# Tests for group_word_chunks() function - Sequential Pointer Behavior
+# =============================================================================
+
+
+class TestGroupWordChunksSequentialPointer:
+    """Tests for the sequential pointer alignment approach."""
+
+    def test_same_word_multiple_occurrence_anchors_correctly(
+        self,
+        mock_punctuation_model_with_fixes: MagicMock,
     ) -> None:
-        """Test that when no word chunks fall within segment, warning is logged.
+        """Test that the same word appearing multiple times anchors to the correct position.
 
-        This tests the edge case where:
-        - First word is found (segment_start is set)
-        - Last word is found with end_time > segment_start (segment_end is set)
-        - Duration is >= MIN_CHUNK_LENGTH_SECONDS
-        - But no chunks satisfy: start_time >= segment_start AND end_time <= segment_end
-
-        This can happen when chunks extend beyond the segment boundaries.
+        This is the key regression test for the bug where every segment anchored
+        to the first occurrence of common words like "jeg", "det", "er".
         """
-        # Create chunks where the matching words have timestamps that don't
-        # satisfy the filtering condition
+        # Create word chunks where "jeg" appears at positions 0, 3, and 6
         chunks = [
-            Chunk(
-                start_time=0.0,
-                end_time=5.0,  # This chunk extends far beyond the segment
-                audio=np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
-                text="hello",
-                speaker="SPEAKER_00",
-            ),
-            Chunk(
-                start_time=4.5,  # Overlaps with first chunk
-                end_time=5.0,  # Same end time - segment_end will be 5.0
-                audio=np.array([4.0, 5.0]),
-                text="world",
-                speaker="SPEAKER_00",
-            ),
+            Chunk(start_time=0.0, end_time=0.5, audio=np.array([1.0]), text="jeg", speaker="SPEAKER_00"),
+            Chunk(start_time=0.5, end_time=1.0, audio=np.array([2.0]), text="er", speaker="SPEAKER_00"),
+            Chunk(start_time=1.0, end_time=1.5, audio=np.array([3.0]), text="her", speaker="SPEAKER_00"),
+            Chunk(start_time=1.5, end_time=2.0, audio=np.array([4.0]), text="jeg", speaker="SPEAKER_00"),
+            Chunk(start_time=2.0, end_time=2.5, audio=np.array([5.0]), text="vil", speaker="SPEAKER_00"),
+            Chunk(start_time=2.5, end_time=3.0, audio=np.array([6.0]), text="jeg", speaker="SPEAKER_00"),
+            Chunk(start_time=3.0, end_time=3.5, audio=np.array([7.0]), text="holde", speaker="SPEAKER_00"),
+            Chunk(start_time=3.5, end_time=4.0, audio=np.array([8.0]), text="stedet", speaker="SPEAKER_00"),
         ]
 
-        # Mock the punctuation model
-        mock_punct = MagicMock()
-        mock_punct.punctuate = MagicMock(return_value="hello world.")
+        # Mock punctuate to return text that creates segments with "jeg" as first word
+        # Segment 1: "jeg er her." -> consumes chunks 0-2 (start=0.0)
+        # Segment 2: "jeg vil jeg." -> consumes chunks 3-5 (start=1.5)
+        # Segment 3: "holde stedet." -> consumes chunks 6-7 (start=3.0)
+        mock_punctuation_model_with_fixes.punctuate = MagicMock(
+            return_value="jeg er her. jeg vil jeg. holde stedet."
+        )
 
-        with caplog.at_level(logging.WARNING):
-            result = group_word_chunks(
-                word_chunks=chunks, punctuation_model=mock_punct, max_words=10
+        result = group_word_chunks(
+            word_chunks=chunks,
+            punctuation_model=mock_punctuation_model_with_fixes,
+            max_words=10,
+        )
+
+        # Each segment should anchor to the correct positional occurrence
+        assert len(result) >= 3
+
+        # First segment should start at chunk 0 (jeg at 0.0)
+        assert result[0].start_time == 0.0
+
+        # Second segment should start at chunk 3 (jeg at 1.5), NOT at 0.0
+        assert result[1].start_time == 1.5
+
+        # Third segment should start at chunk 6 (holde at 3.0)
+        assert result[2].start_time == 3.0
+
+    def test_monotonic_timestamps_no_overlap(
+        self,
+        mock_punctuation_model_with_fixes: MagicMock,
+    ) -> None:
+        """Test that for N synthetic word_chunks with monotonically increasing timestamps,
+        every produced segment satisfies start_time < end_time and
+        end_time <= next_segment.start_time.
+        """
+        # Create 10 word chunks with monotonically increasing timestamps
+        chunks = []
+        for i in range(10):
+            chunks.append(
+                Chunk(
+                    start_time=float(i) * 0.5,
+                    end_time=float(i) * 0.5 + 0.5,
+                    audio=np.array([float(i)]),
+                    text=f"word{i}",
+                    speaker="SPEAKER_00",
+                )
             )
 
-        # The first chunk has end_time=5.0 which equals segment_end,
-        # but we need chunks with end_time <= segment_end
-        # This should still work, so let's try a different approach
-        assert isinstance(result, list)
+        # Mock punctuate to return text that creates 3 segments
+        # Each segment consumes 3, 3, and 4 words respectively
+        mock_punctuation_model_with_fixes.punctuate = MagicMock(
+            return_value="First segment. Second segment here. Third segment now complete."
+        )
 
-    def test_word_chunk_extends_beyond_segment_triggers_warning(
-        self, caplog: pytest.LogCaptureFixture
+        result = group_word_chunks(
+            word_chunks=chunks,
+            punctuation_model=mock_punctuation_model_with_fixes,
+            max_words=10,
+        )
+
+        # Verify each segment has start_time < end_time
+        for chunk in result:
+            assert chunk.start_time < chunk.end_time, (
+                f"Segment {chunk.text!r}: start_time={chunk.start_time} >= end_time={chunk.end_time}"
+            )
+
+        # Verify no overlapping segments: end_time[i] <= start_time[i+1]
+        for i in range(len(result) - 1):
+            assert result[i].end_time <= result[i + 1].start_time, (
+                f"Segment {i} end_time={result[i].end_time} > Segment {i+1} start_time={result[i + 1].start_time}"
+            )
+
+    def test_cursor_consumes_exact_word_count(
+        self,
+        mock_punctuation_model_with_fixes: MagicMock,
     ) -> None:
-        """Test warning when all matching chunks extend beyond segment boundaries.
-
-        Creates a scenario where:
-        - First word found at time 0, segment_start = 0
-        - Last word found but its end_time creates segment_end
-        - All word chunks have end_time > segment_end or start_time < segment_start
-        """
-        # Create chunks where the time ranges don't align with segment boundaries
+        """Test that the cursor advances by exactly the number of words in each segment."""
+        # Create 9 word chunks
         chunks = [
             Chunk(
-                start_time=0.0,
-                end_time=2.0,  # First word
-                audio=np.array([1.0, 2.0]),
-                text="hello",
+                start_time=float(i) * 0.5,
+                end_time=float(i) * 0.5 + 0.5,
+                audio=np.array([float(i)]),
+                text=f"word{i}",
                 speaker="SPEAKER_00",
-            ),
-            # A chunk that starts before segment_start (not possible since
-            # segment_start=0) or ends after segment_end
-            Chunk(
-                start_time=1.5,
-                end_time=3.0,  # This extends beyond a 2-second segment
-                audio=np.array([1.5, 2.0, 2.5, 3.0]),
-                text="world",
-                speaker="SPEAKER_00",
-            ),
+            )
+            for i in range(9)
         ]
 
-        mock_punct = MagicMock()
-        mock_punct.punctuate = MagicMock(return_value="hello world.")
+        # Mock punctuate to return text with segments of 3, 3, and 3 words
+        mock_punctuation_model_with_fixes.punctuate = MagicMock(
+            return_value="First three words. Second three words. Third three words."
+        )
 
-        with caplog.at_level(logging.WARNING):
-            result = group_word_chunks(
-                word_chunks=chunks, punctuation_model=mock_punct, max_words=10
-            )
+        result = group_word_chunks(
+            word_chunks=chunks,
+            punctuation_model=mock_punctuation_model_with_fixes,
+            max_words=10,
+        )
 
-        assert isinstance(result, list)
+        # Should create exactly 3 segments
+        assert len(result) == 3
+
+        # First segment should consume chunks 0-2 (3 words)
+        assert result[0].start_time == 0.0
+        assert result[0].end_time == 1.5
+
+        # Second segment should consume chunks 3-5 (3 words)
+        assert result[1].start_time == 1.5
+        assert result[1].end_time == 3.0
+
+        # Third segment should consume chunks 6-8 (3 words)
+        assert result[2].start_time == 3.0
+        assert result[2].end_time == 4.5
+
 
 
 # =============================================================================
