@@ -219,4 +219,4 @@ The readme should also feature the logo in `./public/but-with-subs-logo.jpg` at 
 Create tests for all the backend modules, and ensure they all pass with `make test`.
 Include both simple unit tests as well as full integration tests that test the entire
 flow from downloading the video to generating the subtitles (including the API). We
-should use a short dummy clip for this, so ask me for it.
+should use a short dummy clip for this: ./data/test.mp4
