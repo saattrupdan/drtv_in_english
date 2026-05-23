@@ -22,12 +22,20 @@ recognition is currently Danish-first (`CoRal-project/roest-v3-wav2vec2-315m`).
 - **punctfix** for restoring punctuation after ASR.
 - **yt-dlp** for downloading source media.
 - **FastAPI** backend (`src/but_with_subs/api.py`, served as
-  `uvicorn but_with_subs.api:app`). Currently just a `/health` stub — real endpoints
-  still need to be built.
-- **Vue 3 + Vite + TypeScript** frontend in `src/frontend/`. Currently a stub —
-  `LandingPageView.vue` is a single `<h1>` placeholder.
-- **Docker Compose** with an nginx proxy fronting `frontend` (port 5173) and `backend`
-  (port 8000). See `docker-compose.yaml` + `docker-compose.nginx.conf`.
+  `uvicorn but_with_subs.api:app`). Exposes `GET /health`, `POST /process` (streams
+  NDJSON `ProgressEvent`s through the pipeline), and a `/media` static mount serving
+  files from `./data/`.
+- **SQLModel + Postgres** for persisting URL → media/subtitles mappings
+  (`database.py`). Connection string comes from `DATABASE_URL`; falls back to a local
+  sqlite file when unset so the API also runs outside Docker.
+- **Vue 3 + Vite + TypeScript** frontend in `src/frontend/`. `LandingPageView.vue`
+  drives the whole UX: URL/file input → real `POST /api/process` call → live progress
+  bar from the streamed NDJSON → HTML5 `<video>` with a `<track kind="subtitles">`.
+- **Docker Compose** with an nginx proxy fronting `frontend` (5173), `backend` (8000),
+  and `postgres:18.3-trixie`. nginx disables `proxy_buffering` on `/api/` and uses 1-h
+  read/send timeouts so the NDJSON stream flushes line-by-line. See
+  `docker-compose.yaml` + `docker-compose.nginx.conf`. Vite's dev server mirrors the
+  proxy via `server.proxy["/api"]` in `vite.config.ts`.
 
 ## Repo layout
 
@@ -35,9 +43,11 @@ recognition is currently Danish-first (`CoRal-project/roest-v3-wav2vec2-315m`).
 src/
   but_with_subs/          # Python package — the "modules"
     __init__.py           # Public surface: download, configure_logging, generate_subtitles
-    api.py                # FastAPI app (stub; add endpoints here)
-    constants.py          # Model IDs, sample rate, language codes, palette
-    data_models.py        # Centralised Pydantic models (Chunk, File, DownloadProgress)
+    api.py                # FastAPI app: /health, POST /process (NDJSON stream), /media static mount
+    pipeline.py           # run_pipeline() generator — orchestrates the API's processing stages
+    database.py           # SQLModel FileRecord + build_engine/init_db/upsert_file (Postgres/sqlite)
+    constants.py          # Model IDs, sample rate, language codes, palette, DATA_DIR
+    data_models.py        # Pydantic models (Chunk, File, DownloadProgress, ProgressEvent, VideoWithSubs)
     logging_config.py     # configure_logging() + shared package logger
     device.py             # get_device() — cuda / mps / cpu selection
     downloading.py        # yt-dlp wrapper, yields DownloadProgress
@@ -58,8 +68,9 @@ src/
     translate_string.py
     run_pipeline.py       # End-to-end: URL → download → extract → transcribe → translate → .vtt
     fix_dot_env_file.py   # Used by `make install` to provision .env
-  frontend/               # Vue 3 SPA (currently stub)
-    App.vue, main.ts, routes/, views/LandingPageView.vue
+  frontend/               # Vue 3 SPA
+    App.vue, main.ts, routes/, views/LandingPageView.vue  # Full UI: URL/file input,
+                                                          # streaming progress, <video>+<track>
 
 tests/                    # pytest, mirrors src/but_with_subs/ module names
 data/                     # Downloaded media + generated .vtt outputs (gitignored content)
@@ -70,8 +81,22 @@ Modules use **relative imports** (`from .foo import bar`); scripts and tests use
 
 ## End-to-end flow
 
-The full URL-to-subtitles pipeline lives in `src/scripts/run_pipeline.py`. It composes
-two earlier per-stage scripts:
+There are two end-to-end entry points that share the same building blocks:
+
+- **`src/but_with_subs/pipeline.py:run_pipeline()`** — the canonical path. A generator
+  that yields `ProgressEvent`s (stage, percentage 0-100, message, optional `result`)
+  and is consumed by `POST /process` as an NDJSON `StreamingResponse`. Heavy ML models
+  are passed in (loaded once at FastAPI startup via `lifespan`), not constructed here.
+  Stage boundaries: download 0-50, transcribe 50-95, subtitle 95-100. The final
+  `completed` event carries a `VideoWithSubs(video_path, subtitles_path)` whose paths
+  are rewritten by `api.py:_to_media_url` to `/api/media/<filename>` so the browser
+  can fetch them through the same proxy. A `FileRecord` row is upserted after
+  download and again after subtitles are generated.
+- **`src/scripts/run_pipeline.py`** — CLI wrapper for local one-shot runs without
+  the API. Composes the same modules but writes `.vtt` files directly. Useful for
+  debugging individual stages.
+
+The CLI path also composes two earlier per-stage scripts:
 
 **1. `src/scripts/download_video.py`** — `download(url, progress_hook=...)` from
 `downloading.py` wraps `yt-dlp`:
@@ -110,18 +135,41 @@ block (the source video stays in `./data/`).
 ## Key files to read first
 
 1. `src/but_with_subs/__init__.py` — the public API surface.
-2. `src/but_with_subs/constants.py` — model IDs and tunables (`ASR_MODEL_ID`,
-   `TRANSLATION_MODEL`, `TARGET_SAMPLE_RATE`, `MAX_WORDS`).
-3. `src/but_with_subs/data_models.py` — every shared Pydantic / data type.
-4. `src/scripts/run_pipeline.py` — the canonical end-to-end pipeline (URL →
-   `.vtt`); read this before the per-stage scripts.
-5. `makefile` — canonical commands.
+2. `src/but_with_subs/api.py` + `src/but_with_subs/pipeline.py` — the canonical
+   end-to-end path; the API's `lifespan` shows how models are loaded once and the
+   pipeline shows how they're stitched together.
+3. `src/but_with_subs/constants.py` — model IDs and tunables (`ASR_MODEL_ID`,
+   `TRANSLATION_MODEL`, `TARGET_SAMPLE_RATE`, `MAX_WORDS`, `DATA_DIR`).
+4. `src/but_with_subs/data_models.py` — every shared Pydantic / data type.
+5. `src/but_with_subs/database.py` — `FileRecord` schema and `upsert_file` semantics
+   (partial updates).
+6. `src/frontend/views/LandingPageView.vue` — the only frontend view; see
+   `consumeStream` for the NDJSON parsing contract.
+7. `src/scripts/run_pipeline.py` — CLI variant of the pipeline.
+8. `makefile` — canonical commands.
 
 ## Things to look out for
 
-- **Backend is a stub.** `src/but_with_subs/api.py` only exposes `/health` so the
-  Docker build succeeds. Real endpoints (download, transcribe, subtitle) still need to
-  be wired up before the frontend can talk to anything.
+- **Streaming contract.** `/process` returns NDJSON (one `ProgressEvent` per line,
+  `application/x-ndjson`). nginx (`docker-compose.nginx.conf`) and Vite
+  (`vite.config.ts`) both proxy `/api/*` to the backend with `proxy_buffering off` /
+  HTTP/1.1 so events flush per line. Don't reintroduce buffering middleware or batch
+  the generator's yields.
+- **Path → URL rewriting.** The pipeline emits absolute filesystem paths for
+  `VideoWithSubs.video_path` / `subtitles_path`; `api.py:_to_media_url` rewrites them
+  to `/api/media/<filename>` against the `/media` static mount. If you add fields with
+  paths, rewrite them here too — the browser can't read absolute container paths.
+- **Models load once at startup.** `lifespan` builds the ASR pipeline, `PunctFixer`,
+  M2M100 + SMALL100 tokenizer, and database engine into `app.state.app_state`. Don't
+  re-instantiate them per request, and don't import `pipeline.run_pipeline` in a way
+  that forces eager model loading.
+- **Database.** `database.build_engine()` reads `DATABASE_URL`
+  (`postgresql+psycopg://…` in Docker, sqlite fallback elsewhere). `psycopg[binary]`
+  is the driver. `upsert_file` does **partial** updates — `None` arguments don't
+  overwrite — so it's safe to set `subtitles_path` after the initial insert.
+- **ffmpeg in the backend image.** `Dockerfile.backend` apt-installs `ffmpeg`
+  because `yt-dlp` and `audio_extraction.py` shell out to it. Don't drop this when
+  refactoring the image.
 - **pyannote.audio 4.x quirks**: there's a history of fixes around the VAD API
   (`instantiate()` for threshold params, calling `.apply()` instead of `__call__`).
   See commits `90e0d59`, `220cdf7`, `27b43ef`. Check current pyannote.audio docs before
