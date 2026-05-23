@@ -44,7 +44,7 @@ class ProcessRequest(BaseModel):
     """Body of a ``POST /process`` call."""
 
     url: str
-    language: str | None = None
+    language: str
 
 
 @contextlib.asynccontextmanager
