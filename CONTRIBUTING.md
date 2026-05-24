@@ -1,4 +1,4 @@
-# But With Subs Contributing Guide
+# Danglish Contributing Guide
 
 Thank you for investing your time in contributing to our project! :sparkles:.
 
@@ -77,14 +77,14 @@ questions or request for additional information.
 
 ### Your PR is merged
 
-Congratulations :tada::tada: The But With Subs team thanks you :sparkles:.
+Congratulations :tada::tada: The Danglish team thanks you :sparkles:.
 
 [1]: https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github
 [2]: https://docs.github.com/en/get-started/quickstart/set-up-git
 [3]: https://docs.github.com/en/get-started/quickstart/github-flow
 [4]: https://docs.github.com/en/github/collaborating-with-pull-requests
 [5]: https://docs.github.com/en/github/searching-for-information-on-github/searching-on-github/searching-issues-and-pull-requests#search-by-the-title-body-or-comments
-[6]: https://github.com/saattrupdan/but_with_subs/issues
+[6]: https://github.com/saattrupdan/danglish/issues
 [7]: https://docs.github.com/en/desktop/installing-and-configuring-github-desktop/getting-started-with-github-desktop
 [8]: https://docs.github.com/en/desktop/contributing-and-collaborating-using-github-desktop/cloning-and-forking-repositories-from-github-desktop
 [9]: https://docs.github.com/en/github/getting-started-with-github/fork-a-repo#fork-an-example-repository

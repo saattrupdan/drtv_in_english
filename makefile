@@ -27,12 +27,12 @@ help:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 install: ## Install dependencies
-	@echo "Installing the 'but_with_subs' project..."
+	@echo "Installing the 'danglish' project..."
 	@$(MAKE) --quiet install-uv
 	@$(MAKE) --quiet install-dependencies
 	@$(MAKE) --quiet setup-environment-variables
 	@$(MAKE) --quiet setup-git
-	@echo "Installed the 'but_with_subs' project! You can now activate your virtual environment with 'source .venv/bin/activate'."
+	@echo "Installed the 'danglish' project! You can now activate your virtual environment with 'source .venv/bin/activate'."
 	@echo "Note that this is a 'uv' project. Use 'uv add <package>' to install new dependencies and 'uv remove <package>' to remove them."
 
 install-non-interactive:

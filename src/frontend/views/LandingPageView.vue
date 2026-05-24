@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
-
-const LANGUAGES = ["en", "de", "es", "fr", "ja", "ko", "nl", "pt", "sv", "da"];
+import { computed, onBeforeUnmount, ref, useTemplateRef } from "vue";
 
 type Stage = "idle" | "processing" | "ready" | "playing" | "error";
 
@@ -19,30 +17,24 @@ interface ProgressEvent {
 
 const stage = ref<Stage>("idle");
 const url = ref("");
-const language = ref("en");
 const progress = ref(0);
 const progressMessage = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
 const showToast = ref(false);
-const isDragOver = ref(false);
-const selectedFileName = ref<string | null>(null);
 const videoSrc = ref<string | null>(null);
 const subtitlesSrc = ref<string | null>(null);
 
-const fileInput = useTemplateRef<HTMLInputElement>("fileInput");
 const videoEl = useTemplateRef<HTMLVideoElement>("videoEl");
 
 let toastTimer: number | null = null;
 let abortController: AbortController | null = null;
 
-const canSubmit = computed(
-  () => url.value.trim().length > 0 || selectedFileName.value !== null,
-);
+const canSubmit = computed(() => url.value.trim().length > 0);
 
 const progressLabel = computed(() => {
   if (progressMessage.value) return progressMessage.value;
   if (progress.value < 50) return "Downloading video…";
-  if (progress.value < 100) return "Transcribing audio…";
+  if (progress.value < 100) return "Translating subtitles…";
   return "Done";
 });
 
@@ -60,7 +52,7 @@ async function startProcessing() {
     const response = await fetch("/api/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: url.value.trim(), language: language.value }),
+      body: JSON.stringify({ url: url.value.trim(), language: "en" }),
       signal: abortController.signal,
     });
     if (!response.ok || !response.body) {
@@ -122,41 +114,6 @@ function onSubmit() {
   void startProcessing();
 }
 
-function onFilePicked(event: Event) {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (file) {
-    selectedFileName.value = file.name;
-    url.value = "";
-  }
-}
-
-function onDrop(event: DragEvent) {
-  isDragOver.value = false;
-  const file = event.dataTransfer?.files?.[0];
-  if (file) {
-    selectedFileName.value = file.name;
-    url.value = "";
-  }
-}
-
-function onDragOver() {
-  isDragOver.value = true;
-}
-
-function onDragLeave() {
-  isDragOver.value = false;
-}
-
-function openFilePicker() {
-  fileInput.value?.click();
-}
-
-function clearFile() {
-  selectedFileName.value = null;
-  if (fileInput.value) fileInput.value.value = "";
-}
-
 function goHome() {
   if (abortController !== null) {
     abortController.abort();
@@ -168,15 +125,12 @@ function goHome() {
   }
   stage.value = "idle";
   url.value = "";
-  language.value = "en";
   progress.value = 0;
   progressMessage.value = null;
   errorMessage.value = null;
   videoSrc.value = null;
   subtitlesSrc.value = null;
   showToast.value = false;
-  selectedFileName.value = null;
-  if (fileInput.value) fileInput.value.value = "";
 }
 
 function onVideoPlay() {
@@ -192,19 +146,11 @@ function onVideoPlay() {
 
 function onFullscreenChange() {
   if (!document.fullscreenElement && stage.value === "playing") {
-    // User exited fullscreen — keep playing inline (per spec)
     stage.value = "playing";
   }
 }
 
 document.addEventListener("fullscreenchange", onFullscreenChange);
-
-watch(url, (val) => {
-  if (val.length > 0 && selectedFileName.value) {
-    selectedFileName.value = null;
-    if (fileInput.value) fileInput.value.value = "";
-  }
-});
 
 onBeforeUnmount(() => {
   if (abortController !== null) abortController.abort();
@@ -216,85 +162,54 @@ onBeforeUnmount(() => {
 <template>
   <div class="page">
     <header class="header" :class="{ 'header--compact': stage !== 'idle' }">
-      <img
-        src="/but-with-subs-logo.jpg"
-        alt="But With Subs logo"
+      <svg
         class="logo"
-      />
-      <h1 class="title">
-        <span class="title-ellipsis">...</span> But With
-        <span class="title-accent">Subs</span>
-      </h1>
+        role="img"
+        aria-labelledby="DRTV-logo"
+        viewBox="0 0 800 800"
+      >
+        <title id="DRTV-logo">DRTV</title>
+        <path d="M0 0v800h800V0Z" fill="#ff001e"></path>
+        <g>
+          <path d="M0 560h800v240H0z"></path>
+          <path
+            fill="#fff"
+            d="M319.27 618.67h-171.2a2.07 2.07 0 0 0-2.28 2.27v115.3a2.09 2.09 0 0 0 2.28 2.29h171.2c50.29 0 75.67-16.71 75.67-60.31 0-43.3-25.38-59.55-75.67-59.55Zm-44.33 97.83h-53.63c-1.52 0-1.83-.61-1.83-1.83v-72.16c0-1.2.31-1.82 1.83-1.82h53.63c31.89 0 44.66 9.11 44.66 37.83s-12.77 37.98-44.66 37.98ZM665 733.67l-49.52-34.94c-1.22-.92-2-1.37-2-2s.46-.92 1.53-.92c25 0 44.5-11.69 44.5-37.51s-16.65-39.63-47.51-39.63H424.4a2.06 2.06 0 0 0-2.27 2.27v115.3a2.08 2.08 0 0 0 2.27 2.29h69a2.08 2.08 0 0 0 2.28-2.29V708.9c0-1.37.46-1.82 1.83-1.82h39.73c2 0 2.73.15 4.1 1.22l34.49 28.56a6.6 6.6 0 0 0 4.85 1.67h85.84q1.83 0 1.83-1.38c.04-1.21-2.09-2.57-3.35-3.48Zm-107.54-48h-59.81c-1.37 0-1.83-.46-1.83-1.82v-41.34c0-1.36.46-1.82 1.83-1.82h59.85c20.06 0 28.56 5.48 28.56 22 0 16.74-8.5 22.97-28.56 22.97Z"
+          ></path>
+        </g>
+        <g>
+          <path
+            fill="#fff"
+            d="M352.12 349.76 474 279.38a4.92 4.92 0 0 0 0-8.52l-121.9-70.37a4.91 4.91 0 0 0-7.37 4.26V345.5a4.92 4.92 0 0 0 7.39 4.26Z"
+          ></path>
+          <path
+            fill="#fff"
+            d="M396.59 467.42a191.8 191.8 0 0 1-176.88-117.14l44.82-19a143.2 143.2 0 0 0 132.06 87.45c79.06 0 143.37-64.31 143.37-143.36S475.65 132 396.59 132a143.2 143.2 0 0 0-132.11 87.57l-44.83-19A191.77 191.77 0 0 1 396.59 83.32c105.9 0 192.05 86.15 192.05 192.05s-86.15 192.05-192.05 192.05Z"
+          ></path>
+        </g>
+      </svg>
+      <h1 class="title">DRTV <span class="title-accent">in English</span></h1>
     </header>
 
     <main class="main">
       <!-- IDLE -->
       <section v-if="stage === 'idle'" class="card">
         <p class="lede">
-          Watch anything with subtitles in the language you actually want.
+          Paste a DRTV URL and watch it with English subtitles.
         </p>
 
         <form class="form" @submit.prevent="onSubmit">
-          <div
-            class="dropzone"
-            :class="{ 'dropzone--over': isDragOver }"
-            @dragover.prevent="onDragOver"
-            @dragleave.prevent="onDragLeave"
-            @drop.prevent="onDrop"
-          >
-            <input
-              v-model="url"
-              type="text"
-              class="url-input"
-              placeholder="Paste a video URL…"
-              autofocus
-              @keydown.enter.prevent="onSubmit"
-            />
-
-            <div class="dropzone-actions">
-              <span class="dropzone-hint">
-                or drop a file here ·
-                <button
-                  type="button"
-                  class="link-button"
-                  @click="openFilePicker"
-                >
-                  browse
-                </button>
-              </span>
-              <input
-                ref="fileInput"
-                type="file"
-                accept="video/*,audio/*"
-                class="file-input"
-                @change="onFilePicked"
-              />
-            </div>
-
-            <div v-if="selectedFileName" class="file-chip">
-              <span>{{ selectedFileName }}</span>
-              <button
-                type="button"
-                class="file-chip-clear"
-                aria-label="Remove file"
-                @click="clearFile"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-
-          <div class="language-selector">
-            <label for="language-select">Subtitle language:</label>
-            <select id="language-select" v-model="language">
-              <option v-for="lang in LANGUAGES" :key="lang" :value="lang">
-                {{ lang }}
-              </option>
-            </select>
-          </div>
+          <input
+            v-model="url"
+            type="text"
+            class="url-input"
+            placeholder="https://www.dr.dk/drtv/se/…"
+            autofocus
+            @keydown.enter.prevent="onSubmit"
+          />
 
           <button type="submit" class="primary-button" :disabled="!canSubmit">
-            Watch with Subs
+            Watch with English subs
           </button>
         </form>
       </section>
@@ -342,14 +257,15 @@ onBeforeUnmount(() => {
           <track
             v-if="subtitlesSrc"
             kind="subtitles"
+            srclang="en"
             :src="subtitlesSrc"
-            label="Subtitles"
+            label="English"
             default
           />
         </video>
 
         <button class="ghost-button home-button" @click="goHome">
-          ← Process another video
+          ← Watch another video
         </button>
       </section>
 
@@ -395,23 +311,17 @@ onBeforeUnmount(() => {
 }
 
 .logo {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  object-fit: cover;
-  box-shadow: var(--shadow-lg);
+  width: 64px;
+  height: 64px;
+  border-radius: 4px;
 }
 
 .title {
   font-size: 28px;
   font-weight: 800;
   margin: 0;
-  letter-spacing: -0.02em;
-}
-
-.title-ellipsis {
-  color: var(--text-muted);
-  font-weight: 500;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
 }
 
 .title-accent {
@@ -465,116 +375,24 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
-.dropzone {
-  border: 1.5px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  background: var(--bg-elev-2);
-  transition:
-    border-color 200ms ease,
-    background 200ms ease;
-}
-
-.dropzone--over {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
 .url-input {
   width: 100%;
-  background: transparent;
-  border: none;
+  background: var(--bg-elev-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
   outline: none;
   color: var(--text);
   font-size: 16px;
-  padding: 10px 4px;
+  padding: 14px 16px;
+  transition: border-color 200ms ease;
+}
+
+.url-input:focus {
+  border-color: var(--accent);
 }
 
 .url-input::placeholder {
   color: var(--text-muted);
-}
-
-.dropzone-actions {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.dropzone-hint {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.link-button {
-  background: none;
-  border: none;
-  color: var(--accent);
-  cursor: pointer;
-  padding: 0;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.link-button:hover {
-  color: var(--accent-hover);
-  text-decoration: underline;
-}
-
-.file-input {
-  display: none;
-}
-
-.file-chip {
-  margin-top: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--accent-soft);
-  color: var(--text);
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 13px;
-}
-
-.file-chip-clear {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 0;
-}
-
-.file-chip-clear:hover {
-  color: var(--text);
-}
-
-.language-selector {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.language-selector label {
-  font-size: 13px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.language-selector select {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 14px;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.language-selector select:hover {
-  border-color: var(--accent);
 }
 
 .primary-button {
@@ -630,10 +448,6 @@ onBeforeUnmount(() => {
 
 .progress-wrapper--center {
   max-width: 480px;
-}
-
-.progress-wrapper--top {
-  /* lives inside card--player at the top */
 }
 
 .progress-meta {

@@ -1,11 +1,11 @@
-"""Tests for but_with_subs.logging_config module."""
+"""Tests for danglish.logging_config module."""
 
 import io
 import logging
 
 import pytest
 
-from but_with_subs import logging_config
+from danglish import logging_config
 
 
 def _clean_root_handlers() -> None:
@@ -25,7 +25,7 @@ class TestLoggerExists:
 
     def test_logger_has_correct_name(self) -> None:
         """Assert the logger has the expected name."""
-        assert logging_config.logger.name == "but_with_subs"
+        assert logging_config.logger.name == "danglish"
 
 
 class TestConfigureLoggingRootLogger:

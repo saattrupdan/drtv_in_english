@@ -1,4 +1,4 @@
-"""Test suite for the but_with_subs package."""
+"""Test suite for the danglish package."""
 
 
 def test_dummy() -> None:

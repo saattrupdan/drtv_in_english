@@ -1,7 +1,7 @@
 [project]
-name = "but_with_subs"
+name = "danglish"
 version = "0.0.0"
-description = "Watch anything online... but with subs."
+description = "Watch DR TV videos with English subtitles."
 readme = "README.md"
 authors = [
   {name = "Dan Saattrup Smart", email = "dan.smart@alexandra.dk"},
@@ -11,35 +11,15 @@ maintainers = [
 ]
 requires-python = ">=3.12,<4.0"
 dependencies = [
-    "bits-and-bobs>=0.2.0",
     "fastapi[standard]>=0.135.3",
-    "huggingface-hub>=0.36.0",
-    "kenlm",
-    "nltk>=3.9.4",
     "openai>=1.50",
-    "punctfix>=0.11.1",
-    "omegaconf>=2.3.0",
-    "pyannote-audio>=4.0.4",
-    "psycopg[binary]>=3.2.0",
-    "pyctcdecode>=0.5.0",
-    "scipy>=1.17.1",
-    "sqlmodel>=0.0.22",
-    "torch>=2.0.0",
-    "torchaudio>=2.0.0",
-    "torchcodec>=0.4.0",
     "tqdm>=4.67.3",
-    "transformers>=4.0.0",
     "yt-dlp>=2026.3.17",
 ]
 
-[tool.uv]
-override-dependencies = [
-  "numpy>=2.0",
-]
-
 [project.urls]
-Repository = "https://github.com/saattrupdan/but_with_subs"
-Issues = "https://github.com/saattrupdan/but_with_subs/issues"
+Repository = "https://github.com/saattrupdan/danglish"
+Issues = "https://github.com/saattrupdan/danglish/issues"
 
 [project.license]
 file = "LICENSE"
@@ -87,7 +67,7 @@ select = [
   # Docstrings
   "D",
   "DOC",
-  # pycodestyle errors and warnings (PEP8)
+  # pycodestyle errors and warnings (PEP8)
   "E",
   "W",
   # flake-annotations (type hints)
@@ -104,9 +84,9 @@ ignore = [
   "ANN002",
   # Type annotations for **kwargs
   "ANN003",
-  # Always add blank line before class docstring
+  # Always add blank line before class docstring
   "D203",
-  # No new-line as first line of docstring
+  # No new-line as first line of docstring
   "D213",
 ]
 
@@ -127,7 +107,7 @@ addopts = [
   '--durations=10',
   '--color=yes',
   '--doctest-modules',
-  '--cov=src/but_with_subs',
+  '--cov=src/danglish',
 ]
 xfail_strict = true
 asyncio_mode = "auto"
@@ -143,19 +123,8 @@ filterwarnings = [
 log_cli_level = "info"
 testpaths = [
   "tests",
-  "src/but_with_subs",
+  "src/danglish",
 ]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[tool.uv.sources]
-kenlm = { url = "https://github.com/kpu/kenlm/archive/master.zip" }
-torch = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
-torchaudio = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
-torchcodec = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 
 [build-system]
 requires = ["hatchling"]

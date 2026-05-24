@@ -8,24 +8,14 @@ from pathlib import Path
 
 import click
 
-from but_with_subs import configure_logging
+from danglish import configure_logging
 
 configure_logging()
 
 DESIRED_ENVIRONMENT_VARIABLES = {
-    "HF_TOKEN": (
-        "Enter your HuggingFace token (https://huggingface.co/settings/tokens), "
-        "used to authenticate model downloads: "
-    ),
-    "LLM_BASE_URL": (
-        "Enter your LLM base URL (e.g. https://api.openai.com/v1): "
-    ),
-    "LLM_API_KEY": (
-        "Enter your LLM API key: "
-    ),
-    "LLM_MODEL": (
-        "Enter your LLM model name (e.g. gpt-4o-mini): "
-    ),
+    "LLM_BASE_URL": ("Enter your LLM base URL (e.g. https://api.openai.com/v1): "),
+    "LLM_API_KEY": ("Enter your LLM API key: "),
+    "LLM_MODEL": ("Enter your LLM model name (e.g. gpt-4o-mini): "),
 }
 
 

@@ -1,34 +1,24 @@
-"""Consolidated data models for the but_with_subs package.
-
-This module centralises all Pydantic models, enums, and namedtuples that are shared
-across multiple submodules. Each class retains its original docstring and is annotated
-with a comment indicating where it was moved from.
-"""
+"""Shared Pydantic models for the danglish package."""
 
 from pathlib import Path
 
-import numpy as np
 from pydantic import BaseModel
 
 
 class Chunk(BaseModel):
-    """A chunk of audio data with transcription metadata."""
-
-    model_config = {"arbitrary_types_allowed": True}
+    """A single subtitle cue."""
 
     start_time: float
     end_time: float
-    audio: np.ndarray
     text: str | None
-    speaker: str | None
+    speaker: str | None = None
 
 
 class File(BaseModel):
-    """Model representing downloaded media files."""
+    """A downloaded video and its source-language subtitles."""
 
     url: str
     video_path: Path | None
-    audio_path: Path | None
     subtitles_path: Path | None = None
 
 
@@ -44,8 +34,8 @@ class ProgressEvent(BaseModel):
 
     Attributes:
         stage:
-            Coarse pipeline stage (``downloading``, ``transcribing``,
-            ``subtitling``, ``completed``, ``error``).
+            Coarse pipeline stage (``downloading``, ``translating``,
+            ``completed``, ``error``).
         percentage:
             Overall progress as a float in ``[0, 100]``.
         message:
@@ -61,7 +51,7 @@ class ProgressEvent(BaseModel):
 
 
 class DownloadProgress(BaseModel):
-    """Model representing download progress.
+    """Progress update from yt-dlp.
 
     Attributes:
         status:
@@ -69,7 +59,7 @@ class DownloadProgress(BaseModel):
         current_file:
             Name of the file currently being downloaded, or None.
         percentage:
-            Download progress as a float from 0.0 to 100.0.
+            Download progress as a float from 0.0 to 1.0.
     """
 
     status: str

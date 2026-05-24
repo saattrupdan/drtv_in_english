@@ -1,42 +1,32 @@
-"""End-to-end pipeline: URL → subtitles.
+"""End-to-end pipeline: DR URL → translated subtitles.
 
-Downloads a video from a URL, extracts its audio, transcribes the audio,
-corrects and translates the transcript via an LLM, writes ``.vtt`` subtitle
-files next to the video, and deletes the intermediate ``.wav`` audio file.
+Downloads a DR TV video + its Danish subtitles, translates the subtitles
+via an LLM, and writes a ``.<lang>.vtt`` file next to the video.
 
 Usage:
-    uv run src/scripts/run_pipeline.py [URL] --language en
+    uv run src/scripts/run_pipeline.py <DR URL> --language en
 """
 
 import logging
 import os
 import sys
-import warnings
 
-import bits_and_bobs as bnb
 import click
 from dotenv import load_dotenv
-from punctfix.inference import PunctFixer
 from tqdm.auto import tqdm
-from transformers import pipeline
 
-from but_with_subs import configure_logging, download, load_diarization_pipeline
-from but_with_subs.audio_extraction import extract_audio
-from but_with_subs.audio_loading import load_audio
-from but_with_subs.constants import ASR_MODEL_ID, MAX_WORDS
-from but_with_subs.data_models import Chunk
-from but_with_subs.device import get_device
-from but_with_subs.llm import build_client, correct_and_translate
-from but_with_subs.subtitling import generate_subtitles
-from but_with_subs.text_chunking import group_word_chunks
-from but_with_subs.transcribing import assign_speakers, transcribe_audio
-from but_with_subs.vtt import parse_external_vtt
+from danglish import (
+    build_client,
+    configure_logging,
+    correct_and_translate,
+    download,
+    parse_external_vtt,
+    write_vtt_file,
+)
 
 load_dotenv()
 
-logger = logging.getLogger("but_with_subs")
-
-warnings.filterwarnings("ignore", category=UserWarning)
+logger = logging.getLogger("danglish")
 
 configure_logging()
 
@@ -46,7 +36,8 @@ configure_logging()
 @click.option(
     "--language",
     type=str,
-    required=True,
+    default="en",
+    show_default=True,
     help="Target language for translation (e.g. 'en' for English).",
 )
 @click.option(
@@ -57,7 +48,7 @@ configure_logging()
     help="Maximum number of LLM requests in flight at once.",
 )
 def main(url: str, language: str, max_parallel: int) -> None:
-    """Download a video and produce translated subtitles end-to-end."""
+    """Download a DR video and produce translated subtitles end-to-end."""
     logger.info(f"Downloading from {url}...")
     with tqdm(total=100, unit="%", desc="Download progress") as pbar:
         file = download(
@@ -69,83 +60,35 @@ def main(url: str, language: str, max_parallel: int) -> None:
         logger.error("Download did not produce a video file")
         sys.exit(1)
 
-    audio_path = None
-    try:
-        if file.subtitles_path is not None:
-            logger.info(f"Using source subtitles: {file.subtitles_path}")
-            chunks: list[Chunk] = parse_external_vtt(path=file.subtitles_path)
-            logger.info(f"Parsed {len(chunks)} cues from source subtitles")
-            output_anchor = file.video_path
-        else:
-            audio_path = extract_audio(video_path=file.video_path)
+    if file.subtitles_path is None:
+        logger.error("No Danish subtitles available for this video")
+        sys.exit(1)
 
-            logger.info(f"Loading the {ASR_MODEL_ID} model...")
-            with bnb.no_terminal_output():
-                model = pipeline(
-                    task="automatic-speech-recognition",
-                    model=ASR_MODEL_ID,
-                    device=get_device(),
-                    num_beams=5,
-                )
+    logger.info(f"Using source subtitles: {file.subtitles_path}")
+    chunks = parse_external_vtt(path=file.subtitles_path)
+    logger.info(f"Parsed {len(chunks)} cues from source subtitles")
 
-            logger.info("Loading the punctuation model...")
-            with bnb.no_terminal_output():
-                punctuation_model = PunctFixer(language="da")
+    llm_client = build_client()
+    llm_model = os.environ["LLM_MODEL"]
 
-            logger.info("Loading the audio file...")
-            audio = load_audio(path=audio_path)
+    with tqdm(total=len(chunks), desc="Translating", unit="chunk") as pbar:
 
-            logger.info("Loading the diarisation pipeline...")
-            with bnb.no_terminal_output():
-                diarization_model = load_diarization_pipeline()
+        def _on_progress(ratio: float) -> None:
+            pbar.n = int(ratio * len(chunks))
+            pbar.refresh()
 
-            word_chunks = transcribe_audio(audio=audio, model=model, show_progress=True)
-            logger.info(f"Generated {len(word_chunks)} word-level segments")
-
-            from but_with_subs.audio_chunking import diarize
-
-            turns = diarize(audio, diarization_model)
-            word_chunks = assign_speakers(word_chunks, turns)
-            logger.info(
-                f"Assigned speakers to "
-                f"{sum(1 for c in word_chunks if c.speaker is not None)} "
-                f"of {len(word_chunks)} chunks"
-            )
-
-            chunks = group_word_chunks(
-                word_chunks=word_chunks,
-                punctuation_model=punctuation_model,
-                max_words=MAX_WORDS,
-            )
-            logger.info(f"Grouped into {len(chunks)} text segments")
-            output_anchor = audio_path
-
-        llm_client = build_client()
-        llm_model = os.environ["LLM_MODEL"]
-
-        with tqdm(total=len(chunks), desc="Translating", unit="chunk") as pbar:
-
-            def _on_progress(ratio: float) -> None:
-                pbar.n = int(ratio * len(chunks))
-                pbar.refresh()
-
-            chunks = correct_and_translate(
-                chunks,
-                target_language=language,
-                client=llm_client,
-                model=llm_model,
-                max_parallel=max_parallel,
-                on_progress=_on_progress,
-            )
-
-        output_path = output_anchor.with_suffix(".vtt")
-        generate_subtitles(
-            chunks=chunks, audio_path=output_anchor, output_path=output_path
+        chunks = correct_and_translate(
+            chunks,
+            target_language=language,
+            client=llm_client,
+            model=llm_model,
+            max_parallel=max_parallel,
+            on_progress=_on_progress,
         )
-    finally:
-        if audio_path is not None and audio_path.exists():
-            logger.info(f"Removing intermediate audio file: {audio_path}")
-            audio_path.unlink()
+
+    output_path = file.video_path.with_suffix(f".{language}.vtt")
+    write_vtt_file(chunks=chunks, path=output_path)
+    logger.info(f"Wrote translated subtitles to {output_path}")
 
 
 if __name__ == "__main__":

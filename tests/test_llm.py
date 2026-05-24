@@ -8,38 +8,25 @@ conditions.
 import json
 import unittest.mock as um
 
-import numpy as np
 import openai
 import pytest
 
-from but_with_subs.data_models import Chunk
-from but_with_subs.llm import CorrectedChunk, build_client, correct_and_translate
+from danglish.data_models import Chunk
+from danglish.llm import CorrectedChunk, build_client, correct_and_translate
 
 
 def _make_chunk(
-    text: str,
+    text: str | None,
     start_time: float = 0.0,
     end_time: float = 1.0,
     speaker: str | None = None,
 ) -> Chunk:
-    """Create a Chunk with audio data.
-
-    Args:
-        text: The text content for the chunk.
-        start_time: The start time in seconds.
-        end_time: The end time in seconds.
-        speaker: Optional speaker name.
+    """Create a Chunk for testing.
 
     Returns:
-        A Chunk instance with default audio data.
+        A Chunk instance with the given fields.
     """
-    return Chunk(
-        start_time=start_time,
-        end_time=end_time,
-        audio=np.zeros(16000, dtype=np.float32),
-        text=text,
-        speaker=speaker,
-    )
+    return Chunk(start_time=start_time, end_time=end_time, text=text, speaker=speaker)
 
 
 # ---------------------------------------------------------------------------
@@ -184,15 +171,12 @@ def test_correct_and_translate_batches_chunks() -> None:
 def test_correct_and_translate_malformed_json_preserves_original() -> None:
     """Test that malformed JSON for a batch preserves originals for that batch."""
     mock_client = _make_mock_client(
-        responses=[
-            "not valid json",
-            _batch_response({1: "Good translation"}),
-        ]
+        responses=["not valid json", _batch_response({1: "Good translation"})]
     )
 
     chunks = [_make_chunk("Original text"), _make_chunk("Second text")]
 
-    with um.patch("but_with_subs.llm.logger") as mock_logger:
+    with um.patch("danglish.llm.logger") as mock_logger:
         result = correct_and_translate(
             chunks, "en", client=mock_client, context_window=0, batch_size=1
         )
@@ -205,7 +189,7 @@ def test_correct_and_translate_malformed_json_preserves_original() -> None:
 def test_correct_and_translate_missing_id_preserves_original() -> None:
     """Test that a chunk omitted from the LLM response falls back to its original."""
     mock_client = _make_mock_client(
-        responses=[_batch_response({1: "Valid translation"})],
+        responses=[_batch_response({1: "Valid translation"})]
     )
 
     chunks = [_make_chunk("Original text"), _make_chunk("Second text")]
@@ -248,9 +232,7 @@ def test_correct_and_translate_progress_callback() -> None:
 
 def test_correct_and_translate_preserves_chunk_metadata() -> None:
     """Test that timing and speaker metadata are preserved through translation."""
-    mock_client = _make_mock_client(
-        responses=[_batch_response({0: "Translated text"})]
-    )
+    mock_client = _make_mock_client(responses=[_batch_response({0: "Translated text"})])
 
     original_start = 5.5
     original_end = 8.5
@@ -280,13 +262,7 @@ def test_correct_and_translate_handles_none_text() -> None:
 
     chunks = [
         _make_chunk("Has text"),
-        Chunk(
-            start_time=1.0,
-            end_time=2.0,
-            audio=np.zeros(0, dtype=np.float32),
-            text=None,
-            speaker="Bob",
-        ),
+        _make_chunk(None, start_time=1.0, end_time=2.0, speaker="Bob"),
     ]
 
     result = correct_and_translate(
