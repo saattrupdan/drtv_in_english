@@ -142,7 +142,7 @@ def correct_and_translate(
             f"Chunks (translate ONLY the chunks with ids {target_ids}):\n\n"
             f"{numbered}"
             f"---\n"
-            f'Return a JSON object of the form '
+            f"Return a JSON object of the form "
             f'{{"translations": {{"<id>": "<corrected and translated text>", ...}}}} '
             f"covering exactly the requested ids ({target_ids})."
         )
@@ -208,14 +208,12 @@ def _request_batch(
                 {"role": "user", "content": user_prompt},
             ],
             response_format={"type": "json_object"},
-            temperature=0.3,
+            temperature=1.0,
             timeout=600.0,
         )
         raw = response.choices[0].message.content
         if raw is None:
-            logger.warning(
-                f"LLM returned no content for batch {target_indices}"
-            )
+            logger.warning(f"LLM returned no content for batch {target_indices}")
             return {}
 
         parsed = json.loads(_extract_json(raw))
