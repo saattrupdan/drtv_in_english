@@ -68,6 +68,53 @@ def parse_vtt_file(path: Path) -> list[Chunk]:
     return chunks
 
 
+def parse_external_vtt(path: Path) -> list[Chunk]:
+    """Parse a standard WebVTT file from any source into Chunk objects.
+
+    Unlike :func:`parse_vtt_file`, this accepts cues without numeric
+    identifiers, with multi-line text and leading whitespace used for
+    visual centring (as produced by DR's broadcaster subtitles).
+
+    Returns:
+        List of Chunk objects, one per cue. Chunks have zero-filled audio
+        since no decoded audio is available at parse time.
+    """
+    content = path.read_text(encoding="utf-8")
+    chunks: list[Chunk] = []
+
+    cue_pattern = re.compile(
+        r"(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})[^\n]*\n"
+        r"((?:.+\n?)+?)(?=\n\s*\n|\n[^\n]*-->|\Z)",
+        re.MULTILINE,
+    )
+
+    for match in cue_pattern.finditer(content):
+        start_time = parse_vtt_timestamp(match.group(1))
+        end_time = parse_vtt_timestamp(match.group(2))
+        raw_text = match.group(3)
+
+        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        text = " ".join(lines)
+        text = re.sub(r"<[^>]+>", "", text).strip()
+        if not text:
+            continue
+
+        duration = max(0.0, end_time - start_time)
+        audio = np.zeros(int(duration * TARGET_SAMPLE_RATE), dtype=np.float32)
+
+        chunks.append(
+            Chunk(
+                start_time=start_time,
+                end_time=end_time,
+                audio=audio,
+                text=text,
+                speaker=None,
+            )
+        )
+
+    return chunks
+
+
 def write_vtt_file(chunks: list[Chunk], path: Path) -> None:
     """Write chunks to a WebVTT file.
 

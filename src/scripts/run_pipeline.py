@@ -30,6 +30,7 @@ from but_with_subs.llm import build_client, correct_and_translate
 from but_with_subs.subtitling import generate_subtitles
 from but_with_subs.text_chunking import group_word_chunks
 from but_with_subs.transcribing import assign_speakers, transcribe_audio
+from but_with_subs.vtt import parse_external_vtt
 
 load_dotenv()
 
@@ -48,7 +49,14 @@ configure_logging()
     required=True,
     help="Target language for translation (e.g. 'en' for English).",
 )
-def main(url: str, language: str) -> None:
+@click.option(
+    "--max-parallel",
+    type=int,
+    default=20,
+    show_default=True,
+    help="Maximum number of LLM requests in flight at once.",
+)
+def main(url: str, language: str, max_parallel: int) -> None:
     """Download a video and produce translated subtitles end-to-end."""
     logger.info(f"Downloading from {url}...")
     with tqdm(total=100, unit="%", desc="Download progress") as pbar:
@@ -61,50 +69,57 @@ def main(url: str, language: str) -> None:
         logger.error("Download did not produce a video file")
         sys.exit(1)
 
-    audio_path = extract_audio(video_path=file.video_path)
-
+    audio_path = None
     try:
-        logger.info(f"Loading the {ASR_MODEL_ID} model...")
-        with bnb.no_terminal_output():
-            model = pipeline(
-                task="automatic-speech-recognition",
-                model=ASR_MODEL_ID,
-                device=get_device(),
-                num_beams=5,
+        if file.subtitles_path is not None:
+            logger.info(f"Using source subtitles: {file.subtitles_path}")
+            chunks: list[Chunk] = parse_external_vtt(path=file.subtitles_path)
+            logger.info(f"Parsed {len(chunks)} cues from source subtitles")
+            output_anchor = file.video_path
+        else:
+            audio_path = extract_audio(video_path=file.video_path)
+
+            logger.info(f"Loading the {ASR_MODEL_ID} model...")
+            with bnb.no_terminal_output():
+                model = pipeline(
+                    task="automatic-speech-recognition",
+                    model=ASR_MODEL_ID,
+                    device=get_device(),
+                    num_beams=5,
+                )
+
+            logger.info("Loading the punctuation model...")
+            with bnb.no_terminal_output():
+                punctuation_model = PunctFixer(language="da")
+
+            logger.info("Loading the audio file...")
+            audio = load_audio(path=audio_path)
+
+            logger.info("Loading the diarisation pipeline...")
+            with bnb.no_terminal_output():
+                diarization_model = load_diarization_pipeline()
+
+            word_chunks = transcribe_audio(audio=audio, model=model, show_progress=True)
+            logger.info(f"Generated {len(word_chunks)} word-level segments")
+
+            from but_with_subs.audio_chunking import diarize
+
+            turns = diarize(audio, diarization_model)
+            word_chunks = assign_speakers(word_chunks, turns)
+            logger.info(
+                f"Assigned speakers to "
+                f"{sum(1 for c in word_chunks if c.speaker is not None)} "
+                f"of {len(word_chunks)} chunks"
             )
 
-        logger.info("Loading the punctuation model...")
-        with bnb.no_terminal_output():
-            punctuation_model = PunctFixer(language="da")
+            chunks = group_word_chunks(
+                word_chunks=word_chunks,
+                punctuation_model=punctuation_model,
+                max_words=MAX_WORDS,
+            )
+            logger.info(f"Grouped into {len(chunks)} text segments")
+            output_anchor = audio_path
 
-        logger.info("Loading the audio file...")
-        audio = load_audio(path=audio_path)
-
-        logger.info("Loading the diarisation pipeline...")
-        with bnb.no_terminal_output():
-            diarization_model = load_diarization_pipeline()
-
-        word_chunks = transcribe_audio(audio=audio, model=model, show_progress=True)
-        logger.info(f"Generated {len(word_chunks)} word-level segments")
-
-        # Assign speakers via diarisation
-        from but_with_subs.audio_chunking import diarize
-
-        turns = diarize(audio, diarization_model)
-        word_chunks = assign_speakers(word_chunks, turns)
-        logger.info(
-            f"Assigned speakers to {sum(1 for c in word_chunks if c.speaker is not None)} "
-            f"of {len(word_chunks)} chunks"
-        )
-
-        chunks: list[Chunk] = group_word_chunks(
-            word_chunks=word_chunks,
-            punctuation_model=punctuation_model,
-            max_words=MAX_WORDS,
-        )
-        logger.info(f"Grouped into {len(chunks)} text segments")
-
-        # Build LLM client for correct-and-translate.
         llm_client = build_client()
         llm_model = os.environ["LLM_MODEL"]
 
@@ -119,15 +134,16 @@ def main(url: str, language: str) -> None:
                 target_language=language,
                 client=llm_client,
                 model=llm_model,
+                max_parallel=max_parallel,
                 on_progress=_on_progress,
             )
 
-        output_path = audio_path.with_suffix(".vtt")
+        output_path = output_anchor.with_suffix(".vtt")
         generate_subtitles(
-            chunks=chunks, audio_path=audio_path, output_path=output_path
+            chunks=chunks, audio_path=output_anchor, output_path=output_path
         )
     finally:
-        if audio_path.exists():
+        if audio_path is not None and audio_path.exists():
             logger.info(f"Removing intermediate audio file: {audio_path}")
             audio_path.unlink()
 

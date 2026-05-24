@@ -49,6 +49,18 @@ def download(
     data_dir = Path("data")
     data_dir.mkdir(parents=True, exist_ok=True)
 
+    # Priority order: real Danish tracks first, then auto-generated. yt-dlp
+    # treats these as patterns and downloads every match, so we pick the
+    # highest-priority result ourselves after extraction.
+    subtitle_priority = [
+        "da",
+        "da_combined",
+        "da-DK",
+        "da_foreign",
+        "a.da",
+        "a.da-DK",
+    ]
+
     ydl_opts: dict[str, t.Any] = {
         "paths": dict(home=DATA_DIR),
         "format": "bestvideo*+bestaudio*",
@@ -57,6 +69,10 @@ def download(
         "consoletitle": False,
         "noprogress": True,
         "no_warnings": True,
+        "writesubtitles": True,
+        "writeautomaticsub": True,
+        "subtitleslangs": subtitle_priority,
+        "subtitlesformat": "vtt",
         "progress_hooks": [
             lambda info: _parse_progress_info(info=info, progress_hook=progress_hook)
         ],
@@ -86,6 +102,31 @@ def download(
         elif audio_path is None and path.suffix in audio_suffixes:
             audio_path = path
 
-    logger.info(f"Download results - video: {video_path}, audio: {audio_path}")
+    subtitles_path = _pick_subtitle(
+        info=info, priority=subtitle_priority
+    )
 
-    return File(url=url, video_path=video_path, audio_path=audio_path)
+    logger.info(
+        f"Download results - video: {video_path}, audio: {audio_path}, "
+        f"subtitles: {subtitles_path}"
+    )
+
+    return File(
+        url=url,
+        video_path=video_path,
+        audio_path=audio_path,
+        subtitles_path=subtitles_path,
+    )
+
+
+def _pick_subtitle(info: dict, priority: list[str]) -> Path | None:
+    """Return the highest-priority downloaded subtitle file, if any."""
+    requested = info.get("requested_subtitles") or {}
+    for lang in priority:
+        entry = requested.get(lang)
+        if not entry:
+            continue
+        filepath = entry.get("filepath")
+        if filepath and Path(filepath).exists():
+            return Path(filepath)
+    return None

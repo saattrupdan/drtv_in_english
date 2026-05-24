@@ -29,6 +29,7 @@ class File(BaseModel):
     url: str
     video_path: Path | None
     audio_path: Path | None
+    subtitles_path: Path | None = None
 
 
 class VideoWithSubs(BaseModel):
