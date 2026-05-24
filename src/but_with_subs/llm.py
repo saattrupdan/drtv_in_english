@@ -15,6 +15,8 @@ from __future__ import annotations
 import collections.abc as c
 import json
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import openai
 from pydantic import BaseModel, ValidationError
@@ -77,6 +79,7 @@ def correct_and_translate(
     model: str = "gpt-4o-mini",
     context_window: int = 6,
     batch_size: int = 5,
+    max_parallel: int = 20,
     on_progress: c.Callable[[float], None] | None = None,
 ) -> list[Chunk]:
     """Rewrite each chunk's text so it is both ASR-corrected and translated.
@@ -102,6 +105,8 @@ def correct_and_translate(
         batch_size (optional):
             Number of target chunks per LLM request. Higher values mean
             fewer requests but larger prompts and outputs. Defaults to 5.
+        max_parallel (optional):
+            Maximum number of LLM requests in flight at once. Defaults to 20.
         on_progress (optional):
             Callback invoked with a float in ``[0, 1]`` after each batch.
             Defaults to None.
@@ -117,10 +122,13 @@ def correct_and_translate(
         return []
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1")
+    if max_parallel < 1:
+        raise ValueError("max_parallel must be at least 1")
 
     n = len(chunks)
     result: list[Chunk] = list(chunks)
 
+    batches: list[tuple[list[int], str]] = []
     for batch_start in range(0, n, batch_size):
         batch_end = min(n, batch_start + batch_size)
         window_start = max(0, batch_start - context_window)
@@ -146,7 +154,13 @@ def correct_and_translate(
             f'{{"translations": {{"<id>": "<corrected and translated text>", ...}}}} '
             f"covering exactly the requested ids ({target_ids})."
         )
+        batches.append((target_indices, user_prompt))
 
+    completed = 0
+    progress_lock = threading.Lock()
+
+    def _run_batch(item: tuple[list[int], str]) -> tuple[list[int], dict[int, str]]:
+        target_indices, user_prompt = item
         translations = _request_batch(
             client=client,
             model=model,
@@ -154,17 +168,24 @@ def correct_and_translate(
             user_prompt=user_prompt,
             target_indices=target_indices,
         )
+        return target_indices, translations
 
-        for idx in target_indices:
-            corrected = translations.get(idx)
-            if not corrected:
-                corrected = chunks[idx].text or ""
-            new_chunk = chunks[idx].model_copy()
-            new_chunk.text = corrected
-            result[idx] = new_chunk
+    with ThreadPoolExecutor(max_workers=max_parallel) as pool:
+        futures = [pool.submit(_run_batch, item) for item in batches]
+        for future in as_completed(futures):
+            target_indices, translations = future.result()
+            for idx in target_indices:
+                corrected = translations.get(idx)
+                if not corrected:
+                    corrected = chunks[idx].text or ""
+                new_chunk = chunks[idx].model_copy()
+                new_chunk.text = corrected
+                result[idx] = new_chunk
 
-        if on_progress is not None:
-            on_progress(min(1.0, batch_end / n))
+            if on_progress is not None:
+                with progress_lock:
+                    completed += 1
+                    on_progress(min(1.0, completed / len(batches)))
 
     return result
 
