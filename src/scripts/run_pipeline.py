@@ -122,7 +122,7 @@ def main(url: str, language: str) -> None:
                 on_progress=_on_progress,
             )
 
-        output_path = audio_path.with_suffix(f".{language}.vtt")
+        output_path = audio_path.with_suffix(".vtt")
         generate_subtitles(
             chunks=chunks, audio_path=audio_path, output_path=output_path
         )

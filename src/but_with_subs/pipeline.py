@@ -6,16 +6,15 @@ rather than constructed here, so the API can load them once at startup.
 """
 
 import collections.abc as c
-import typing as t
 from pathlib import Path
 
 import numpy as np
 import openai
-from pyannote.audio import Pipeline
 from punctfix.inference import PunctFixer
+from pyannote.audio import Pipeline
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
-from transformers import AutomaticSpeechRecognitionPipeline, pipeline
+from transformers import AutomaticSpeechRecognitionPipeline
 
 from .audio_extraction import extract_audio
 from .audio_loading import load_audio
@@ -35,10 +34,7 @@ TRANSCRIBE_END = 95.0
 SUBTITLE_END = 100.0
 
 
-def _diarize(
-    audio: np.ndarray,
-    model: Pipeline,
-) -> list[tuple[float, float, str]]:
+def _diarize(audio: np.ndarray, model: Pipeline) -> list[tuple[float, float, str]]:
     """Run diarisation on audio using the given Pipeline.
 
     Args:
@@ -190,7 +186,7 @@ def run_pipeline(
     yield ProgressEvent(
         stage="subtitling", percentage=TRANSCRIBE_END, message="Generating subtitles…"
     )
-    subtitles_path = audio_path.with_suffix(f".{language}.vtt")
+    subtitles_path = audio_path.with_suffix(".vtt")
     generate_subtitles(chunks=chunks, audio_path=audio_path, output_path=subtitles_path)
 
     with Session(engine) as session:
