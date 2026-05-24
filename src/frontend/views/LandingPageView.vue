@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Hls from "hls.js";
-import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from "vue";
 
 type Stage = "idle" | "preparing" | "playing" | "error";
 
@@ -66,6 +66,8 @@ async function startPreparing() {
     }
     prepared.value = (await response.json()) as PrepareResponse;
     stage.value = "playing";
+    await nextTick(); // Wait for <video> element to mount
+    attachPlayer(videoEl.value, prepared.value);
     startTranslationStream(prepared.value.job_id);
   } catch (err) {
     if ((err as Error).name === "AbortError") return;
@@ -164,13 +166,16 @@ function handleCueEvent(event: CueEvent) {
     translationDone.value = true;
     return;
   }
-  if (!englishTrack || !videoEl.value) return;
+  if (!englishTrack || !videoEl.value) {
+    console.warn("Cue received before player attached, dropping:", event);
+    return;
+  }
 
   const cue = new VTTCue(event.start, event.end, event.text);
   englishTrack.addCue(cue);
   cuesReceived.value += 1;
 
-  if (cuesReceived.value === 1) {
+  if (!englishTrack.mode || englishTrack.mode === "hidden") {
     englishTrack.mode = "showing";
     const danishTrack = Array.from(videoEl.value.textTracks).find(
       (t) => t.language === "da",
