@@ -9,6 +9,15 @@ from .data_models import Chunk
 def parse_external_vtt(path: Path) -> list[Chunk]:
     """Parse a standard WebVTT file into Chunk objects.
 
+    Returns:
+        List of Chunk objects, one per cue.
+    """
+    return parse_vtt_text(path.read_text(encoding="utf-8"))
+
+
+def parse_vtt_text(content: str) -> list[Chunk]:
+    """Parse a WebVTT document into Chunk objects.
+
     Accepts cues without numeric identifiers, with multi-line text and
     leading whitespace used for visual centring (as produced by DR's
     broadcaster subtitles).
@@ -16,7 +25,6 @@ def parse_external_vtt(path: Path) -> list[Chunk]:
     Returns:
         List of Chunk objects, one per cue.
     """
-    content = path.read_text(encoding="utf-8")
     chunks: list[Chunk] = []
 
     cue_pattern = re.compile(

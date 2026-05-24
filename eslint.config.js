@@ -1,4 +1,5 @@
 import vueEslintParser from "vue-eslint-parser";
+import globals from "globals";
 import js from "@eslint/js";
 import pluginVue from "eslint-plugin-vue";
 import ts from "@typescript-eslint/parser";
@@ -15,6 +16,9 @@ export default [
       parserOptions: {
         extraFileExtensions: [".vue"],
         sourceType: "module",
+      },
+      globals: {
+        ...globals.browser,
       },
     },
     plugins: {

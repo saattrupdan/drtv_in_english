@@ -10,17 +10,19 @@
     "check": "vue-tsc --noEmit && eslint src/frontend --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
   },
   "dependencies": {
+    "hls.js": "^1.5.17",
     "vue": "^3.5.32",
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/eslint-config-prettier": "^10.2.0",
     "@vue/eslint-config-typescript": "^14.7.0",
     "eslint": "^10.2.0",
-    "@eslint/js": "^10.0.1",
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.6.0",
     "prettier": "^3.8.2",
     "typescript": "^6.0.2",
     "vite": "^8.0.8",

@@ -6,6 +6,7 @@ conditions.
 """
 
 import json
+import re
 import unittest.mock as um
 
 import openai
@@ -100,11 +101,27 @@ def test_corrected_chunk_rejects_empty_text() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_client(responses: list[str] | None = None) -> openai.OpenAI:
+_TARGET_IDS_RE = re.compile(r"translate ONLY the chunks with ids ([\d, ]+)")
+
+
+def _make_mock_client(
+    responses: list[str] | None = None,
+    translations: dict[int, str] | None = None,
+) -> openai.OpenAI:
     """Create a mock OpenAI client with pre-configured responses.
 
+    When ``translations`` is given, the mock inspects each call's user
+    prompt to find the requested target ids and returns a JSON object
+    containing translations for exactly those ids. This makes tests
+    deterministic regardless of which batch executes first under the
+    thread-pool used by ``correct_and_translate``.
+
     Args:
-        responses: List of JSON strings to return for each chunk.
+        responses:
+            Legacy mode — sequential JSON strings returned in call order.
+        translations:
+            Mapping from chunk index to corrected text. The mock picks
+            the right subset per call based on the prompt.
 
     Returns:
         A MagicMock configured to simulate openai.OpenAI.
@@ -112,7 +129,30 @@ def _make_mock_client(responses: list[str] | None = None) -> openai.OpenAI:
     mock_client = um.MagicMock()
     mock_client.max_retries = 3
 
-    if responses is not None:
+    if translations is not None:
+
+        def _by_target_ids(*_args: object, **kwargs: object) -> um.MagicMock:
+            messages = kwargs.get("messages", [])
+            user_msg = next(
+                (m for m in messages if m.get("role") == "user"), {"content": ""}
+            )
+            match = _TARGET_IDS_RE.search(user_msg["content"])
+            ids = (
+                [int(s.strip()) for s in match.group(1).split(",")] if match else []
+            )
+            payload = {
+                "translations": {
+                    str(i): translations[i] for i in ids if i in translations
+                }
+            }
+            resp = um.MagicMock()
+            resp.choices = [
+                um.MagicMock(message=um.MagicMock(content=json.dumps(payload)))
+            ]
+            return resp
+
+        mock_client.chat.completions.create.side_effect = _by_target_ids
+    elif responses is not None:
         mock_responses = []
         for resp in responses:
             mock_resp = um.MagicMock()
@@ -151,11 +191,7 @@ def test_correct_and_translate_batches_chunks() -> None:
     to the corresponding chunks.
     """
     mock_client = _make_mock_client(
-        responses=[
-            _batch_response({0: "Translated 0", 1: "Translated 1"}),
-            _batch_response({2: "Translated 2", 3: "Translated 3"}),
-            _batch_response({4: "Translated 4"}),
-        ]
+        translations={i: f"Translated {i}" for i in range(5)}
     )
 
     chunks = [_make_chunk(f"Danish text {i}") for i in range(5)]
@@ -170,9 +206,26 @@ def test_correct_and_translate_batches_chunks() -> None:
 
 def test_correct_and_translate_malformed_json_preserves_original() -> None:
     """Test that malformed JSON for a batch preserves originals for that batch."""
-    mock_client = _make_mock_client(
-        responses=["not valid json", _batch_response({1: "Good translation"})]
-    )
+
+    def _by_prompt(*_args: object, **kwargs: object) -> um.MagicMock:
+        messages = kwargs.get("messages", [])
+        user_msg = next(
+            (m for m in messages if m.get("role") == "user"), {"content": ""}
+        )
+        match = _TARGET_IDS_RE.search(user_msg["content"])
+        target_id = int(match.group(1).strip()) if match else -1
+        content = (
+            _batch_response({1: "Good translation"})
+            if target_id == 1
+            else "not valid json"
+        )
+        resp = um.MagicMock()
+        resp.choices = [um.MagicMock(message=um.MagicMock(content=content))]
+        return resp
+
+    mock_client = um.MagicMock()
+    mock_client.max_retries = 3
+    mock_client.chat.completions.create.side_effect = _by_prompt
 
     chunks = [_make_chunk("Original text"), _make_chunk("Second text")]
 

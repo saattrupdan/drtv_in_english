@@ -25,7 +25,7 @@ Then open <http://localhost>, paste a DRTV URL, and click
 
 Series URLs (`/drtv/serie/...`) automatically resolve to the first
 episode. Single-episode (`/drtv/se/...`) and film (`/drtv/program/...`)
-URLs are downloaded as-is.
+URLs are streamed as-is.
 
 ## Local Development
 
@@ -37,44 +37,37 @@ uv run fastapi dev src/danglish/api.py       # backend on :8000
 
 The Vite dev server proxies `/api/*` to the backend on port 8000.
 
-## CLI
-
-For a one-shot run without the web app:
-
-```bash
-uv run python src/scripts/run_pipeline.py <DRTV URL> --language en
-```
-
-The downloaded `.mp4` and translated `.en.vtt` end up in `./data/`.
-
 ## Workflow
 
 ```text
- ┌───────────┐   POST /api/process    ┌──────────────┐
- │ Frontend  │ ─────────────────────► │   FastAPI    │
- │ (Vue 3)   │ ◄───────── NDJSON ──── │   backend    │
- └───────────┘   progress events      └──────────────┘
-        ▲                                     │
-        │  /api/media/<file>                  │
-        │  (video + .vtt)                     ▼
-        └─────────────────────────────  ./data/
+ ┌───────────┐  POST /api/prepare       ┌──────────────┐
+ │ Frontend  │ ──────────────────────►  │   FastAPI    │
+ │ (Vue 3 +  │ ◄──────── job_id ─────── │   backend    │
+ │  hls.js)  │                          │              │
+ │           │  GET /api/stream/.../    │              │
+ │           │  master.m3u8 + segments  │              │
+ │           │ ◄──── HLS proxy ──────►  │              │
+ │           │                          │              │
+ │           │  GET /api/translate/...  │              │
+ │           │ ◄──── NDJSON cues ────── │              │
+ └───────────┘                          └──────────────┘
 ```
 
-Backend pipeline:
-
-```text
- download (yt-dlp)  ──►  parse Danish VTT  ──►  translate with LLM  ──►  write .en.vtt
-       0–50%                                          50–100%                100%
-```
+Nothing is written to disk: the backend resolves DR's HLS playlist and
+Danish subtitle URLs with yt-dlp, proxies HLS segments through itself
+(re-attaching DR's CDN headers), and streams translated subtitle cues
+to the browser as the LLM finishes each batch. The browser shows the
+video immediately with Danish subs, then swaps to English as cues
+arrive.
 
 ## Stack
 
 | Layer | Tech |
 | --- | --- |
-| Frontend | Vue 3, Vite, TypeScript |
-| Backend | FastAPI, Pydantic |
+| Frontend | Vue 3, Vite, TypeScript, hls.js |
+| Backend | FastAPI, Pydantic, httpx |
 | Translation | OpenAI-compatible LLM (any) |
-| Media | `yt-dlp`, `ffmpeg` |
+| Media | `yt-dlp` (metadata only) |
 | Infra | Docker Compose, nginx |
 
 ## Contribute

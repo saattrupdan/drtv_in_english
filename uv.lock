@@ -185,6 +185,7 @@ version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
+    { name = "httpx" },
     { name = "openai" },
     { name = "tqdm" },
     { name = "yt-dlp" },
@@ -208,6 +209,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.3" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "openai", specifier = ">=1.50" },
     { name = "tqdm", specifier = ">=4.67.3" },
     { name = "yt-dlp", specifier = ">=2026.3.17" },

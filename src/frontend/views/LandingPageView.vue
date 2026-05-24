@@ -1,64 +1,72 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useTemplateRef } from "vue";
+import Hls from "hls.js";
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
 
-type Stage = "idle" | "processing" | "ready" | "playing" | "error";
+type Stage = "idle" | "preparing" | "playing" | "error";
 
-interface VideoWithSubs {
-  video_path: string;
-  subtitles_path: string;
+interface PrepareResponse {
+  job_id: string;
+  title: string;
+  hls_url: string;
+  original_subs_url: string;
+  cue_count: number;
 }
 
-interface ProgressEvent {
-  stage: string;
-  percentage: number;
-  message?: string | null;
-  result?: VideoWithSubs | null;
+interface CueEvent {
+  index: number;
+  start: number;
+  end: number;
+  text: string;
+  done: boolean;
 }
 
 const stage = ref<Stage>("idle");
 const url = ref("");
-const progress = ref(0);
-const progressMessage = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
-const showToast = ref(false);
-const videoSrc = ref<string | null>(null);
-const subtitlesSrc = ref<string | null>(null);
+const prepared = ref<PrepareResponse | null>(null);
+const cuesReceived = ref(0);
+const translationDone = ref(false);
 
 const videoEl = useTemplateRef<HTMLVideoElement>("videoEl");
 
-let toastTimer: number | null = null;
-let abortController: AbortController | null = null;
+let hls: Hls | null = null;
+let prepareAbort: AbortController | null = null;
+let translateAbort: AbortController | null = null;
+let englishTrack: TextTrack | null = null;
 
 const canSubmit = computed(() => url.value.trim().length > 0);
 
-const progressLabel = computed(() => {
-  if (progressMessage.value) return progressMessage.value;
-  if (progress.value < 50) return "Downloading video…";
-  if (progress.value < 100) return "Translating subtitles…";
-  return "Done";
+const translationProgress = computed(() => {
+  if (!prepared.value || prepared.value.cue_count === 0) return 0;
+  return Math.min(
+    100,
+    Math.round((cuesReceived.value / prepared.value.cue_count) * 100),
+  );
 });
 
-async function startProcessing() {
+async function startPreparing() {
   if (!canSubmit.value) return;
-  stage.value = "processing";
-  progress.value = 0;
-  progressMessage.value = null;
+  stage.value = "preparing";
   errorMessage.value = null;
-  videoSrc.value = null;
-  subtitlesSrc.value = null;
+  prepared.value = null;
+  cuesReceived.value = 0;
+  translationDone.value = false;
 
-  abortController = new AbortController();
+  prepareAbort = new AbortController();
   try {
-    const response = await fetch("/api/process", {
+    const response = await fetch("/api/prepare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: url.value.trim(), language: "en" }),
-      signal: abortController.signal,
+      signal: prepareAbort.signal,
     });
-    if (!response.ok || !response.body) {
-      throw new Error(`Request failed (${response.status})`);
+    if (!response.ok) {
+      const detail = await safeDetail(response);
+      throw new Error(detail ?? `Request failed (${response.status})`);
     }
-    await consumeStream(response.body);
+    prepared.value = (await response.json()) as PrepareResponse;
+    stage.value = "playing";
+    startTranslationStream(prepared.value.job_id);
   } catch (err) {
     if ((err as Error).name === "AbortError") return;
     stage.value = "error";
@@ -66,96 +74,145 @@ async function startProcessing() {
   }
 }
 
-async function consumeStream(body: ReadableStream<Uint8Array>) {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let newlineIndex;
-    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, newlineIndex).trim();
-      buffer = buffer.slice(newlineIndex + 1);
-      if (line.length === 0) continue;
-      handleEvent(JSON.parse(line) as ProgressEvent);
-    }
+async function safeDetail(response: Response): Promise<string | null> {
+  try {
+    const body = (await response.json()) as { detail?: string };
+    return body?.detail ?? null;
+  } catch {
+    return null;
   }
-  const tail = buffer.trim();
-  if (tail.length > 0) handleEvent(JSON.parse(tail) as ProgressEvent);
 }
 
-function handleEvent(event: ProgressEvent) {
-  if (event.stage === "error") {
+watch(
+  () => [stage.value, prepared.value, videoEl.value] as const,
+  ([currentStage, currentPrepared, currentVideo]) => {
+    if (
+      currentStage === "playing" &&
+      currentPrepared !== null &&
+      currentVideo !== null
+    ) {
+      attachPlayer(currentVideo, currentPrepared);
+    }
+  },
+);
+
+function attachPlayer(video: HTMLVideoElement, info: PrepareResponse) {
+  teardownPlayer();
+
+  if (Hls.isSupported()) {
+    hls = new Hls();
+    hls.loadSource(info.hls_url);
+    hls.attachMedia(video);
+  } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = info.hls_url;
+  } else {
     stage.value = "error";
-    errorMessage.value = event.message || "Pipeline failed.";
+    errorMessage.value = "Your browser does not support HLS playback.";
     return;
   }
-  progress.value = Math.max(progress.value, event.percentage);
-  progressMessage.value = event.message ?? null;
-  if (event.stage === "completed" && event.result) {
-    videoSrc.value = event.result.video_path;
-    subtitlesSrc.value = event.result.subtitles_path;
-    onComplete();
+
+  englishTrack = video.addTextTrack("subtitles", "English", "en");
+  englishTrack.mode = "hidden";
+
+  video.addEventListener("loadedmetadata", () => {
+    const danishTrack = Array.from(video.textTracks).find(
+      (t) => t.language === "da",
+    );
+    if (danishTrack) danishTrack.mode = "showing";
+  });
+
+  void video.play().catch(() => {
+    // Autoplay blocked — user can press play. No-op.
+  });
+}
+
+function startTranslationStream(jobId: string) {
+  translateAbort = new AbortController();
+  void consumeTranslations(jobId, translateAbort.signal);
+}
+
+async function consumeTranslations(jobId: string, signal: AbortSignal) {
+  try {
+    const response = await fetch(`/api/translate/${jobId}`, { signal });
+    if (!response.ok || !response.body) {
+      throw new Error(`Translation stream failed (${response.status})`);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newline;
+      while ((newline = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (line.length === 0) continue;
+        handleCueEvent(JSON.parse(line) as CueEvent);
+      }
+    }
+  } catch (err) {
+    if ((err as Error).name === "AbortError") return;
+    // Soft-fail: video keeps playing with Danish subs.
+    console.error("Translation stream error:", err);
   }
 }
 
-function onComplete() {
-  stage.value = "ready";
-  showToast.value = true;
-  toastTimer = window.setTimeout(() => {
-    showToast.value = false;
-  }, 4000);
+function handleCueEvent(event: CueEvent) {
+  if (event.done) {
+    translationDone.value = true;
+    return;
+  }
+  if (!englishTrack || !videoEl.value) return;
+
+  const cue = new VTTCue(event.start, event.end, event.text);
+  englishTrack.addCue(cue);
+  cuesReceived.value += 1;
+
+  if (cuesReceived.value === 1) {
+    englishTrack.mode = "showing";
+    const danishTrack = Array.from(videoEl.value.textTracks).find(
+      (t) => t.language === "da",
+    );
+    if (danishTrack) danishTrack.mode = "hidden";
+  }
+}
+
+function teardownPlayer() {
+  if (hls) {
+    hls.destroy();
+    hls = null;
+  }
+  englishTrack = null;
 }
 
 function onSubmit() {
-  void startProcessing();
+  void startPreparing();
 }
 
 function goHome() {
-  if (abortController !== null) {
-    abortController.abort();
-    abortController = null;
+  if (prepareAbort) {
+    prepareAbort.abort();
+    prepareAbort = null;
   }
-  if (toastTimer !== null) {
-    window.clearTimeout(toastTimer);
-    toastTimer = null;
+  if (translateAbort) {
+    translateAbort.abort();
+    translateAbort = null;
   }
+  teardownPlayer();
   stage.value = "idle";
   url.value = "";
-  progress.value = 0;
-  progressMessage.value = null;
   errorMessage.value = null;
-  videoSrc.value = null;
-  subtitlesSrc.value = null;
-  showToast.value = false;
+  prepared.value = null;
+  cuesReceived.value = 0;
+  translationDone.value = false;
 }
-
-function onVideoPlay() {
-  stage.value = "playing";
-  showToast.value = false;
-  const el = videoEl.value;
-  if (el && el.requestFullscreen) {
-    el.requestFullscreen().catch(() => {
-      // ignore — some browsers block this without a real user gesture
-    });
-  }
-}
-
-function onFullscreenChange() {
-  if (!document.fullscreenElement && stage.value === "playing") {
-    stage.value = "playing";
-  }
-}
-
-document.addEventListener("fullscreenchange", onFullscreenChange);
 
 onBeforeUnmount(() => {
-  if (abortController !== null) abortController.abort();
-  if (toastTimer !== null) window.clearTimeout(toastTimer);
-  document.removeEventListener("fullscreenchange", onFullscreenChange);
+  if (prepareAbort) prepareAbort.abort();
+  if (translateAbort) translateAbort.abort();
+  teardownPlayer();
 });
 </script>
 
@@ -192,7 +249,6 @@ onBeforeUnmount(() => {
     </header>
 
     <main class="main">
-      <!-- IDLE -->
       <section v-if="stage === 'idle'" class="card">
         <p class="lede">
           Paste a DRTV URL and watch it with English subtitles.
@@ -214,62 +270,43 @@ onBeforeUnmount(() => {
         </form>
       </section>
 
-      <!-- PROCESSING -->
-      <section v-else-if="stage === 'processing'" class="card card--center">
-        <div class="progress-wrapper progress-wrapper--center">
-          <div class="progress-meta">
-            <span class="progress-label">{{ progressLabel }}</span>
-            <span class="progress-percent">{{ Math.floor(progress) }}%</span>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
-          </div>
+      <section v-else-if="stage === 'preparing'" class="card card--center">
+        <div class="preparing">
+          <div class="spinner" aria-hidden="true"></div>
+          <span class="preparing-label">Preparing stream…</span>
         </div>
       </section>
 
-      <!-- READY / PLAYING -->
       <section
-        v-else-if="stage === 'ready' || stage === 'playing'"
+        v-else-if="stage === 'playing' && prepared"
         class="card card--player"
-        :class="{ 'card--playing': stage === 'playing' }"
       >
-        <div
-          v-if="stage === 'ready'"
-          class="progress-wrapper progress-wrapper--top"
-        >
-          <div class="progress-meta">
-            <span class="progress-label">Done</span>
-            <span class="progress-percent">100%</span>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" style="width: 100%"></div>
-          </div>
-        </div>
-
-        <video
-          ref="videoEl"
-          class="video"
-          controls
-          playsinline
-          :src="videoSrc ?? undefined"
-          @play="onVideoPlay"
-        >
+        <video ref="videoEl" class="video" controls playsinline>
           <track
-            v-if="subtitlesSrc"
             kind="subtitles"
-            srclang="en"
-            :src="subtitlesSrc"
-            label="English"
+            srclang="da"
+            :src="prepared.original_subs_url"
+            label="Dansk"
             default
           />
         </video>
+
+        <div v-if="!translationDone" class="translation-status">
+          <div class="spinner spinner--sm" aria-hidden="true"></div>
+          <span>
+            Translating subtitles… {{ cuesReceived }} /
+            {{ prepared.cue_count }} ({{ translationProgress }}%)
+          </span>
+        </div>
+        <div v-else class="translation-status translation-status--done">
+          English subtitles ready.
+        </div>
 
         <button class="ghost-button home-button" @click="goHome">
           ← Watch another video
         </button>
       </section>
 
-      <!-- ERROR -->
       <section v-else-if="stage === 'error'" class="card card--center">
         <div class="error-block">
           <p class="error-message">{{ errorMessage }}</p>
@@ -277,13 +314,6 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </main>
-
-    <transition name="toast">
-      <div v-if="showToast" class="toast" role="status">
-        <span class="toast-dot"></span>
-        Ready to watch!
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -353,13 +383,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.card--playing {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
 }
 
 .lede {
@@ -441,44 +464,36 @@ onBeforeUnmount(() => {
   border-color: var(--text-muted);
 }
 
-.progress-wrapper {
-  width: 100%;
-  transition: all 600ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.progress-wrapper--center {
-  max-width: 480px;
-}
-
-.progress-meta {
+.preparing {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 13px;
-}
-
-.progress-label {
+  align-items: center;
+  gap: 12px;
   color: var(--text-muted);
 }
 
-.progress-percent {
-  color: var(--text);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+.preparing-label {
+  font-size: 14px;
 }
 
-.progress-track {
-  height: 6px;
-  background: var(--bg-elev-2);
-  border-radius: 999px;
-  overflow: hidden;
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
 }
 
-.progress-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 999px;
-  transition: width 120ms linear;
+.spinner--sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .video {
@@ -487,6 +502,19 @@ onBeforeUnmount(() => {
   background: #000;
   border-radius: var(--radius);
   display: block;
+}
+
+.translation-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.translation-status--done {
+  color: var(--success, #22c55e);
 }
 
 .home-button {
@@ -505,44 +533,5 @@ onBeforeUnmount(() => {
   color: #ef4444;
   margin: 0;
   font-size: 14px;
-}
-
-.toast {
-  position: fixed;
-  bottom: 32px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-elev-2);
-  color: var(--text);
-  padding: 12px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.toast-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
-}
-
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translate(-50%, 12px);
-}
-
-.toast-enter-active,
-.toast-leave-active {
-  transition:
-    opacity 300ms ease,
-    transform 300ms ease;
 }
 </style>

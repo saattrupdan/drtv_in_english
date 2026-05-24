@@ -81,6 +81,7 @@ def correct_and_translate(
     batch_size: int = 5,
     max_parallel: int = 20,
     on_progress: c.Callable[[float], None] | None = None,
+    on_batch_done: c.Callable[[list[int], list[Chunk]], None] | None = None,
 ) -> list[Chunk]:
     """Rewrite each chunk's text so it is both ASR-corrected and translated.
 
@@ -110,6 +111,10 @@ def correct_and_translate(
         on_progress (optional):
             Callback invoked with a float in ``[0, 1]`` after each batch.
             Defaults to None.
+        on_batch_done (optional):
+            Callback invoked with ``(indices, translated_chunks)`` after
+            each batch finishes, so callers can stream cues as they
+            become available. Defaults to None.
 
     Returns:
         A new list of Chunk objects with corrected and translated text.
@@ -174,6 +179,7 @@ def correct_and_translate(
         futures = [pool.submit(_run_batch, item) for item in batches]
         for future in as_completed(futures):
             target_indices, translations = future.result()
+            translated_batch: list[Chunk] = []
             for idx in target_indices:
                 corrected = translations.get(idx)
                 if not corrected:
@@ -181,7 +187,10 @@ def correct_and_translate(
                 new_chunk = chunks[idx].model_copy()
                 new_chunk.text = corrected
                 result[idx] = new_chunk
+                translated_batch.append(new_chunk)
 
+            if on_batch_done is not None:
+                on_batch_done(target_indices, translated_batch)
             if on_progress is not None:
                 with progress_lock:
                     completed += 1
