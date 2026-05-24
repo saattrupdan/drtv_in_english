@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Hls from "hls.js";
-import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
 
 type Stage = "idle" | "preparing" | "playing" | "error";
 
@@ -67,7 +67,7 @@ async function startPreparing() {
     prepared.value = (await response.json()) as PrepareResponse;
     stage.value = "playing";
     await nextTick(); // Wait for <video> element to mount
-    attachPlayer(videoEl.value, prepared.value);
+    attachPlayer(videoEl.value!, prepared.value);
     startTranslationStream(prepared.value.job_id);
   } catch (err) {
     if ((err as Error).name === "AbortError") return;
