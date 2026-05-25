@@ -1,4 +1,4 @@
-# Danglish Contributing Guide
+# DRTV in English — Contributing Guide
 
 Thank you for investing your time in contributing to our project! :sparkles:.
 
@@ -43,7 +43,7 @@ to work on, you are welcome to open a PR with a fix.
    - Using the command line:
    - [Fork the repo][9] so that you can make your changes without affecting the
   original project until you're ready to merge them.
-2. Run `make install` from within the repo to get set up
+2. Install the extension build deps: `cd extension && npm install`.
 3. Create a working branch and start with your changes!
 
 ### Commit Your Update
@@ -77,7 +77,7 @@ questions or request for additional information.
 
 ### Your PR is merged
 
-Congratulations :tada::tada: The Danglish team thanks you :sparkles:.
+Congratulations :tada::tada: Thanks for contributing :sparkles:.
 
 [1]: https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github
 [2]: https://docs.github.com/en/get-started/quickstart/set-up-git

@@ -1,7 +1,9 @@
 <!-- markdownlint-disable MD041 -->
-# Danglish
+# DRTV in English
 
-Watch DR TV videos with English subtitles.
+Watch DR TV with English subtitles via a Manifest V3 browser extension
+(Chrome + Firefox) that injects translated cues into DR's own player.
+Bring your own LLM API key — nothing runs on a server.
 
 ______________________________________________________________________
 [![License](https://img.shields.io/github/license/saattrupdan/danglish)](https://github.com/saattrupdan/danglish/blob/main/LICENSE)
@@ -11,64 +13,91 @@ Developer:
 
 - Dan Saattrup Smart (<dan.smart@alexandra.dk>)
 
-## Quick Start
+## How it works
 
-The fastest way to run the app — frontend, backend, and nginx proxy —
-is via Docker Compose:
+1. Detects when you open an episode on `dr.dk/drtv`.
+2. Sniffs DR's Danish `.vtt` subtitle file from the network.
+3. Translates the cues with your chosen LLM provider.
+4. Injects the English cues as a native `TextTrack` on DR's `<video>`.
 
-```bash
-docker compose up --build --remove-orphans
+No backend, no proxy, no media downloading. DR's player handles
+playback; the extension only adds an extra subtitle track.
+
+Full architecture and phased plan: [`docs/extension-plan.md`](docs/extension-plan.md).
+
+## Layout
+
+```
+manifest.chrome.json
+manifest.firefox.json
+build.mjs                 # esbuild → dist/chrome and dist/firefox
+src/
+  background/             # service worker: vtt-sniffer + vtt-parser + translator
+  content/                # menu + track injector
+  options/                # provider/key form
+  shared/                 # types, episode-id helpers, storage wrapper
+spike/                    # Phase 0 single-file spike (kept for reference)
+icons/
+docs/
+  extension-plan.md
 ```
 
-Then open <http://localhost>, paste a DRTV URL, and click
-**Watch with English subs**.
+## Develop
 
-Series URLs (`/drtv/serie/...`) automatically resolve to the first
-episode. Single-episode (`/drtv/se/...`) and film (`/drtv/program/...`)
-URLs are streamed as-is.
-
-## Local Development
-
-```bash
-make install
-npm run dev                                  # frontend on :5173
-uv run fastapi dev src/drtv_in_english/api.py       # backend on :8000
+```sh
+npm install
+npm run build      # one-shot: produces dist/chrome and dist/firefox
+npm run watch      # rebuild on save
+npm run typecheck  # tsc --noEmit
 ```
 
-The Vite dev server proxies `/api/*` to the backend on port 8000.
+### Load in Firefox
 
-## Workflow
+1. `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on**.
+2. Pick `dist/firefox/manifest.json`.
+3. Open a DRTV episode (e.g. the Phase 0 test episode in
+   [`docs/extension-plan.md`](docs/extension-plan.md)).
+4. Click DR's subtitle button → pick **English** to translate the
+   episode. The status pill in the bottom-right shows progress.
+5. DevTools → Browser Console to see `[drtv-en/...]` logs from both
+   the content script and the background script.
 
-```text
- ┌───────────┐  POST /api/prepare       ┌──────────────┐
- │ Frontend  │ ──────────────────────►  │   FastAPI    │
- │ (Vue 3 +  │ ◄──────── job_id ─────── │   backend    │
- │  hls.js)  │                          │              │
- │           │  GET /api/stream/.../    │              │
- │           │  master.m3u8 + segments  │              │
- │           │ ◄──── HLS proxy ──────►  │              │
- │           │                          │              │
- │           │  GET /api/translate/...  │              │
- │           │ ◄──── NDJSON cues ────── │              │
- └───────────┘                          └──────────────┘
-```
+> If the first English click reports *"No Danish VTT seen yet"*, pick
+> **Dansk** first. That makes DR's player fetch the subtitle file, the
+> background sniffer captures it, and then English works on the next
+> click.
 
-Nothing is written to disk: the backend resolves DR's HLS playlist and
-Danish subtitle URLs with yt-dlp, proxies HLS segments through itself
-(re-attaching DR's CDN headers), and streams translated subtitle cues
-to the browser as the LLM finishes each batch. The browser shows the
-video immediately with Danish subs, then swaps to English as cues
-arrive.
+### Load in Chrome
 
-## Stack
+1. `chrome://extensions` → toggle **Developer mode**.
+2. **Load unpacked** → `dist/chrome`.
+3. Same verification flow as Firefox.
 
-| Layer | Tech |
-| --- | --- |
-| Frontend | Vue 3, Vite, TypeScript, hls.js |
-| Backend | FastAPI, Pydantic, httpx |
-| Translation | OpenAI-compatible LLM (any) |
-| Media | `yt-dlp` (metadata only) |
-| Infra | Docker Compose, nginx |
+## What's shipped
+
+- Background service worker:
+  - `webRequest` sniffer for `*.vtt` on `*.dr.dk` (`vtt-sniffer.ts`).
+  - VTT parser with CRLF → LF normalisation (`vtt-parser.ts`).
+  - Real LLM adapters for Anthropic, OpenAI, Gemini, and
+    OpenAI-compatible endpoints, plus a stub for offline testing.
+  - Per-tab port lifecycle with cancel-on-disconnect.
+  - IndexedDB cache keyed by `(episodeId, sourceVttHash)`.
+- Content script:
+  - Three-way Off / Dansk / English menu hooked into DR's existing
+    subtitle button (sibling "EN" pill as fallback).
+  - Single English `TextTrack` per `<video>`, cleared on cancel.
+  - Status pill showing `Translating subtitles to English… N%`.
+  - SPA navigation handling between episodes within DRTV.
+- Options page: provider, endpoint, model, API key persisted to
+  `chrome.storage.local`. Cache-size readout and clear-cache button.
+
+## What's deferred
+
+- Overlay subtitle renderer (Phase 0 confirmed native `TextTrack`
+  works; we keep the spec but don't ship the renderer until a DR
+  build masks the native track).
+- Packaging into signed CRX/XPI and store submission — see Phases 4
+  and 5 in [`docs/extension-plan.md`](docs/extension-plan.md).
 
 ## Contribute
 

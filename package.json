@@ -1,31 +1,17 @@
 {
-  "name": "danglish-frontend",
+  "name": "drtv-in-english-extension",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0-dev",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc && vite build",
-    "preview": "vite preview",
-    "check": "vue-tsc --noEmit && eslint src/frontend --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
-  },
-  "dependencies": {
-    "hls.js": "^1.5.17",
-    "vue": "^3.5.32",
-    "vue-router": "^5.0.4"
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@vitejs/plugin-vue": "^6.0.6",
-    "@vue/eslint-config-prettier": "^10.2.0",
-    "@vue/eslint-config-typescript": "^14.7.0",
-    "eslint": "^10.2.0",
-    "eslint-plugin-prettier": "^5.5.5",
-    "eslint-plugin-vue": "^10.8.0",
-    "globals": "^17.6.0",
-    "prettier": "^3.8.2",
-    "typescript": "^6.0.2",
-    "vite": "^8.0.8",
-    "vue-tsc": "^3.2.6"
+    "@types/chrome": "^0.0.270",
+    "esbuild": "^0.24.0",
+    "sharp": "^0.34.5",
+    "typescript": "^5.5.0"
   }
 }

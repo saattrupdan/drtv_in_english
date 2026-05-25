@@ -75,11 +75,11 @@ costs real bugs. Read before writing any subtitle / playback code.
   what eventually triggers playback, even if translation is still
   catching up.
 - **CRLF in WebVTT will silently collapse the whole file into one
-  cue.** `src/drtv_in_english/vtt.py` normalizes `\r\n` → `\n` before
+  cue.** `src/background/vtt-parser.ts` normalises `\r\n` → `\n` before
   the cue regex matches. The regex's lookahead doesn't accept `\r` as
   a line boundary; without normalization, the greedy text capture
   swallows everything to EOF. Symptom: `cue_count == 1` and one giant
-  block of English text. Port the normalization line, not just the
+  block of English text. Keep the normalisation line, not just the
   regex.
 
 ## Key technical decisions
@@ -115,7 +115,8 @@ above.
 
 ### 3. How we get the LLM to translate
 
-Reuse the prompt and JSON-output format from `llm.py` exactly. The
+Reuse the prompt and JSON-output format from the prior Python
+implementation exactly (now ported to `src/background/translator.ts`). The
 extension calls the user's chosen provider directly. The options page
 lets the user pick a provider, which selects both the API shape and a
 default endpoint:
@@ -244,42 +245,38 @@ Firefox quirks (small):
 - Firefox's add-on signing requires submission to AMO; document this in
   README.
 
-## Repo layout (proposed)
+## Repo layout
 
 ```
-extension/
-  manifest.chrome.json
-  manifest.firefox.json
-  src/
-    background/
-      index.ts            # service worker entry
-      vtt-sniffer.ts      # webRequest hook
-      translator.ts       # LLM call, batching, prompt (port of llm.py)
-      vtt-parser.ts       # port of vtt.py
-      messaging.ts        # background ↔ content protocol
-    content/
-      index.ts            # page entry, finds <video>, posts to bg
-      track-injector.ts   # adds TextTrack and cues
-      overlay-renderer.ts # fallback overlay
-    options/
-      index.html
-      options.ts          # API key + endpoint + model config
-    shared/
-      types.ts
-      storage.ts          # chrome.storage.local wrapper
-  build.ts                # esbuild or vite config — produces
-                          # extension/dist/chrome and dist/firefox
-  package.json
-  tsconfig.json
+manifest.chrome.json
+manifest.firefox.json
+build.mjs                 # esbuild — produces dist/chrome and dist/firefox
+package.json
+tsconfig.json
+src/
+  background/
+    index.ts              # service worker entry
+    vtt-sniffer.ts        # webRequest hook
+    translator.ts         # LLM call, batching, prompt
+    vtt-parser.ts         # VTT parser with CRLF normalisation
+    messaging.ts          # background ↔ content protocol
+  content/
+    index.ts              # page entry, finds <video>, posts to bg
+    track-injector.ts     # adds TextTrack and cues
+    overlay-renderer.ts   # fallback overlay (specced, not shipped)
+  options/
+    index.html
+    options.ts            # API key + endpoint + model config
+  shared/
+    types.ts
+    storage.ts            # chrome.storage.local wrapper
 docs/
   extension-plan.md       # this file
 ```
 
-The existing Python backend stays in place on `main`. The extension
-lives in its own subtree so it can be deleted as a unit if abandoned.
-The shared logic (prompt text, VTT regex, batching strategy) is
-re-implemented in TypeScript rather than shared — porting is a few
-hundred lines and avoids a Python ↔ JS build pipeline.
+The extension lives at the repo root. The pre-extension Python +
+Vue stack was removed when we pivoted; git history before that commit
+still has it.
 
 ## Phased implementation
 
@@ -306,7 +303,7 @@ Target episode (DRM-protected, has Danish subs, in catalogue):
 player while the video plays, *and* we have a path to a clickable
 in-player English-subs control.
 
-**Findings from the run** (spike code lives in `extension/spike/`):
+**Findings from the run** (spike code lives in `spike/`):
 
 - **Native `TextTrack` works on DRM playback.** Cues added via
   `addTextTrack` + `VTTCue` render correctly on the test episode,
@@ -332,7 +329,7 @@ in-player English-subs control.
 - **Firefox-only verified.** Chrome was not tested in this spike;
   Phase 4 packaging will need to re-verify Chrome before submission.
 
-### Phase 1 — End-to-end with stubbed translation
+### Phase 1 — End-to-end with stubbed translation ✅
 
 - Wire up the real extension skeleton from the layout above.
 - Inject the three-way subtitle selector (Off / Dansk / English) into
@@ -347,9 +344,10 @@ in-player English-subs control.
 subtitle button, see "EN: <Danish>" subtitles appear within a few
 seconds.
 
-### Phase 2 — Real LLM + options page
+### Phase 2 — Real LLM + options page ✅
 
-- Port the prompt and batching logic from `src/drtv_in_english/llm.py`.
+- Port the prompt and batching logic from the prior Python `llm.py`
+  (now lives in `src/background/translator.ts`).
 - Build the options page: provider dropdown (Anthropic / OpenAI /
   OpenAI-compatible), API key, endpoint (auto-filled from provider but
   overridable), model name. Persist in `chrome.storage.local`.
@@ -362,7 +360,7 @@ seconds.
 **Exit criterion:** real English translation flows through against all
 three API shapes; settings survive browser restart.
 
-### Phase 2b — Caching
+### Phase 2b — Caching ✅
 
 - Add IndexedDB cache keyed by `(episodeId, sourceVttHash)`.
 - On episode load, hit cache before fetching VTT.
@@ -371,7 +369,22 @@ three API shapes; settings survive browser restart.
 **Exit criterion:** re-watching a translated episode causes zero LLM
 calls.
 
-### Phase 3 — Streaming + UX polish
+### Phase 3 — Streaming + UX polish ✅
+
+**Note on overlay fallback:** the spike confirmed native `TextTrack` +
+`VTTCue` render correctly on DRTV (including DRM playback and
+fullscreen), so the overlay-renderer code path was *not* implemented
+in this phase. Adding a renderer no one tests is dead code that rots;
+we'll revisit only if DR's player ships a build that masks the native
+track. The trigger to write it is "user reports English subs not
+appearing despite cues being parsed."
+
+**Note on progress display:** the plan called for an "N/M" pill, but
+the user's feedback was that counts/jargon don't read to non-technical
+viewers. The translating status now reads
+`"Translating subtitles to English… 25%"` in the centered overlay
+(same place as the buffer spinner) — same information, no counts.
+
 
 - Stream cues from background → content as each LLM batch finishes
   (don't wait for the whole episode).
@@ -389,8 +402,8 @@ within DRTV, and on slow networks.
 
 ### Phase 4 — Packaging
 
-- Build both `extension/dist/chrome` (CRX-compatible) and
-  `extension/dist/firefox` (XPI-compatible).
+- Build both `dist/chrome` (CRX-compatible) and
+  `dist/firefox` (XPI-compatible).
 - Add a build script (esbuild) that copies the right manifest into
   each output directory and produces signed-ready zips.
 - Document the unpacked-install flow for development.
@@ -494,23 +507,20 @@ episode.
 - **Phase 0 test episode:**
   `https://www.dr.dk/drtv/se/tingbjerg_eksperimentet_-de-udvalgte_594476`.
 
-## What we ditch from the current code
+## What was removed from the pre-extension code
 
-- All of `src/drtv_in_english/api.py`, `hls_proxy.py`, `jobs.py`, and
-  the FastAPI lifespan — replaced by the extension's background
-  worker.
-- `src/drtv_in_english/resolver.py` (yt-dlp) — replaced by client-side
-  URL sniffing.
-- `src/frontend/` entirely — DRTV's own UI is the frontend.
-- Docker, docker-compose, nginx proxy config.
-- The Python project would remain as a translation library (could be
-  trimmed to `vtt.py`, `llm.py`, `data_models.py`) for anyone who wants
-  to run a server, but is no longer part of the user-facing product.
+The whole pre-extension stack — FastAPI backend (`api.py`,
+`hls_proxy.py`, `jobs.py`, `resolver.py`), the Vue 3 + hls.js frontend
+under `src/frontend/`, the Python package, the pytest suite,
+`pyproject.toml`/`uv.lock`/`makefile`, Docker Compose, the nginx proxy
+config, and the dev-only CI workflow — was deleted when we pivoted to
+the extension. Git history before that commit still has it.
 
-## What we keep
+## What we ported
 
-- The translation prompt and batching strategy — proven, just port to
-  TypeScript.
-- The CRLF-normalising VTT parser — three lines of regex, port verbatim.
+- The translation prompt and batching strategy — proven; reimplemented
+  in TypeScript in `src/background/translator.ts`.
+- The CRLF-normalising VTT parser — three lines of regex; ported
+  verbatim in `src/background/vtt-parser.ts`.
 - The general UX shape: stream cues as they're ready, don't block on
   the whole episode.
