@@ -289,11 +289,14 @@ Goal: prove the two riskiest assumptions — that we can render
 English text over DR's actual player, and that we can hook into
 their subtitle button.
 
+Target episode (DRM-protected, has Danish subs, in catalogue):
+`https://www.dr.dk/drtv/se/tingbjerg_eksperimentet_-de-udvalgte_594476`.
+
 - Hand-write a `manifest.json` and `content.js` that, when loaded on a
   DRTV episode page, finds the `<video>` element and adds one hard-
   coded English `VTTCue` covering 0–60s.
 - Verify in both Chrome and Firefox that the cue renders, including in
-  fullscreen, on a DRM-protected episode.
+  fullscreen, on the test episode (which uses Widevine DRM).
 - Locate the existing subtitle button in DR's player DOM and verify we
   can either replace its menu or render a sibling widget next to it.
 - If TextTrack doesn't render through DR's subtitle layer, try the
@@ -358,16 +361,58 @@ calls.
 **Exit criterion:** good UX on a fresh episode, on episode switches
 within DRTV, and on slow networks.
 
-### Phase 4 — Packaging + distribution
+### Phase 4 — Packaging
 
 - Build both `extension/dist/chrome` (CRX-compatible) and
   `extension/dist/firefox` (XPI-compatible).
-- Add a tiny build script that wraps `esbuild` or `vite` and copies the
-  right manifest into each output directory.
-- Document the install / sideload flow in `extension/README.md`.
+- Add a build script (esbuild) that copies the right manifest into
+  each output directory and produces signed-ready zips.
+- Document the unpacked-install flow for development.
 
 **Exit criterion:** unpacked installs from `dist/chrome` and
-`dist/firefox` both work; CI builds both zips.
+`dist/firefox` both work end-to-end.
+
+### Phase 5 — Store submission
+
+- **Privacy policy.** Single HTML page on a stable URL stating:
+  what data we collect (none — API key stays in `chrome.storage.local`
+  on the user's machine), what we send to third parties (Danish VTT
+  text to the user's chosen LLM endpoint, with the user's key, and
+  nothing else), and that we do not phone home. Required by Chrome
+  Web Store for any extension with permissions; AMO doesn't require
+  the URL but accepts the same text.
+- **Permission justifications.** Per-permission, one short sentence
+  for the Chrome Web Store review:
+  - `host_permissions` for `*.dr.dk` — to read the page's `<video>`,
+    inject subtitles, and observe DR's subtitle network requests.
+  - `host_permissions` for the user-configured LLM endpoint —
+    requested at runtime via `optional_host_permissions` when the user
+    saves their key, so we don't pre-grant access to arbitrary hosts.
+  - `webRequest` — to capture the Danish `.vtt` URL DR's player
+    fetches.
+  - `storage` — API key + cache.
+  - `webNavigation` — to detect SPA navigation between episodes.
+- **Icons** in 16, 32, 48, 128 px. Reuse the DRTV-in-English SVG
+  from `public/favicon.svg` as the source; render to PNG at each
+  size.
+- **Screenshots** (1280×800) showing: options page with provider
+  configured, the injected three-way subtitle button, English subs
+  rendering during playback.
+- **Store listing copy.** Short description (≤132 chars), long
+  description, category (`Productivity` or `Accessibility` —
+  Accessibility is more honest), language (English).
+- **Chrome Web Store** submission via the Developer Dashboard
+  ($5 one-time developer fee, automated review usually ≤3 days).
+- **Firefox AMO** submission via `addons.mozilla.org`. AMO signs the
+  XPI; unsigned XPIs only install in Developer / Nightly Firefox.
+  Review can take 1–7 days depending on whether they flag anything
+  for human review.
+- **Versioning.** Semver, starting `0.1.0` for the first store
+  release. Both stores reject re-uploads of the same version number.
+
+**Exit criterion:** extension is live in both stores and a fresh
+profile can install it, configure an API key, and translate the test
+episode.
 
 ## Risks and unknowns
 
@@ -419,23 +464,11 @@ within DRTV, and on slow networks.
   still one click.
 - **Local cache** in IndexedDB, keyed by episode id and source-VTT
   hash. Clear-cache button in the options page; no auto-expiry.
-
-## Open questions for the project owner
-
-These can't be answered by reading the code or this plan — they
-depend on the owner's intent. Whoever picks this up: get answers
-before starting Phase 4 (and ideally before Phase 0).
-
-- **Sideload only, or publish to stores?** If sideload (personal /
-  small group), most of Phase 4 is a 10-minute zip. If publishing to
-  Chrome Web Store + Firefox AMO, Phase 4 grows considerably:
-  privacy policy URL, per-permission justifications, multi-resolution
-  icons, screenshots, store listing copy, and Firefox add-on signing
-  via AMO submission.
-- **A reliable test-episode URL for Phase 0.** Needs to be: freely
-  available in the relevant region, currently in DR's catalogue (not
-  rotated out), DRM-protected (most DR content is, and we have to
-  prove the approach works there), and has Danish subtitles.
+- **Publishing target: Chrome Web Store + Firefox AMO.** Not
+  sideload-only. Phase 4 owns the full submission workload (privacy
+  policy, icons, screenshots, listing copy, AMO signing).
+- **Phase 0 test episode:**
+  `https://www.dr.dk/drtv/se/tingbjerg_eksperimentet_-de-udvalgte_594476`.
 
 ## What we ditch from the current code
 
