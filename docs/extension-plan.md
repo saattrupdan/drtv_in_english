@@ -79,17 +79,51 @@ above.
 ### 3. How we get the LLM to translate
 
 Reuse the prompt and JSON-output format from `llm.py` exactly. The
-extension calls the user's chosen provider directly:
+extension calls the user's chosen provider directly. The options page
+lets the user pick a provider, which selects both the API shape and a
+default endpoint:
 
-- Default: OpenAI (`https://api.openai.com/v1/chat/completions`),
-  configurable to any OpenAI-compatible endpoint (so users can point at
-  Anthropic via a proxy, vLLM, Ollama, etc.).
-- API key lives in `chrome.storage.local` — never sent anywhere except
-  the user's configured endpoint.
-- Default `batch_size=1` to match current latency tuning; default
-  `max_parallel=20`.
+| Provider          | API shape          | Default endpoint                                |
+| ----------------- | ------------------ | ----------------------------------------------- |
+| Anthropic         | `/messages`        | `https://api.anthropic.com/v1/messages`         |
+| OpenAI            | `/responses`       | `https://api.openai.com/v1/responses`           |
+| OpenAI-compatible | `/chat/completions`| user-supplied (vLLM, Ollama, OpenRouter, etc.)  |
 
-### 4. How we display subtitles
+One translator module with a thin per-shape adapter — the prompt, the
+JSON output schema, and the batching logic are shared; only the
+request body, the auth header style (`x-api-key` + `anthropic-version`
+for Anthropic, `Authorization: Bearer` for the rest), and the
+response-extraction code differ.
+
+API key lives in `chrome.storage.local` — never sent anywhere except
+the user's configured endpoint. Default `batch_size=1` and
+`max_parallel=20`, matching the current backend.
+
+### 4. How the user triggers translation
+
+DRTV's existing subtitle button is binary (Danish on / off). We extend
+it in-place into a three-way selector — **Off / Dansk / English** —
+rather than adding a separate "English subs" button. Picking "English"
+is what kicks off translation for the current episode.
+
+Implementation outline:
+
+- Wait for DR's player to mount its controls (MutationObserver on the
+  player container).
+- Find the existing subtitle/caption button. DR's player is custom
+  (Shaka-based), so its DOM is opaque — we identify the button by its
+  ARIA label or class prefix and re-test if their build changes.
+- Replace its click handler / popup so it opens a small three-item
+  menu we render. The menu drives both DR's native track state (for
+  Dansk) and our translation pipeline (for English).
+- Selection persists for the current episode only — the next episode
+  resets to Off unless the user re-picks (avoids surprise LLM spend).
+- If we can't reliably hook into DR's button (e.g., they wrap it in a
+  shadow root or rebuild it on every play/pause), fall back to
+  rendering our own pill-shaped "EN" toggle as a sibling, positioned
+  next to it. Still in-player, still one click, but a separate widget.
+
+### 5. How we display subtitles
 
 Two-layer approach with runtime fallback:
 
@@ -108,7 +142,7 @@ Detection logic: after attaching the TextTrack, watch for whether
 DR's player's `aria-live` subtitle region updates when our cues
 activate. If not, switch to overlay mode.
 
-### 5. Manifest V3 for both browsers
+### 6. Manifest V3 for both browsers
 
 - `manifest.json` with a single `background.service_worker` entry.
 - `host_permissions`: `https://*.dr.dk/*`, plus the LLM endpoint(s) the
@@ -169,42 +203,53 @@ hundred lines and avoids a Python ↔ JS build pipeline.
 
 ### Phase 0 — Spike
 
-Goal: prove the riskiest assumption — that we can inject visible
-English text into DR's actual player.
+Goal: prove the two riskiest assumptions — that we can render
+English text over DR's actual player, and that we can hook into
+their subtitle button.
 
 - Hand-write a `manifest.json` and `content.js` that, when loaded on a
   DRTV episode page, finds the `<video>` element and adds one hard-
   coded English `VTTCue` covering 0–60s.
 - Verify in both Chrome and Firefox that the cue renders, including in
-  fullscreen.
-- If it doesn't render via TextTrack, try the overlay approach in the
-  same spike.
+  fullscreen, on a DRM-protected episode.
+- Locate the existing subtitle button in DR's player DOM and verify we
+  can either replace its menu or render a sibling widget next to it.
+- If TextTrack doesn't render through DR's subtitle layer, try the
+  overlay approach in the same spike.
 
 **Exit criterion:** an English line of text appears over the DRTV
-player while the video plays.
+player while the video plays, *and* we have a path to a clickable
+in-player English-subs control.
 
 ### Phase 1 — End-to-end with stubbed translation
 
 - Wire up the real extension skeleton from the layout above.
+- Inject the three-way subtitle selector (Off / Dansk / English) into
+  DR's player. Picking "English" triggers translation; Off and Dansk
+  drive DR's native state.
 - `vtt-sniffer` captures DR's Danish VTT URL.
 - `vtt-parser` parses it into chunks.
 - `translator` *stubs* the LLM: returns "EN: " + Danish text.
 - Content script injects all cues.
 
-**Exit criterion:** open a DRTV episode → see "EN: <Danish>" subtitles
-appear across the whole episode within a few seconds.
+**Exit criterion:** open a DRTV episode, click "English" in the
+subtitle button, see "EN: <Danish>" subtitles appear within a few
+seconds.
 
 ### Phase 2 — Real LLM + options page
 
 - Port the prompt and batching logic from `src/drtv_in_english/llm.py`.
-- Build the options page: input for API key, endpoint, model name.
-  Persist in `chrome.storage.local`.
+- Build the options page: provider dropdown (Anthropic / OpenAI /
+  OpenAI-compatible), API key, endpoint (auto-filled from provider but
+  overridable), model name. Persist in `chrome.storage.local`.
+- Implement three thin adapters (`/messages`, `/responses`,
+  `/chat/completions`) behind a shared `translator` interface.
 - Replace the stub with the real LLM call.
-- Add per-batch error handling that falls back to original text (same
-  as backend).
+- Per-batch error handling that falls back to original text (same as
+  backend).
 
-**Exit criterion:** real English translation flows through, settings
-survive browser restart.
+**Exit criterion:** real English translation flows through against all
+three API shapes; settings survive browser restart.
 
 ### Phase 3 — Streaming + UX polish
 
@@ -261,17 +306,17 @@ within DRTV, and on slow networks.
    fragile. We accept that the extension may need maintenance when DR
    changes their stack — that's true of yt-dlp too.
 
-## Open questions for the user
+## Decisions
 
-- Do you want a "use a public backend" mode in addition to BYO key, or
-  is BYO key the only mode? (BYO key only is the cleanest serverless
-  story; the hybrid adds back the ops you're trying to avoid.)
-- Default LLM provider — stick with OpenAI compatible? Or also a
-  first-class Anthropic provider option?
-- Single-action UX (auto-translate every episode) or click-to-activate
-  (extension button starts translation per-episode)? Single-action is
-  smoother; click-to-activate avoids LLM spend on episodes the user
-  ends up skipping.
+- **BYO key only.** No public backend mode. Single user → single key →
+  single LLM bill.
+- **Three first-class API shapes.** Anthropic uses `/messages`, OpenAI
+  uses `/responses`, everything else uses the OpenAI-compatible
+  `/chat/completions`. Provider is a single dropdown in the options
+  page; endpoint defaults follow from the choice but are editable.
+- **Click-to-activate per episode.** The user clicks "English" in the
+  injected subtitle menu to start translation; we don't auto-translate
+  every episode they land on. Avoids surprise LLM spend.
 
 ## What we ditch from the current code
 
