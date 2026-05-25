@@ -402,11 +402,9 @@ within DRTV, and on slow networks.
   description, category (`Productivity` or `Accessibility` —
   Accessibility is more honest), language (English).
 - **Chrome Web Store** submission via the Developer Dashboard
-  ($5 one-time developer fee, automated review usually ≤3 days).
+  ($5 one-time developer fee).
 - **Firefox AMO** submission via `addons.mozilla.org`. AMO signs the
   XPI; unsigned XPIs only install in Developer / Nightly Firefox.
-  Review can take 1–7 days depending on whether they flag anything
-  for human review.
 - **Versioning.** Semver, starting `0.1.0` for the first store
   release. Both stores reject re-uploads of the same version number.
 
