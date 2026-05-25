@@ -45,6 +45,43 @@ to operate.
 Single codebase, packaged for two stores. Manifest V3 in both. Firefox
 supports MV3 service workers since 121; we can target that.
 
+## Lessons from prior iterations
+
+These came out of building and tearing down several variants of the
+current web frontend. Re-deriving them costs hours; ignoring them
+costs real bugs. Read before writing any subtitle / playback code.
+
+- **Exactly one attach path.** When the current frontend had both a
+  Vue `watch` and a direct `attachPlayer()` call, the player got
+  attached twice, leaving an orphan `<track>` element and a destroyed-
+  then-recreated Hls instance. Symptom: "I selected English subs and
+  nothing shows." Whatever drives subtitle initialization in the
+  extension (the subtitle-button click handler, in our case), make
+  sure it runs exactly once per episode load.
+- **Don't re-force user state.** We tried `video.addEventListener("volumechange", ...)`
+  that re-set `muted = false`, and `textTracks.addEventListener("change", ...)`
+  that re-set `mode = "showing"`. In Chrome these "worked"; in Firefox
+  the mute button became unclickable (presumably the immediate re-flip
+  confused the controls). **Set state once on activation, then trust
+  the user's clicks.** If the user mutes after picking English, leave
+  them muted.
+- **Autoplay after async work won't get audio.** Calling
+  `video.play()` from a `.then()` after a fetch + an LLM call is
+  outside the user-gesture window. The browser will either reject the
+  call or force `muted = true`. The current `Play with English subs`
+  button exists for exactly this reason — the play happens inside the
+  click handler, audio works. The extension's button-injection plan
+  inherits this constraint: the *click* that picks "English" must be
+  what eventually triggers playback, even if translation is still
+  catching up.
+- **CRLF in WebVTT will silently collapse the whole file into one
+  cue.** `src/drtv_in_english/vtt.py` normalizes `\r\n` → `\n` before
+  the cue regex matches. The regex's lookahead doesn't accept `\r` as
+  a line boundary; without normalization, the greedy text capture
+  swallows everything to EOF. Symptom: `cue_count == 1` and one giant
+  block of English text. Port the normalization line, not just the
+  regex.
+
 ## Key technical decisions
 
 ### 1. Where the translation happens
@@ -382,6 +419,23 @@ within DRTV, and on slow networks.
   still one click.
 - **Local cache** in IndexedDB, keyed by episode id and source-VTT
   hash. Clear-cache button in the options page; no auto-expiry.
+
+## Open questions for the project owner
+
+These can't be answered by reading the code or this plan — they
+depend on the owner's intent. Whoever picks this up: get answers
+before starting Phase 4 (and ideally before Phase 0).
+
+- **Sideload only, or publish to stores?** If sideload (personal /
+  small group), most of Phase 4 is a 10-minute zip. If publishing to
+  Chrome Web Store + Firefox AMO, Phase 4 grows considerably:
+  privacy policy URL, per-permission justifications, multi-resolution
+  icons, screenshots, store listing copy, and Firefox add-on signing
+  via AMO submission.
+- **A reliable test-episode URL for Phase 0.** Needs to be: freely
+  available in the relevant region, currently in DR's catalogue (not
+  rotated out), DRM-protected (most DR content is, and we have to
+  prove the approach works there), and has Danish subtitles.
 
 ## What we ditch from the current code
 
