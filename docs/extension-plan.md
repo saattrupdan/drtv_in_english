@@ -167,7 +167,7 @@ hundred lines and avoids a Python ↔ JS build pipeline.
 
 ## Phased implementation
 
-### Phase 0 — Spike (half day)
+### Phase 0 — Spike
 
 Goal: prove the riskiest assumption — that we can inject visible
 English text into DR's actual player.
@@ -183,7 +183,7 @@ English text into DR's actual player.
 **Exit criterion:** an English line of text appears over the DRTV
 player while the video plays.
 
-### Phase 1 — End-to-end with stubbed translation (1 day)
+### Phase 1 — End-to-end with stubbed translation
 
 - Wire up the real extension skeleton from the layout above.
 - `vtt-sniffer` captures DR's Danish VTT URL.
@@ -194,7 +194,7 @@ player while the video plays.
 **Exit criterion:** open a DRTV episode → see "EN: <Danish>" subtitles
 appear across the whole episode within a few seconds.
 
-### Phase 2 — Real LLM + options page (1 day)
+### Phase 2 — Real LLM + options page
 
 - Port the prompt and batching logic from `src/drtv_in_english/llm.py`.
 - Build the options page: input for API key, endpoint, model name.
@@ -206,7 +206,7 @@ appear across the whole episode within a few seconds.
 **Exit criterion:** real English translation flows through, settings
 survive browser restart.
 
-### Phase 3 — Streaming + UX polish (1 day)
+### Phase 3 — Streaming + UX polish
 
 - Stream cues from background → content as each LLM batch finishes
   (don't wait for the whole episode).
@@ -222,7 +222,7 @@ survive browser restart.
 **Exit criterion:** good UX on a fresh episode, on episode switches
 within DRTV, and on slow networks.
 
-### Phase 4 — Packaging + distribution (half day)
+### Phase 4 — Packaging + distribution
 
 - Build both `extension/dist/chrome` (CRX-compatible) and
   `extension/dist/firefox` (XPI-compatible).
