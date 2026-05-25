@@ -1,4 +1,4 @@
-"""Shared Pydantic models for the danglish package."""
+"""Shared Pydantic models for the drtv_in_english package."""
 
 from pydantic import BaseModel
 
@@ -24,9 +24,6 @@ class PrepareResponse(BaseModel):
         hls_url:
             Proxy URL of the HLS master playlist; play with hls.js (or
             natively in Safari).
-        original_subs_url:
-            Proxy URL of DR's Danish ``.vtt``; attach as the initial
-            ``<track>`` while translation runs.
         cue_count:
             Number of cues in the source subtitles; used to render a
             translation progress indicator.
@@ -35,7 +32,6 @@ class PrepareResponse(BaseModel):
     job_id: str
     title: str
     hls_url: str
-    original_subs_url: str
     cue_count: int
 
 

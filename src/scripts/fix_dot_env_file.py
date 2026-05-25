@@ -8,7 +8,7 @@ from pathlib import Path
 
 import click
 
-from danglish import configure_logging
+from drtv_in_english import configure_logging
 
 configure_logging()
 

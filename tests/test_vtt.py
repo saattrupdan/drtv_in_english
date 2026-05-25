@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from danglish.data_models import Chunk
-from danglish.vtt import (
+from drtv_in_english.data_models import Chunk
+from drtv_in_english.vtt import (
     format_vtt_timestamp,
     parse_external_vtt,
     parse_vtt_timestamp,

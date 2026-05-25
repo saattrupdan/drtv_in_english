@@ -2,7 +2,7 @@
 
 Uses yt-dlp's metadata extraction (``download=False``) so no media is
 ever written to disk. The returned URLs are fetched on demand by the
-HLS proxy and subtitle handler in :mod:`danglish.api`.
+HLS proxy and subtitle handler in :mod:`drtv_in_english.api`.
 """
 
 import typing as t

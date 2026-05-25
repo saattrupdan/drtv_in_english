@@ -24,9 +24,6 @@ class Job:
     job_id: str
     title: str
     hls_master_url: str
-    subtitle_url: str
-    subtitle_headers: dict[str, str]
-    source_vtt: bytes
     registry: HlsRegistry
     chunks: list[Chunk]
     cues: list[CueEvent] = field(default_factory=list)
@@ -61,9 +58,6 @@ class JobRegistry:
         *,
         title: str,
         hls_master_url: str,
-        subtitle_url: str,
-        subtitle_headers: dict[str, str],
-        source_vtt: bytes,
         registry: HlsRegistry,
         chunks: list[Chunk],
     ) -> Job:
@@ -77,9 +71,6 @@ class JobRegistry:
             job_id=job_id,
             title=title,
             hls_master_url=hls_master_url,
-            subtitle_url=subtitle_url,
-            subtitle_headers=subtitle_headers,
-            source_vtt=source_vtt,
             registry=registry,
             chunks=chunks,
         )

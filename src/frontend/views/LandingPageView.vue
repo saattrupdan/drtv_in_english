@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import Hls from "hls.js";
-import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from "vue";
 
-type Stage = "idle" | "preparing" | "playing" | "error";
+type Stage = "idle" | "browsing" | "preparing" | "playing" | "error";
+type InputMode = "search" | "url";
 
 interface PrepareResponse {
   job_id: string;
   title: string;
   hls_url: string;
-  original_subs_url: string;
   cue_count: number;
 }
 
@@ -20,44 +20,83 @@ interface CueEvent {
   done: boolean;
 }
 
+interface SearchItem {
+  title: string;
+  subtitle: string;
+  description: string;
+  image: string;
+  path: string;
+  url: string;
+  kind: "series" | "playable";
+}
+
+interface Episode {
+  title: string;
+  subtitle: string;
+  image: string;
+  url: string;
+  episode_number: number | null;
+  season_number: number | null;
+}
+
+function episodeLabel(ep: Episode): string {
+  const s = ep.season_number;
+  const e = ep.episode_number;
+  if (s != null && e != null) return `S${s}:E${e}`;
+  if (e != null) return `Episode ${e}`;
+  return "";
+}
+
 const stage = ref<Stage>("idle");
+const inputMode = ref<InputMode>("search");
 const url = ref("");
+const searchQuery = ref("");
+const searchResults = ref<{ series: SearchItem[]; playable: SearchItem[] }>({
+  series: [],
+  playable: [],
+});
+const isSearching = ref(false);
+const selectedSeriesTitle = ref("");
+const episodes = ref<Episode[]>([]);
+const isLoadingEpisodes = ref(false);
 const errorMessage = ref<string | null>(null);
 const prepared = ref<PrepareResponse | null>(null);
-const cuesReceived = ref(0);
-const translationDone = ref(false);
+const firstCueReady = ref(false);
+const isPlaying = ref(false);
 
 const videoEl = useTemplateRef<HTMLVideoElement>("videoEl");
 
 let hls: Hls | null = null;
 let prepareAbort: AbortController | null = null;
 let translateAbort: AbortController | null = null;
+let searchAbort: AbortController | null = null;
+let searchTimer: number | null = null;
 let englishTrack: TextTrack | null = null;
+let pendingCues: CueEvent[] = [];
 
 const canSubmit = computed(() => url.value.trim().length > 0);
+const hasSearchResults = computed(
+  () =>
+    searchResults.value.series.length > 0 ||
+    searchResults.value.playable.length > 0,
+);
 
-const translationProgress = computed(() => {
-  if (!prepared.value || prepared.value.cue_count === 0) return 0;
-  return Math.min(
-    100,
-    Math.round((cuesReceived.value / prepared.value.cue_count) * 100),
-  );
-});
-
-async function startPreparing() {
-  if (!canSubmit.value) return;
+async function startPreparing(targetUrl?: string) {
+  const sourceUrl = (targetUrl ?? url.value).trim();
+  if (!sourceUrl) return;
   stage.value = "preparing";
   errorMessage.value = null;
   prepared.value = null;
-  cuesReceived.value = 0;
-  translationDone.value = false;
+  firstCueReady.value = false;
+  isPlaying.value = false;
+  pendingCues = [];
 
   prepareAbort = new AbortController();
   try {
     const response = await fetch("/api/prepare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: url.value.trim(), language: "en" }),
+      body: JSON.stringify({ url: sourceUrl, language: "en" }),
       signal: prepareAbort.signal,
     });
     if (!response.ok) {
@@ -85,19 +124,6 @@ async function safeDetail(response: Response): Promise<string | null> {
   }
 }
 
-watch(
-  () => [stage.value, prepared.value, videoEl.value] as const,
-  ([currentStage, currentPrepared, currentVideo]) => {
-    if (
-      currentStage === "playing" &&
-      currentPrepared !== null &&
-      currentVideo !== null
-    ) {
-      attachPlayer(currentVideo, currentPrepared);
-    }
-  },
-);
-
 function attachPlayer(video: HTMLVideoElement, info: PrepareResponse) {
   teardownPlayer();
 
@@ -113,18 +139,25 @@ function attachPlayer(video: HTMLVideoElement, info: PrepareResponse) {
     return;
   }
 
+  video.muted = false;
+  video.volume = 1.0;
+
   englishTrack = video.addTextTrack("subtitles", "English", "en");
-  englishTrack.mode = "hidden";
+  englishTrack.mode = "showing";
+  for (const event of pendingCues) {
+    englishTrack.addCue(new VTTCue(event.start, event.end, event.text));
+  }
+  pendingCues = [];
 
-  video.addEventListener("loadedmetadata", () => {
-    const danishTrack = Array.from(video.textTracks).find(
-      (t) => t.language === "da",
-    );
-    if (danishTrack) danishTrack.mode = "showing";
-  });
+}
 
+function startPlayback() {
+  const video = videoEl.value;
+  if (!video) return;
+  video.muted = false;
+  isPlaying.value = true;
   void video.play().catch(() => {
-    // Autoplay blocked — user can press play. No-op.
+    isPlaying.value = false;
   });
 }
 
@@ -162,25 +195,16 @@ async function consumeTranslations(jobId: string, signal: AbortSignal) {
 }
 
 function handleCueEvent(event: CueEvent) {
-  if (event.done) {
-    translationDone.value = true;
-    return;
-  }
-  if (!englishTrack || !videoEl.value) {
-    console.warn("Cue received before player attached, dropping:", event);
-    return;
+  if (event.done) return;
+
+  if (englishTrack) {
+    englishTrack.addCue(new VTTCue(event.start, event.end, event.text));
+  } else {
+    pendingCues.push(event);
   }
 
-  const cue = new VTTCue(event.start, event.end, event.text);
-  englishTrack.addCue(cue);
-  cuesReceived.value += 1;
-
-  if (!englishTrack.mode || englishTrack.mode === "hidden") {
-    englishTrack.mode = "showing";
-    const danishTrack = Array.from(videoEl.value.textTracks).find(
-      (t) => t.language === "da",
-    );
-    if (danishTrack) danishTrack.mode = "hidden";
+  if (!firstCueReady.value) {
+    firstCueReady.value = true;
   }
 }
 
@@ -194,6 +218,91 @@ function teardownPlayer() {
 
 function onSubmit() {
   void startPreparing();
+}
+
+function onSearchInput() {
+  if (searchTimer !== null) {
+    clearTimeout(searchTimer);
+    searchTimer = null;
+  }
+  const q = searchQuery.value.trim();
+  if (!q) {
+    if (searchAbort) searchAbort.abort();
+    searchResults.value = { series: [], playable: [] };
+    isSearching.value = false;
+    return;
+  }
+  searchTimer = window.setTimeout(() => {
+    void runSearch(q);
+  }, 250);
+}
+
+async function runSearch(q: string) {
+  if (searchAbort) searchAbort.abort();
+  searchAbort = new AbortController();
+  isSearching.value = true;
+  try {
+    const response = await fetch(
+      `/api/search?q=${encodeURIComponent(q)}`,
+      { signal: searchAbort.signal },
+    );
+    if (!response.ok) throw new Error(`Search failed (${response.status})`);
+    searchResults.value = (await response.json()) as {
+      series: SearchItem[];
+      playable: SearchItem[];
+    };
+  } catch (err) {
+    if ((err as Error).name === "AbortError") return;
+    searchResults.value = { series: [], playable: [] };
+  } finally {
+    isSearching.value = false;
+  }
+}
+
+async function selectItem(item: SearchItem) {
+  if (item.kind === "playable") {
+    void startPreparing(item.url);
+    return;
+  }
+  selectedSeriesTitle.value = item.title;
+  episodes.value = [];
+  isLoadingEpisodes.value = true;
+  stage.value = "browsing";
+  try {
+    const response = await fetch(
+      `/api/episodes?path=${encodeURIComponent(item.path)}`,
+    );
+    if (!response.ok) {
+      const detail = await safeDetail(response);
+      throw new Error(detail ?? `Failed to load episodes (${response.status})`);
+    }
+    const data = (await response.json()) as { title: string; episodes: Episode[] };
+    selectedSeriesTitle.value = data.title || item.title;
+    episodes.value = data.episodes;
+  } catch (err) {
+    stage.value = "error";
+    errorMessage.value = (err as Error).message || "Failed to load episodes.";
+  } finally {
+    isLoadingEpisodes.value = false;
+  }
+}
+
+function selectEpisode(ep: Episode) {
+  void startPreparing(ep.url);
+}
+
+function backToSearch() {
+  stage.value = "idle";
+  episodes.value = [];
+  selectedSeriesTitle.value = "";
+}
+
+function showUrlInput() {
+  inputMode.value = "url";
+}
+
+function showSearchInput() {
+  inputMode.value = "search";
 }
 
 function goHome() {
@@ -210,8 +319,11 @@ function goHome() {
   url.value = "";
   errorMessage.value = null;
   prepared.value = null;
-  cuesReceived.value = 0;
-  translationDone.value = false;
+  firstCueReady.value = false;
+  isPlaying.value = false;
+  pendingCues = [];
+  episodes.value = [];
+  selectedSeriesTitle.value = "";
 }
 
 onBeforeUnmount(() => {
@@ -255,24 +367,131 @@ onBeforeUnmount(() => {
 
     <main class="main">
       <section v-if="stage === 'idle'" class="card">
-        <p class="lede">
-          Paste a DRTV URL and watch it with English subtitles.
-        </p>
+        <template v-if="inputMode === 'search'">
+          <p class="lede">Search DRTV and watch with English subtitles.</p>
 
-        <form class="form" @submit.prevent="onSubmit">
           <input
-            v-model="url"
+            v-model="searchQuery"
             type="text"
             class="url-input"
-            placeholder="https://www.dr.dk/drtv/se/…"
+            placeholder="Search shows, films, episodes…"
             autofocus
-            @keydown.enter.prevent="onSubmit"
+            @input="onSearchInput"
           />
 
-          <button type="submit" class="primary-button" :disabled="!canSubmit">
-            Watch with English subs
+          <div v-if="isSearching" class="search-status">
+            <div class="spinner spinner--sm" aria-hidden="true"></div>
+            <span>Searching…</span>
+          </div>
+
+          <div v-if="hasSearchResults" class="results">
+            <div
+              v-for="item in [
+                ...searchResults.series,
+                ...searchResults.playable,
+              ]"
+              :key="item.kind + ':' + item.path"
+              class="result"
+              role="button"
+              tabindex="0"
+              @click="selectItem(item)"
+              @keydown.enter.prevent="selectItem(item)"
+            >
+              <img
+                v-if="item.image"
+                :src="item.image"
+                :alt="item.title"
+                class="result-image"
+                loading="lazy"
+              />
+              <div class="result-text">
+                <div class="result-title">
+                  {{ item.title }}
+                  <span v-if="item.kind === 'series'" class="result-badge">
+                    Series
+                  </span>
+                </div>
+                <div v-if="item.subtitle" class="result-subtitle">
+                  {{ item.subtitle }}
+                </div>
+                <div v-if="item.description" class="result-desc">
+                  {{ item.description }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="link-button" @click="showUrlInput">
+            or paste a URL manually
           </button>
-        </form>
+        </template>
+
+        <template v-else>
+          <p class="lede">Paste a DRTV URL and watch with English subtitles.</p>
+          <form class="form" @submit.prevent="onSubmit">
+            <input
+              v-model="url"
+              type="text"
+              class="url-input"
+              placeholder="https://www.dr.dk/drtv/se/…"
+              autofocus
+              @keydown.enter.prevent="onSubmit"
+            />
+            <button type="submit" class="primary-button" :disabled="!canSubmit">
+              Watch with English subs
+            </button>
+          </form>
+          <button class="link-button" @click="showSearchInput">
+            ← back to search
+          </button>
+        </template>
+      </section>
+
+      <section v-else-if="stage === 'browsing'" class="card">
+        <button class="link-button back-link" @click="backToSearch">
+          ← back to search
+        </button>
+        <h2 class="series-title">{{ selectedSeriesTitle }}</h2>
+
+        <div v-if="isLoadingEpisodes" class="search-status">
+          <div class="spinner spinner--sm" aria-hidden="true"></div>
+          <span>Loading episodes…</span>
+        </div>
+
+        <div v-else-if="episodes.length === 0" class="search-status">
+          <span>No episodes found.</span>
+        </div>
+
+        <div v-else class="results">
+          <div
+            v-for="ep in episodes"
+            :key="ep.url"
+            class="result"
+            role="button"
+            tabindex="0"
+            @click="selectEpisode(ep)"
+            @keydown.enter.prevent="selectEpisode(ep)"
+          >
+            <img
+              v-if="ep.image"
+              :src="ep.image"
+              :alt="ep.title"
+              class="result-image"
+              loading="lazy"
+            />
+            <div class="result-text">
+              <div class="result-title">
+                <span v-if="episodeLabel(ep)" class="episode-tag">
+                  {{ episodeLabel(ep) }}
+                </span>
+                {{ ep.title }}
+              </div>
+              <div v-if="ep.subtitle" class="result-desc">
+                {{ ep.subtitle }}
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section v-else-if="stage === 'preparing'" class="card card--center">
@@ -286,25 +505,27 @@ onBeforeUnmount(() => {
         v-else-if="stage === 'playing' && prepared"
         class="card card--player"
       >
-        <video ref="videoEl" class="video" controls playsinline>
-          <track
-            kind="subtitles"
-            srclang="da"
-            :src="prepared.original_subs_url"
-            label="Dansk"
-            default
-          />
-        </video>
-
-        <div v-if="!translationDone" class="translation-status">
-          <div class="spinner spinner--sm" aria-hidden="true"></div>
-          <span>
-            Translating subtitles… {{ cuesReceived }} /
-            {{ prepared.cue_count }} ({{ translationProgress }}%)
-          </span>
-        </div>
-        <div v-else class="translation-status translation-status--done">
-          English subtitles ready.
+        <div class="video-wrapper">
+          <video
+            v-show="isPlaying"
+            ref="videoEl"
+            class="video"
+            controls
+            controlslist="nodownload"
+            playsinline
+          ></video>
+          <div v-if="!isPlaying" class="video-splash">
+            <template v-if="!firstCueReady">
+              <div class="spinner" aria-hidden="true"></div>
+              <span class="preparing-label">Translating subtitles…</span>
+            </template>
+            <button v-else class="play-button" @click="startPlayback">
+              <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+                <path d="M8 5v14l11-7z" fill="currentColor" />
+              </svg>
+              <span>Play with English subs</span>
+            </button>
+          </div>
         </div>
 
         <button class="ghost-button home-button" @click="goHome">
@@ -501,12 +722,181 @@ onBeforeUnmount(() => {
   }
 }
 
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.video-splash {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #000;
+  color: var(--text-muted);
+}
+
 .video {
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #000;
   border-radius: var(--radius);
   display: block;
+}
+
+.play-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 14px 22px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.play-button:hover {
+  background: var(--accent-hover);
+}
+
+.search-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+  max-height: 540px;
+  overflow-y: auto;
+}
+
+.result {
+  display: flex;
+  gap: 14px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.result:hover,
+.result:focus-visible {
+  background: var(--bg-elev-2);
+  border-color: var(--border);
+  outline: none;
+}
+
+.result-image {
+  width: 140px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg-elev-2);
+  flex-shrink: 0;
+}
+
+.result-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.result-title {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.episode-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  background: var(--bg-elev-2);
+  color: var(--text-muted);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  background: var(--accent);
+  color: white;
+  border-radius: 4px;
+}
+
+.result-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.result-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 8px 0;
+  margin-top: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  align-self: flex-start;
+}
+
+.link-button:hover {
+  color: var(--text);
+}
+
+.back-link {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.series-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 8px;
 }
 
 .translation-status {

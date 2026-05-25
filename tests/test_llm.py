@@ -12,8 +12,8 @@ import unittest.mock as um
 import openai
 import pytest
 
-from danglish.data_models import Chunk
-from danglish.llm import CorrectedChunk, build_client, correct_and_translate
+from drtv_in_english.data_models import Chunk
+from drtv_in_english.llm import CorrectedChunk, build_client, correct_and_translate
 
 
 def _make_chunk(
@@ -229,7 +229,7 @@ def test_correct_and_translate_malformed_json_preserves_original() -> None:
 
     chunks = [_make_chunk("Original text"), _make_chunk("Second text")]
 
-    with um.patch("danglish.llm.logger") as mock_logger:
+    with um.patch("drtv_in_english.llm.logger") as mock_logger:
         result = correct_and_translate(
             chunks, "en", client=mock_client, context_window=0, batch_size=1
         )

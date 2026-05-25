@@ -1,6 +1,6 @@
 """Tests for the HLS proxy module."""
 
-from danglish.hls_proxy import HlsRegistry, is_playlist, rewrite_playlist
+from drtv_in_english.hls_proxy import HlsRegistry, is_playlist, rewrite_playlist
 
 
 def test_registry_returns_same_token_for_same_url() -> None:

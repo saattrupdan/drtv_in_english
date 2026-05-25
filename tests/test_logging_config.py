@@ -1,11 +1,11 @@
-"""Tests for danglish.logging_config module."""
+"""Tests for drtv_in_english.logging_config module."""
 
 import io
 import logging
 
 import pytest
 
-from danglish import logging_config
+from drtv_in_english import logging_config
 
 
 def _clean_root_handlers() -> None:
@@ -25,7 +25,7 @@ class TestLoggerExists:
 
     def test_logger_has_correct_name(self) -> None:
         """Assert the logger has the expected name."""
-        assert logging_config.logger.name == "danglish"
+        assert logging_config.logger.name == "drtv_in_english"
 
 
 class TestConfigureLoggingRootLogger:

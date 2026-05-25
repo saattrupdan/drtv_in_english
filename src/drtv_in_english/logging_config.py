@@ -1,4 +1,4 @@
-"""Central logging configuration for the danglish package.
+"""Central logging configuration for the drtv_in_english package.
 
 This module provides a single entry point for configuring logging
 across the entire application. Call configure_logging() early in
@@ -13,7 +13,7 @@ logger = logging.getLogger(__package__)
 
 
 def configure_logging() -> None:
-    """Configure logging for the danglish package."""
+    """Configure logging for the drtv_in_english package."""
     root_logger = logging.getLogger()
 
     # Remove any existing custom handlers to ensure idempotency

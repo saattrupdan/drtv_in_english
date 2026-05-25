@@ -1,5 +1,5 @@
 [project]
-name = "danglish"
+name = "drtv-in-english"
 version = "0.0.0"
 description = "Watch DR TV videos with English subtitles."
 readme = "README.md"
@@ -108,7 +108,7 @@ addopts = [
   '--durations=10',
   '--color=yes',
   '--doctest-modules',
-  '--cov=src/danglish',
+  '--cov=src/drtv_in_english',
 ]
 xfail_strict = true
 asyncio_mode = "auto"
@@ -124,7 +124,7 @@ filterwarnings = [
 log_cli_level = "info"
 testpaths = [
   "tests",
-  "src/danglish",
+  "src/drtv_in_english",
 ]
 
 [build-system]

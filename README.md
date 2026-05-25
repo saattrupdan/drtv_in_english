@@ -32,7 +32,7 @@ URLs are streamed as-is.
 ```bash
 make install
 npm run dev                                  # frontend on :5173
-uv run fastapi dev src/danglish/api.py       # backend on :8000
+uv run fastapi dev src/drtv_in_english/api.py       # backend on :8000
 ```
 
 The Vite dev server proxies `/api/*` to the backend on port 8000.

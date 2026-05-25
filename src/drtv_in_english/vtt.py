@@ -26,6 +26,7 @@ def parse_vtt_text(content: str) -> list[Chunk]:
         List of Chunk objects, one per cue.
     """
     chunks: list[Chunk] = []
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
 
     cue_pattern = re.compile(
         r"(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})[^\n]*\n"

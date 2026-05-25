@@ -28,8 +28,8 @@ on DRTV, so we never run ASR — we just translate the existing subs.
   (`da`, `da_combined`, `da-DK`, …).
 - **httpx** in the backend acts as an HLS proxy: re-attaches DR's CDN
   headers to playlist and segment requests and streams bytes back.
-- **FastAPI** backend (`src/danglish/api.py`, served as
-  `uvicorn danglish.api:app`). Endpoints: `GET /health`,
+- **FastAPI** backend (`src/drtv_in_english/api.py`, served as
+  `uvicorn drtv_in_english.api:app`). Endpoints: `GET /health`,
   `POST /prepare`, `GET /stream/{job}/master.m3u8`,
   `GET /stream/{job}/p/{token}`, `GET /subs/{job}/da.vtt`,
   `GET /translate/{job}` (NDJSON of `CueEvent`s).
@@ -49,7 +49,7 @@ on DRTV, so we never run ASR — we just translate the existing subs.
 
 ```
 src/
-  danglish/                # Python package
+  drtv_in_english/         # Python package
     __init__.py            # Public surface
     api.py                 # FastAPI app: prepare, HLS proxy, subs, NDJSON translate
     resolver.py            # yt-dlp extract_info (no download): HLS + subtitle URLs
@@ -64,11 +64,11 @@ src/
   frontend/
     App.vue, main.ts, routes/, views/LandingPageView.vue
 
-tests/                     # pytest, mirrors src/danglish/ module names
+tests/                     # pytest, mirrors src/drtv_in_english/ module names
 ```
 
 Modules use **relative imports** (`from .foo import bar`); scripts and
-tests use **absolute imports** (`from danglish import bar`).
+tests use **absolute imports** (`from drtv_in_english import bar`).
 
 ## End-to-end flow
 
@@ -106,14 +106,14 @@ back silently to the original Danish text.
 
 ## Key files to read first
 
-1. `src/danglish/__init__.py` — public API surface.
-2. `src/danglish/api.py` — canonical end-to-end path; the `lifespan`
+1. `src/drtv_in_english/__init__.py` — public API surface.
+2. `src/drtv_in_english/api.py` — canonical end-to-end path; the `lifespan`
    builds the LLM client + an `httpx.AsyncClient`/`httpx.Client`.
-3. `src/danglish/data_models.py` — every shared Pydantic type.
-4. `src/danglish/resolver.py` — series detection + HLS/subtitle picking.
-5. `src/danglish/hls_proxy.py` — playlist URI rewriting + token registry.
-6. `src/danglish/jobs.py` — `Job` with condvar for cue subscribers.
-7. `src/danglish/llm.py` — translation logic; `on_batch_done` is the
+3. `src/drtv_in_english/data_models.py` — every shared Pydantic type.
+4. `src/drtv_in_english/resolver.py` — series detection + HLS/subtitle picking.
+5. `src/drtv_in_english/hls_proxy.py` — playlist URI rewriting + token registry.
+6. `src/drtv_in_english/jobs.py` — `Job` with condvar for cue subscribers.
+7. `src/drtv_in_english/llm.py` — translation logic; `on_batch_done` is the
    streaming hook.
 8. `src/frontend/views/LandingPageView.vue` — the only frontend view;
    see `attachPlayer` (hls.js + tracks) and `consumeTranslations`

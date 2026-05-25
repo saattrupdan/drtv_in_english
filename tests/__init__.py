@@ -1,4 +1,4 @@
-"""Test suite for the danglish package."""
+"""Test suite for the drtv_in_english package."""
 
 
 def test_dummy() -> None:

@@ -6,8 +6,8 @@ Flow:
    Danish ``.vtt`` once, parse it, register a :class:`Job`, and kick
    off background translation. Responds immediately.
 2. Browser plays ``GET /stream/{job}/master.m3u8`` via hls.js.
-3. Browser opens ``GET /translate/{job}`` (NDJSON) and appends each cue
-   to a ``TextTrack`` as it arrives.
+3. Browser opens ``GET /translate/{job}`` (NDJSON) and renders each
+   translated cue in an overlay as it arrives.
 """
 
 import collections.abc as c
@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 import httpx
 import openai
+import yt_dlp
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -87,6 +88,113 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+DRTV_SEARCH_URL = "https://prod95-cdn.dr-massive.com/api/v2/search"
+DRTV_SEARCH_PARAMS = {
+    "device": "web_browser",
+    "ff": "idp,ldp,rpt",
+    "group": "true",
+    "lang": "da",
+    "segments": "drtv,optedout",
+    "sub": "Registered",
+    "userId": "8820df5e01fa4fd8bd6bd3e49b81950f",
+}
+DRTV_BASE = "https://www.dr.dk/drtv"
+
+
+def _simplify_item(item: dict, kind: str) -> dict:
+    """Reduce a DRTV item to the fields the frontend needs."""
+    return {
+        "title": item.get("title") or "",
+        "subtitle": (item.get("customFields") or {}).get("ContextualTitleExtraDetails")
+        or (item.get("customFields") or {}).get("ExtraDetails")
+        or "",
+        "description": item.get("shortDescription") or "",
+        "image": (item.get("images") or {}).get("tile")
+        or (item.get("images") or {}).get("wallpaper")
+        or "",
+        "path": item.get("path") or "",
+        "url": f"{DRTV_BASE}{item.get('path') or ''}",
+        "kind": kind,
+    }
+
+
+@router.get("/search")
+async def search(q: str, request: Request) -> dict:
+    """Search DRTV by free-text query.
+
+    Returns:
+        ``{"series": [...], "playable": [...]}`` — each result has a
+        normalised set of fields the frontend can render directly.
+    """
+    q = q.strip()
+    if not q:
+        return {"series": [], "playable": []}
+
+    state: AppState = request.app.state.app_state
+    params = {**DRTV_SEARCH_PARAMS, "term": q}
+    response = await state.http.get(DRTV_SEARCH_URL, params=params)
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502, detail=f"DRTV search failed ({response.status_code})"
+        )
+    data = response.json()
+    series = [_simplify_item(it, "series") for it in (data.get("series") or {}).get("items") or []]
+    playable = [_simplify_item(it, "playable") for it in (data.get("playable") or {}).get("items") or []]
+    return {"series": series, "playable": playable}
+
+
+@router.get("/episodes")
+def episodes(path: str, request: Request) -> dict:
+    """List episodes for a DRTV series path.
+
+    Args:
+        path:
+            A series path such as ``/serie/badehoteller_404047``.
+
+    Returns:
+        ``{"title": str, "episodes": [...]}`` where each episode has
+        ``title``, ``subtitle``, ``image``, and ``url`` fields ready to
+        feed into ``POST /prepare``.
+    """
+    if not path.startswith("/serie/") and not path.startswith("/saeson/"):
+        raise HTTPException(status_code=422, detail="Path must be a series or season")
+
+    series_url = f"{DRTV_BASE}{path}"
+    episodes_out: list[dict] = []
+    series_title = ""
+
+    try:
+        opts = {"quiet": True, "extract_flat": True, "skip_download": True}
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            top = ydl.extract_info(series_url, download=False, process=True)
+            series_title = top.get("title") or ""
+
+            queue: list[dict] = list(top.get("entries") or [])
+            while queue:
+                entry = queue.pop(0)
+                entry_url = entry.get("url") or ""
+                if "/episode/" in entry_url:
+                    episodes_out.append(
+                        {
+                            "title": entry.get("title") or "",
+                            "subtitle": entry.get("description") or "",
+                            "image": entry.get("thumbnail") or "",
+                            "url": entry_url,
+                            "episode_number": entry.get("episode_number"),
+                            "season_number": entry.get("season_number"),
+                        }
+                    )
+                elif "/saeson/" in entry_url:
+                    season = ydl.extract_info(entry_url, download=False, process=True)
+                    queue.extend(season.get("entries") or [])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=502, detail=f"Failed to list episodes: {exc}"
+        ) from exc
+
+    return {"title": series_title, "episodes": episodes_out}
+
+
 @router.post("/prepare")
 def prepare(req: PrepareRequest, request: Request) -> PrepareResponse:
     """Resolve a DR URL, fetch its subs, and start translating in the background.
@@ -109,8 +217,7 @@ def prepare(req: PrepareRequest, request: Request) -> PrepareResponse:
 
     response = state.sync_http.get(media.subtitle_url, headers=media.subtitle_headers)
     response.raise_for_status()
-    source_vtt = response.content
-    chunks = parse_vtt_text(source_vtt.decode("utf-8", errors="replace"))
+    chunks = parse_vtt_text(response.content.decode("utf-8", errors="replace"))
     if not chunks:
         raise HTTPException(status_code=422, detail="Source subtitles are empty")
 
@@ -118,9 +225,6 @@ def prepare(req: PrepareRequest, request: Request) -> PrepareResponse:
     job = state.jobs.create(
         title=media.title,
         hls_master_url=media.hls_url,
-        subtitle_url=media.subtitle_url,
-        subtitle_headers=media.subtitle_headers,
-        source_vtt=source_vtt,
         registry=registry,
         chunks=chunks,
     )
@@ -136,20 +240,8 @@ def prepare(req: PrepareRequest, request: Request) -> PrepareResponse:
         job_id=job.job_id,
         title=media.title,
         hls_url=f"/api/stream/{job.job_id}/master.m3u8",
-        original_subs_url=f"/api/subs/{job.job_id}/da.vtt",
         cue_count=len(chunks),
     )
-
-
-@router.get("/subs/{job_id}/da.vtt")
-def get_source_subs(job_id: str, request: Request) -> Response:
-    """Return the cached Danish source ``.vtt`` for ``job_id``.
-
-    Returns:
-        WebVTT response body.
-    """
-    job = _require_job(request, job_id)
-    return Response(content=job.source_vtt, media_type="text/vtt")
 
 
 @router.get("/stream/{job_id}/master.m3u8")
@@ -306,6 +398,7 @@ def _translate_job(
             target_language=language,
             client=llm_client,
             model=llm_model,
+            batch_size=1,
             on_batch_done=_on_batch_done,
         )
     except Exception as exc:  # noqa: BLE001
@@ -315,5 +408,5 @@ def _translate_job(
         job.mark_done()
 
 
-app = FastAPI(title="danglish", lifespan=lifespan)
+app = FastAPI(title="drtv_in_english", lifespan=lifespan)
 app.include_router(router)

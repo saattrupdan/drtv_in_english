@@ -15,3 +15,16 @@ __pycache__
 # Ignore local IDE settings
 .vscode
 .idea
+
+# Ignore frontend build artifacts (not needed by backend image)
+node_modules
+dist
+
+# Ignore docs, tests, and local data
+docs
+tests
+tmp
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.log
