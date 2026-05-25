@@ -83,17 +83,24 @@ extension calls the user's chosen provider directly. The options page
 lets the user pick a provider, which selects both the API shape and a
 default endpoint:
 
-| Provider          | API shape          | Default endpoint                                |
-| ----------------- | ------------------ | ----------------------------------------------- |
-| Anthropic         | `/messages`        | `https://api.anthropic.com/v1/messages`         |
-| OpenAI            | `/responses`       | `https://api.openai.com/v1/responses`           |
-| OpenAI-compatible | `/chat/completions`| user-supplied (vLLM, Ollama, OpenRouter, etc.)  |
+| Provider          | API shape           | Default endpoint                                              | Default model       |
+| ----------------- | ------------------- | ------------------------------------------------------------- | ------------------- |
+| Anthropic         | `/messages`         | `https://api.anthropic.com/v1/messages`                       | `claude-haiku-4-5`  |
+| OpenAI            | `/responses`        | `https://api.openai.com/v1/responses`                         | `gpt-5-mini`        |
+| Gemini            | `/chat/completions` | `https://generativelanguage.googleapis.com/v1beta/openai`     | `gemini-3.5-flash`  |
+| OpenAI-compatible | `/chat/completions` | user-supplied (vLLM, Ollama, OpenRouter, etc.)                | user-supplied       |
 
 One translator module with a thin per-shape adapter — the prompt, the
 JSON output schema, and the batching logic are shared; only the
 request body, the auth header style (`x-api-key` + `anthropic-version`
-for Anthropic, `Authorization: Bearer` for the rest), and the
-response-extraction code differ.
+for Anthropic, `x-goog-api-key` on the URL or `Authorization: Bearer`
+for Gemini's compat endpoint, `Authorization: Bearer` for the rest),
+and the response-extraction code differ.
+
+Gemini is a separate preset because it uses `/chat/completions` but
+has its own endpoint URL and (for some users) a different auth flow.
+The translator code path is the same as any other OpenAI-compatible
+backend.
 
 API key lives in `chrome.storage.local` — never sent anywhere except
 the user's configured endpoint. Default `batch_size=1` and
@@ -118,10 +125,17 @@ Implementation outline:
   Dansk) and our translation pipeline (for English).
 - Selection persists for the current episode only — the next episode
   resets to Off unless the user re-picks (avoids surprise LLM spend).
+- **Off means no subtitles at all** — we disable both DR's Danish
+  track and our injected English track. This is the cleanest semantic
+  but does mean the extension writes to DR's player state in both
+  directions; on any DR build where toggling their native track from
+  outside doesn't stick, we degrade to a warning in the options page
+  and let the user toggle Danish via DR's own UI.
 - If we can't reliably hook into DR's button (e.g., they wrap it in a
   shadow root or rebuild it on every play/pause), fall back to
   rendering our own pill-shaped "EN" toggle as a sibling, positioned
-  next to it. Still in-player, still one click, but a separate widget.
+  next to the existing subtitle button. Still in-player, still one
+  click, but a separate widget.
 
 ### 5. How we display subtitles
 
@@ -142,7 +156,38 @@ Detection logic: after attaching the TextTrack, watch for whether
 DR's player's `aria-live` subtitle region updates when our cues
 activate. If not, switch to overlay mode.
 
-### 6. Manifest V3 for both browsers
+### 6. Caching translations locally
+
+The extension keeps an IndexedDB store of completed translations keyed
+by DRTV episode id (extracted from the URL — e.g.
+`badehoteller_-svinkloev_404057`). On opening an episode the user has
+seen before, the cached cues are loaded instantly and no LLM calls
+are made.
+
+Cache entry shape:
+
+```ts
+{
+  episodeId: string,
+  sourceVttHash: string,   // sha-256 of the Danish VTT, so cache
+                           //   invalidates if DR re-issues subs
+  provider: string,        // which LLM made it
+  model: string,
+  cuesJson: string,        // gzipped or raw, depending on size
+  createdAt: number,
+}
+```
+
+- IndexedDB rather than `chrome.storage.local` because translations can
+  be hundreds of KB and `storage.local` has a 10 MB quota.
+- Cache check happens *before* fetching the Danish VTT, on the
+  episode-id key. If hit, we still confirm `sourceVttHash` matches the
+  current VTT to catch DR retranslating their own subs.
+- The options page exposes total cache size and a **"Clear cache"**
+  button.
+- No automatic expiry; users decide when to clear.
+
+### 7. Manifest V3 for both browsers
 
 - `manifest.json` with a single `background.service_worker` entry.
 - `host_permissions`: `https://*.dr.dk/*`, plus the LLM endpoint(s) the
@@ -251,6 +296,15 @@ seconds.
 **Exit criterion:** real English translation flows through against all
 three API shapes; settings survive browser restart.
 
+### Phase 2b — Caching
+
+- Add IndexedDB cache keyed by `(episodeId, sourceVttHash)`.
+- On episode load, hit cache before fetching VTT.
+- Add cache-size readout and clear-cache button to the options page.
+
+**Exit criterion:** re-watching a translated episode causes zero LLM
+calls.
+
 ### Phase 3 — Streaming + UX polish
 
 - Stream cues from background → content as each LLM batch finishes
@@ -310,13 +364,24 @@ within DRTV, and on slow networks.
 
 - **BYO key only.** No public backend mode. Single user → single key →
   single LLM bill.
-- **Three first-class API shapes.** Anthropic uses `/messages`, OpenAI
-  uses `/responses`, everything else uses the OpenAI-compatible
-  `/chat/completions`. Provider is a single dropdown in the options
-  page; endpoint defaults follow from the choice but are editable.
-- **Click-to-activate per episode.** The user clicks "English" in the
-  injected subtitle menu to start translation; we don't auto-translate
-  every episode they land on. Avoids surprise LLM spend.
+- **Four provider presets** (Anthropic, OpenAI, Gemini, OpenAI-compatible)
+  fronting three API shapes (`/messages`, `/responses`,
+  `/chat/completions`). Each preset ships a default endpoint + default
+  model; both are editable in the options page.
+- **Default models:** Anthropic → `claude-haiku-4-5`,
+  OpenAI → `gpt-5-mini`, Gemini → `gemini-3.5-flash`,
+  OpenAI-compatible → user-supplied.
+- **Click-to-activate per episode** via the in-player subtitle button.
+  The injected menu is Off / Dansk / English; picking English triggers
+  translation. Selection does not persist across episodes (avoids
+  surprise LLM spend).
+- **Off means no subtitles** — both Danish and English are turned off
+  when the user picks Off in our menu.
+- **Sibling pill fallback.** If DR's existing subtitle button cannot
+  be hooked, we render a "EN" pill next to it instead. Still in-player,
+  still one click.
+- **Local cache** in IndexedDB, keyed by episode id and source-VTT
+  hash. Clear-cache button in the options page; no auto-expiry.
 
 ## What we ditch from the current code
 
