@@ -400,7 +400,7 @@ viewers. The translating status now reads
 **Exit criterion:** good UX on a fresh episode, on episode switches
 within DRTV, and on slow networks.
 
-### Phase 4 — Packaging
+### Phase 4 — Packaging ✅
 
 - Build both `dist/chrome` (CRX-compatible) and
   `dist/firefox` (XPI-compatible).
@@ -410,6 +410,19 @@ within DRTV, and on slow networks.
 
 **Exit criterion:** unpacked installs from `dist/chrome` and
 `dist/firefox` both work end-to-end.
+
+**Findings from the run:**
+
+- `npm run package` builds both targets and produces
+  `dist/drtv-in-english-{chrome,firefox}-<version>.zip`, with
+  `manifest.json` at the archive root and sourcemaps excluded — the
+  shape both stores expect.
+- The version embedded in the zip filename comes from `package.json`.
+  Phase 5 should bump `0.1.0-dev` → `0.1.0` (and the two manifests'
+  `version` fields) for the first store upload, since both stores
+  reject re-uploads of the same version.
+- Unpacked-install flow for both browsers is in the README under
+  *Load in Firefox* / *Load in Chrome*.
 
 ### Phase 5 — Store submission
 

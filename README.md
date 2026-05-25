@@ -48,8 +48,14 @@ docs/
 npm install
 npm run build      # one-shot: produces dist/chrome and dist/firefox
 npm run watch      # rebuild on save
+npm run package    # build, then zip each target into dist/ for store upload
 npm run typecheck  # tsc --noEmit
 ```
+
+`npm run package` produces `dist/drtv-in-english-chrome-<version>.zip` and
+`dist/drtv-in-english-firefox-<version>.zip`. Sourcemaps are excluded.
+The Chrome zip is what the Web Store accepts directly; AMO accepts the
+Firefox zip and re-signs it as an XPI on submission.
 
 ### Load in Firefox
 
@@ -96,8 +102,10 @@ npm run typecheck  # tsc --noEmit
 - Overlay subtitle renderer (Phase 0 confirmed native `TextTrack`
   works; we keep the spec but don't ship the renderer until a DR
   build masks the native track).
-- Packaging into signed CRX/XPI and store submission — see Phases 4
-  and 5 in [`docs/extension-plan.md`](docs/extension-plan.md).
+- Store submission (privacy policy, listing copy, screenshots, AMO
+  signing) — see Phase 5 in
+  [`docs/extension-plan.md`](docs/extension-plan.md). The build script
+  already produces store-ready zips via `npm run package`.
 
 ## Contribute
 

@@ -8,12 +8,14 @@
 import { build, context } from "esbuild";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const watch = process.argv.includes("--watch");
+const pkg = process.argv.includes("--package");
 
 const entryPoints = {
   "background/index": resolve(here, "src/background/index.ts"),
@@ -111,4 +113,39 @@ for (const t of targets) {
 
 if (watch) {
   console.log("[build] watching for changes…");
+}
+
+if (pkg) {
+  const { version } = JSON.parse(
+    await readFile(resolve(here, "package.json"), "utf8"),
+  );
+  for (const t of targets) {
+    await packageTarget(t.name, version);
+  }
+}
+
+async function packageTarget(name, version) {
+  const outDir = resolve(here, "dist", name);
+  const zipName = `drtv-in-english-${name}-${version}.zip`;
+  const zipPath = resolve(here, "dist", zipName);
+  await rm(zipPath, { force: true });
+  // `zip -r ... .` from inside outDir so paths inside the archive are
+  // relative to the extension root (manifest.json at top level — what
+  // both stores expect).
+  await runZip(outDir, zipPath);
+  console.log(`[build] packaged ${name} -> dist/${zipName}`);
+}
+
+function runZip(cwd, zipPath) {
+  return new Promise((resolveP, reject) => {
+    const child = spawn(
+      "zip",
+      ["-r", "-q", "-X", zipPath, ".", "-x", "*.map"],
+      { cwd, stdio: "inherit" },
+    );
+    child.on("error", reject);
+    child.on("exit", (code) =>
+      code === 0 ? resolveP() : reject(new Error(`zip exited ${code}`)),
+    );
+  });
 }
