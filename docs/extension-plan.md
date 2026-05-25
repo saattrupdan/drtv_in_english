@@ -283,7 +283,7 @@ hundred lines and avoids a Python ↔ JS build pipeline.
 
 ## Phased implementation
 
-### Phase 0 — Spike
+### Phase 0 — Spike ✅
 
 Goal: prove the two riskiest assumptions — that we can render
 English text over DR's actual player, and that we can hook into
@@ -305,6 +305,32 @@ Target episode (DRM-protected, has Danish subs, in catalogue):
 **Exit criterion:** an English line of text appears over the DRTV
 player while the video plays, *and* we have a path to a clickable
 in-player English-subs control.
+
+**Findings from the run** (spike code lives in `extension/spike/`):
+
+- **Native `TextTrack` works on DRM playback.** Cues added via
+  `addTextTrack` + `VTTCue` render correctly on the test episode,
+  including in fullscreen. DR's player does *not* mask the native
+  subtitle layer. The overlay fallback in §5 is therefore the
+  contingency path, not the default — Phase 1+ should target the
+  native track first.
+- **DR's subtitle button is in the light DOM** and matchable via ARIA
+  label / class substring (the regex `/subtitle|caption|undertekst|cc\b|sprog|language/`
+  caught it on first try). Replacing its click handler in the capture
+  phase (`addEventListener("click", …, true)` + `stopImmediatePropagation`)
+  successfully suppresses DR's own popup and lets us render our own
+  3-way menu. The "sibling pill" fallback (§4) was not needed.
+- **Content-script matches must be broad.** Originally scoped to
+  `/drtv/se/*` + `/drtv/episode/*`; this broke SPA navigation because
+  the script wasn't present on intermediate DRTV pages (home, show
+  pages) to catch the pushState into an episode. Broadened to
+  `https://www.dr.dk/drtv/*`. Even with this, going *back* in history
+  and then re-entering an episode still does not re-attach reliably
+  — Phase 3 must own this properly via the background service worker
+  and `chrome.webNavigation.onHistoryStateUpdated` rather than
+  patching `history.pushState` from the content script.
+- **Firefox-only verified.** Chrome was not tested in this spike;
+  Phase 4 packaging will need to re-verify Chrome before submission.
 
 ### Phase 1 — End-to-end with stubbed translation
 
