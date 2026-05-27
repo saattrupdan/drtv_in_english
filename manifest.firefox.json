@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "DRTV in English",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "English subtitles for DRTV — translated client-side with your own LLM API key.",
   "permissions": ["storage", "webRequest", "webNavigation"],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": ["https://www.dr.dk/*"],
+  "optional_host_permissions": ["https://*/"],
   "background": {
     "scripts": ["background/index.js"]
   },
