@@ -228,12 +228,12 @@ function onPortEvent(event: PortEvent): void {
       // playback when runway runs out — no need for a "retry" nag.
       stopStallWatchdog(s);
       s.track.addCues(event.cues);
-      // BufferGuard's onStatus callback drives the overlay from here:
-      // markReady → check() will either show "Buffering…" if we still
-      // need runway, or clear it via onStatus(null). Calling hideStatus()
-      // here unconditionally would race the guard and blank the spinner
-      // mid-buffer.
-      s.guard.markReady(event.cues.map((c) => c.start));
+      // Defer markReady to let the "schedule" handler run first
+      // (setSchedule populates this.starts which markReady depends on).
+      // queueMicrotask guarantees the schedule handler runs before this.
+      queueMicrotask(() => {
+        if (state === s) s.guard.markReady(event.cues.map((c) => c.start));
+      });
       break;
     case "done":
       stopStallWatchdog(s);
