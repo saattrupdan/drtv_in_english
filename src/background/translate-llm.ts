@@ -15,6 +15,7 @@
 
 import type { Cue } from "../shared/types.js";
 import type { ProviderConfig } from "../shared/storage.js";
+import { loadMaxParallel, saveMaxParallel } from "../shared/storage.js";
 
 export interface TranslateLLMOptions {
   onBatch: (cues: Cue[]) => void;
@@ -76,77 +77,117 @@ export async function translateWithLLM(
 
   const batches = buildBatches(cues, cfg.batchSize, cfg.contextWindow);
   let emitted = 0;
+  let failedCount = 0;
+  let totalBatches = 0;
 
-  // Remaining batch indices, re-prioritized on each pick by distance
-  // from the user's current playhead. A seek immediately surfaces the
-  // batches around the new position; finished batches stay finished.
-  const remaining = new Set<number>(batches.map((_, i) => i));
+  // Load persisted maxParallel for this provider+model, or use configured value
+  const persistedMaxParallel = await loadMaxParallel(cfg.provider, cfg.model);
+  let currentConcurrency = persistedMaxParallel ?? cfg.maxParallel;
 
-  const pickNext = (): number | undefined => {
-    if (remaining.size === 0) return undefined;
-    const p = opts.getPlayhead?.() ?? 0;
-    let bestI: number | undefined;
-    let bestD = Infinity;
-    for (const i of remaining) {
-      const indices = batches[i]!.targetIndices;
-      const firstCue = cues[indices[0]!]!;
-      const lastCue = cues[indices[indices.length - 1]!]!;
-      // Batches that straddle the playhead translate the cue the user
-      // needs *right now* — always pick those first. Otherwise: future
-      // batches preferred; past batches still translated but
-      // deprioritized (the user may scroll back to them later).
-      let d: number;
-      if (firstCue.start <= p && p <= lastCue.end) {
-        d = 0;
-      } else if (firstCue.start >= p) {
-        d = firstCue.start - p;
-      } else {
-        d = (p - firstCue.start) * 10 + 1000;
+  // Adaptive concurrency: track success rate and adjust
+  const attemptWithConcurrency = async (
+    concurrency: number,
+  ): Promise<{ success: boolean; saved: boolean }> => {
+    const remaining = new Set<number>(batches.map((_, i) => i));
+    let roundFailures = 0;
+    let roundTotal = 0;
+
+    const pickNext = (): number | undefined => {
+      if (remaining.size === 0) return undefined;
+      const p = opts.getPlayhead?.() ?? 0;
+      let bestI: number | undefined;
+      let bestD = Infinity;
+      for (const i of remaining) {
+        const indices = batches[i]!.targetIndices;
+        const firstCue = cues[indices[0]!]!;
+        const lastCue = cues[indices[indices.length - 1]!]!;
+        let d: number;
+        if (firstCue.start <= p && p <= lastCue.end) {
+          d = 0;
+        } else if (firstCue.start >= p) {
+          d = firstCue.start - p;
+        } else {
+          d = (p - firstCue.start) * 10 + 1000;
+        }
+        if (d < bestD) {
+          bestD = d;
+          bestI = i;
+        }
       }
-      if (d < bestD) {
-        bestD = d;
-        bestI = i;
-      }
+      if (bestI === undefined) return undefined;
+      remaining.delete(bestI);
+      return bestI;
+    };
+
+    const workers: Promise<void>[] = [];
+    for (let w = 0; w < Math.min(concurrency, remaining.size); w++) {
+      workers.push(
+        (async () => {
+          while (remaining.size > 0) {
+            if (opts.signal?.aborted) return;
+            const i = pickNext();
+            if (i === undefined) return;
+            const { targetIndices, userPrompt } = batches[i]!;
+            roundTotal++;
+            const translations = await runBatch(
+              cfg,
+              userPrompt,
+              targetIndices,
+              opts.signal,
+            ).catch((err) => {
+              console.warn(
+                "[drtv-en/bg] batch failed",
+                targetIndices,
+                err,
+              );
+              roundFailures++;
+              return new Map<number, string>();
+            });
+            if (opts.signal?.aborted) return;
+            const batchCues: Cue[] = targetIndices.map((idx) => {
+              const src = cues[idx]!;
+              const text = translations.get(idx)?.trim() || src.text;
+              return { start: src.start, end: src.end, text };
+            });
+            emitted += batchCues.length;
+            opts.onBatch(batchCues);
+          }
+        })(),
+      );
     }
-    if (bestI === undefined) return undefined;
-    remaining.delete(bestI);
-    return bestI;
+
+    await Promise.all(workers);
+
+    // If >50% failures, this concurrency level is too high
+    const failureRate = roundTotal > 0 ? roundFailures / roundTotal : 0;
+    const success = failureRate <= 0.5;
+
+    // Save on first successful round
+    let saved = false;
+    if (success && persistedMaxParallel === null) {
+      await saveMaxParallel(cfg.provider, cfg.model, concurrency);
+      saved = true;
+    }
+
+    return { success, saved };
   };
 
-  const concurrency = Math.max(1, cfg.maxParallel);
-  const workers: Promise<void>[] = [];
-
-  for (let w = 0; w < Math.min(concurrency, batches.length); w++) {
-    workers.push(
-      (async () => {
-        while (remaining.size > 0) {
-          if (opts.signal?.aborted) return;
-          const i = pickNext();
-          if (i === undefined) return;
-          const { targetIndices, userPrompt } = batches[i]!;
-          const translations = await runBatch(
-            cfg,
-            userPrompt,
-            targetIndices,
-            opts.signal,
-          ).catch((err) => {
-            console.warn("[drtv-en/bg] batch failed", targetIndices, err);
-            return new Map<number, string>();
-          });
-          if (opts.signal?.aborted) return;
-          const batchCues: Cue[] = targetIndices.map((idx) => {
-            const src = cues[idx]!;
-            const text = translations.get(idx)?.trim() || src.text;
-            return { start: src.start, end: src.end, text };
-          });
-          emitted += batchCues.length;
-          opts.onBatch(batchCues);
-        }
-      })(),
+  // Start with current concurrency, halve if needed
+  while (currentConcurrency >= 1) {
+    if (opts.signal?.aborted) break;
+    const result = await attemptWithConcurrency(currentConcurrency);
+    if (result.success) {
+      return emitted;
+    }
+    // Halve concurrency and retry remaining batches
+    currentConcurrency = Math.max(1, Math.floor(currentConcurrency / 2));
+    console.log(
+      "[drtv-en/bg] reducing concurrency to",
+      currentConcurrency,
+      "due to failures",
     );
   }
 
-  await Promise.all(workers);
   return emitted;
 }
 
@@ -179,7 +220,7 @@ function buildBatches(
     const targetIds = targetIndices.join(", ");
 
     const userPrompt =
-      `Target language: ${TARGET_LANGUAGE}\n\n` +
+      `Translate the Danish subtitles to English. Output ONLY English text.\n\n` +
       `Chunks (translate ONLY the chunks with ids ${targetIds}):\n\n` +
       `${numbered}` +
       `---\n` +
@@ -199,7 +240,10 @@ async function runBatch(
   signal: AbortSignal | undefined,
 ): Promise<Map<number, string>> {
   const raw = await callProvider(cfg, userPrompt, signal);
-  return parseTranslations(raw, targetIndices);
+  console.log("[drtv-en/bg] llm raw response (truncated):", raw?.slice(0, 500));
+  const parsed = parseTranslations(raw, targetIndices);
+  console.log("[drtv-en/bg] llm parsed:", parsed.size, "cues");
+  return parsed;
 }
 
 async function callProvider(
@@ -302,14 +346,17 @@ async function callChatCompletions(
   userPrompt: string,
   signal: AbortSignal | undefined,
 ): Promise<string> {
-  const body = {
+  const body: Record<string, unknown> = {
     model: cfg.model,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
-    response_format: { type: "json_object" },
     temperature: 1.0,
+    // Ensure JSON output (OpenAI standard, widely supported by compat servers)
+    response_format: { type: "json_object" },
+    // Disable reasoning/thinking for faster responses (Qwen-specific)
+    chat_template_kwargs: { enable_thinking: false },
   };
   const res = await fetch(cfg.endpoint, {
     method: "POST",
@@ -334,12 +381,16 @@ function parseTranslations(
   targetIndices: number[],
 ): Map<number, string> {
   const out = new Map<number, string>();
-  if (!raw) return out;
+  if (!raw) {
+    console.log("[drtv-en/bg] parseTranslations: empty raw");
+    return out;
+  }
   const json = extractJson(raw);
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
+    console.log("[drtv-en/bg] parseTranslations: JSON parse failed, json=", json.slice(0, 200));
     return out;
   }
   if (!parsed || typeof parsed !== "object") return out;

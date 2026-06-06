@@ -45,6 +45,8 @@ interface ActiveJob {
   playhead: number;
 }
 const activeJobs = new Map<number, ActiveJob>();
+// Heartbeat interval — cleared when job ends or port disconnects.
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== PORT_NAME) return;
@@ -73,6 +75,10 @@ chrome.runtime.onConnect.addListener((port) => {
       cancelJob(tabId);
       return;
     }
+    if (msg.type === "heartbeat") {
+      // Acknowledge content-script pings.
+      return;
+    }
     if (msg.type === "request-translate") {
       void runJob(tabId, msg.episodeId, msg.playhead ?? 0, send);
     }
@@ -83,6 +89,7 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 
   port.onDisconnect.addListener(() => {
+    clearInterval(heartbeatInterval);
     cancelJob(tabId);
   });
 });
@@ -104,6 +111,18 @@ async function runJob(
   const abort = new AbortController();
   const job: ActiveJob = { episodeId, abort, playhead: initialPlayhead };
   activeJobs.set(tabId, job);
+
+  // Heartbeat to keep the service worker alive during long translations.
+  // Chrome kills idle service workers after ~30s; vLLM endpoints can be
+  // slow enough that translation exceeds this limit. Ping the content
+  // script every 10s to keep the port connection alive.
+  heartbeatInterval = setInterval(() => {
+    try {
+      send({ type: "heartbeat" });
+    } catch {
+      // Port may be gone; nothing useful to do.
+    }
+  }, 10_000);
 
   try {
     const playlist = await waitForDanishPlaylist(tabId, abort.signal, send);
@@ -185,6 +204,7 @@ async function runJob(
       message: err instanceof Error ? err.message : String(err),
     });
   } finally {
+    clearInterval(heartbeatInterval);
     if (activeJobs.get(tabId)?.abort === abort) {
       activeJobs.delete(tabId);
     }

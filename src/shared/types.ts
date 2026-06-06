@@ -17,7 +17,8 @@ export type PortEvent =
   | { type: "schedule"; starts: number[] }
   | { type: "cues"; cues: Cue[] }
   | { type: "done"; total: number }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "heartbeat" };
 
 export type TranslationState =
   | "idle"

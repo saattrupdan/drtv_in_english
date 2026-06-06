@@ -90,6 +90,7 @@ async function bootEpisode(episodeId: string): Promise<void> {
   state = s;
 
   port.onDisconnect.addListener(() => {
+    console.log(TAG, "port disconnected");
     if (state === s) {
       // Background went away — don't keep a dead port reference.
       s.port = null as unknown as chrome.runtime.Port;
@@ -208,7 +209,11 @@ function sendForState(s: EpisodeState, msg: PortMessage): void {
 
 function onPortEvent(event: PortEvent): void {
   const s = state;
-  if (!s) return;
+  if (!s) {
+    console.warn(TAG, "port event dropped — no state", event.type);
+    return;
+  }
+  console.log(TAG, "port event:", event.type);
   switch (event.type) {
     case "status":
       // Pre-translation phases (fetching/parsing/etc) keep the centered
@@ -228,21 +233,23 @@ function onPortEvent(event: PortEvent): void {
       // playback when runway runs out — no need for a "retry" nag.
       stopStallWatchdog(s);
       s.track.addCues(event.cues);
-      // Defer markReady to let the "schedule" handler run first
-      // (setSchedule populates this.starts which markReady depends on).
-      // queueMicrotask guarantees the schedule handler runs before this.
-      queueMicrotask(() => {
-        if (state === s) s.guard.markReady(event.cues.map((c) => c.start));
-      });
+      // markReady is unnecessary — the BufferGuard's check() callback
+      // (fired on video timeupdate) computes the frontier dynamically
+      // from cue start times and drives the overlay.  See the "done"
+      // case below for the success message.
       break;
     case "done":
       stopStallWatchdog(s);
+      s.guard.stop();
       showStatus("English subtitles ready", { hideAfterMs: 2500 });
       break;
     case "error":
       stopStallWatchdog(s);
       s.guard.disable();
       showStatus(event.message, { hideAfterMs: 8000 });
+      break;
+    case "heartbeat":
+      // Background keeps us alive — no action needed.
       break;
   }
 }
@@ -271,11 +278,13 @@ function attachStatusOverlay(video: HTMLVideoElement): void {
   // Re-host the overlay if DR rebuilt the player container under us.
   if (statusEl && statusEl.isConnected && statusEl.parentElement) {
     if (statusEl.parentElement.contains(video)) return;
+    console.log(TAG, "re-hosting overlay — video moved");
     statusEl.remove();
     statusEl = null;
     statusTextEl = null;
   }
   const host = video.parentElement ?? document.body;
+  console.log(TAG, "attachStatusOverlay host:", host.tagName, "video parent:", video.parentElement?.tagName);
   if (getComputedStyle(host).position === "static") {
     host.style.position = "relative";
   }
@@ -287,10 +296,15 @@ function attachStatusOverlay(video: HTMLVideoElement): void {
   statusTextEl = document.createElement("span");
   statusEl.append(spinner, statusTextEl);
   host.appendChild(statusEl);
+  console.log(TAG, "statusEl created, isConnected:", statusEl.isConnected);
 }
 
 function showStatus(text: string, opts: StatusOpts = {}): void {
-  if (!statusEl || !statusTextEl) return;
+  if (!statusEl || !statusTextEl) {
+    console.warn(TAG, "showStatus called but statusEl is null");
+    return;
+  }
+  console.log(TAG, "showStatus:", text, "busy:", !!opts.busy);
   statusTextEl.textContent = text;
   statusEl.classList.toggle("drtv-en-busy", !!opts.busy);
   statusEl.style.display = "flex";
@@ -300,6 +314,7 @@ function showStatus(text: string, opts: StatusOpts = {}): void {
 }
 
 function hideStatus(): void {
+  console.log(TAG, "hideStatus called");
   if (statusEl) statusEl.style.display = "none";
 }
 

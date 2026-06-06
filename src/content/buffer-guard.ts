@@ -92,6 +92,15 @@ export class BufferGuard {
     this.onStatus(null);
   }
 
+  // Stop the guard without clearing the overlay — used when the
+  // translation is done and we want the "English subtitles ready"
+  // message to persist without check() overwriting it.
+  stop(): void {
+    this.active = false;
+    this.video.removeEventListener("timeupdate", this.check);
+    this.video.removeEventListener("seeking", this.check);
+  }
+
   destroy(): void {
     this.video.removeEventListener("timeupdate", this.check);
     this.video.removeEventListener("seeking", this.check);
