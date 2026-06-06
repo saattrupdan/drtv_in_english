@@ -58,6 +58,21 @@ docs/
 | Build (chrome + firefox) | `npm run build` |
 | Watch / rebuild on save | `npm run watch` |
 | Typecheck | `npm run typecheck` |
+| Package for stores | `npm run package` |
+
+## Updating the version
+
+Before releasing, bump the version in **two places**:
+
+1. **`manifest.chrome.json`** — set `"version"` (e.g. `"1.0.0"`)
+2. **`manifest.firefox.json`** — set `"version"` (e.g. `"1.0.0"`)
+
+Then run `npm run package` to rebuild with the new version. The build
+script reads the version from the manifests and names the output zips
+accordingly (e.g. `drtv-in-english-chrome-1.0.0.zip`).
+
+After packaging, update **`CHANGELOG.md`** with the new version number
+and release date. Commit all changes together before submitting to stores.
 
 ## Things to look out for
 
