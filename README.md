@@ -113,10 +113,14 @@ Firefox zip and re-signs it as an XPI on submission.
 - Overlay subtitle renderer (Phase 0 confirmed native `TextTrack`
   works; we keep the spec but don't ship the renderer until a DR
   build masks the native track).
-- Store submission (privacy policy, listing copy, screenshots, AMO
-  signing) — see Phase 5 in
-  [`docs/extension-plan.md`](docs/extension-plan.md). The build script
-  already produces store-ready zips via `npm run package`.
+
+## Store status
+
+- **Firefox Add-ons (AMO)** — Submitted, awaiting approval
+- **Chrome Web Store** — Submitted, awaiting review
+
+Once approved, installation links will be available on both stores.
+The build script produces store-ready zips via `npm run package`.
 
 ## Contribute
 
