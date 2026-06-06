@@ -60,7 +60,20 @@ export class TrackManager {
 
   addCues(cues: Cue[]): void {
     const track = this.ensureTrack();
+    // Deduplicate: skip cues that already exist in the track. This
+    // guards against the background re-sending batches (e.g. from
+    // cache hits or re-translation) which would cause stacking.
+    const existing = new Set<string>();
+    const trackCues = track.cues;
+    if (trackCues) {
+      for (let i = 0; i < trackCues.length; i++) {
+        const c = trackCues[i] as VTTCue;
+        existing.add(`${c.startTime.toFixed(3)}|${c.endTime.toFixed(3)}|${c.text}`);
+      }
+    }
     for (const c of cues) {
+      const key = `${c.start.toFixed(3)}|${c.end.toFixed(3)}|${c.text}`;
+      if (existing.has(key)) continue;
       try {
         const vtt = new VTTCue(c.start, c.end, c.text);
         this.positionCue(vtt);
