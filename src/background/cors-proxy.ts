@@ -1,8 +1,10 @@
 // CORS proxy for LLM provider requests.
 // Chrome MV3: uses declarativeNetRequest to modify response headers.
 // Firefox MV3: uses webRequest with blocking (still supported).
+//
+// Accepts all origins so users can configure any LLM provider without CORS issues.
 
-const CORS_PROXY_ORIGINS = ["https://inference.alexandra.dk"];
+const CORS_PROXY_ORIGINS = ["<all_urls>"];
 
 const CORS_HEADERS = [
   { name: "Access-Control-Allow-Origin", value: "*" },
@@ -23,7 +25,7 @@ export async function enableCorsProxy(): Promise<void> {
 }
 
 function enableCorsProxyFirefox(): void {
-  // Add CORS headers to responses from the inference server
+  // Add CORS headers to ALL responses (for any LLM provider the user configures)
   chrome.webRequest.onHeadersReceived.addListener(
     (details) => {
       if (!details.responseHeaders) return {};
@@ -39,7 +41,7 @@ function enableCorsProxyFirefox(): void {
       return { responseHeaders: filtered };
     },
     {
-      urls: CORS_PROXY_ORIGINS.map((o) => `${o}/*`),
+      urls: ["<all_urls>"],
       types: ["xmlhttprequest"],
     },
     ["blocking", "responseHeaders"] as chrome.webRequest.OnHeadersReceivedOptions,
@@ -62,7 +64,7 @@ async function enableCorsProxyChrome(): Promise<void> {
         })),
       },
       condition: {
-        urlFilter: "inference.alexandra.dk",
+        urlFilter: "*://*/*",
         resourceTypes: ["xmlhttprequest"],
       },
     },
