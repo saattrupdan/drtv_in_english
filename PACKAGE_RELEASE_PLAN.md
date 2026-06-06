@@ -4,18 +4,15 @@ This document walks through getting the extension live in both stores.
 
 **Prerequisites:** The Phase 5 code changes are already committed — icons, privacy policy, tightened manifests, store listing copy, and permission justifications are all in the repo.
 
+**Privacy Policy URL:** `https://saattrupdan.github.io/drtv_in_english/privacy-policy.html`
+
 ---
 
-## Step 1: Host the privacy policy
+## Step 1: Host the privacy policy ✅
 
-The privacy policy lives at `privacy-policy.html` in the repo. Stores require a publicly accessible URL.
+**Done:** Privacy policy is live at `https://saattrupdan.github.io/drtv_in_english/privacy-policy.html`
 
-**Options:**
-- **GitHub Pages** — push the repo (or a dedicated branch) to GitHub and enable Pages. URL: `https://dansmart.github.io/drtv_in_english/privacy-policy.html`
-- **Any web host** — upload the HTML file somewhere.
-- **Raw GitHub blob** — not ideal (stores sometimes reject `raw.githubusercontent.com` links), but functional.
-
-**Action:** Pick a host, get a stable URL, note it down. You'll paste it into both store dashboards.
+Hosted on GitHub Pages from the `gh-pages` branch. Use this URL for both store dashboards.
 
 ---
 
@@ -87,7 +84,7 @@ Once both stores approve:
 
 ## Checklist
 
-- [ ] Privacy policy hosted at a stable URL
+- [x] Privacy policy hosted at a stable URL
 - [ ] 3 screenshots taken at 1280×800
 - [ ] Chrome Web Store submitted ($5 fee)
 - [ ] Firefox AMO submitted
