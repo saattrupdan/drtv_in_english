@@ -46,7 +46,7 @@ interface ActiveJob {
 }
 const activeJobs = new Map<number, ActiveJob>();
 // Heartbeat interval — cleared when job ends or port disconnects.
-let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+let heartbeatInterval: ReturnType<typeof setInterval> | undefined = undefined;
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== PORT_NAME) return;
@@ -73,10 +73,6 @@ chrome.runtime.onConnect.addListener((port) => {
     }
     if (msg.type === "cancel") {
       cancelJob(tabId);
-      return;
-    }
-    if (msg.type === "heartbeat") {
-      // Acknowledge content-script pings.
       return;
     }
     if (msg.type === "request-translate") {
