@@ -44,13 +44,13 @@ docs/
 
 ## Screenshots
 
-![Options page](gfx/drtv-in-english-options.png)
+![Options page](package/assets/drtv-in-english-options-chrome.jpg)
 *Options page — choose your LLM provider and enter your API key*
 
-![Subtitle menu](gfx/drtv-in-english-subs-menu.png)
+![Subtitle menu](package/assets/drtv-in-english-subs-menu-chrome.jpg)
 *Three-way Off / Dansk / English menu injected into DR's player*
 
-![English subtitles](gfx/drtv-in-english-subs.png)
+![English subtitles](package/assets/drtv-in-english-subs-chrome.jpg)
 *English subtitles rendering over the video*
 
 ## Develop

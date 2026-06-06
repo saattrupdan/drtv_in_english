@@ -15,13 +15,16 @@ package/
   chrome/                  # Chrome build output (for testing)
   firefox/                 # Firefox build output (for testing)
   zips/
-    drtv-in-english-chrome-0.1.0-dev.zip    # Upload to Chrome Web Store
-    drtv-in-english-firefox-0.1.0-dev.zip   # Upload to Firefox AMO
+    drtv-in-english-chrome-1.0.0.zip        # Upload to Chrome Web Store
+    drtv-in-english-firefox-1.0.0.zip       # Upload to Firefox AMO
     drtv-in-english-source.zip              # Source package for Mozilla review
-  assets/
-    drtv-in-english-options.png             # Screenshot: options page
-    drtv-in-english-subs-menu.png           # Screenshot: subtitle menu
-    drtv-in-english-subs.png                # Screenshot: English subs
+  assets/                   # Store screenshots (1280x800 JPEG)
+    drtv-in-english-options-chrome.jpg
+    drtv-in-english-subs-menu-chrome.jpg
+    drtv-in-english-subs-chrome.jpg
+    drtv-in-english-options-firefox.jpg
+    drtv-in-english-subs-menu-firefox.jpg
+    drtv-in-english-subs-firefox.jpg
   submission/
     STORE-LISTING.md                        # Store descriptions
     PERMISSION-JUSTIFICATIONS.md            # Firefox permission justifications
@@ -42,11 +45,17 @@ Hosted on GitHub Pages from the `gh-pages` branch. Use this URL for both store d
 
 Screenshots in `package/assets/`:
 
-1. **Options page** — `drtv-in-english-options.png`
-2. **Three-way subtitle button** — `drtv-in-english-subs-menu.png`
-3. **English subs rendering** — `drtv-in-english-subs.png`
+**For Chrome Web Store:**
+1. `drtv-in-english-options-chrome.jpg` — Options page
+2. `drtv-in-english-subs-menu-chrome.jpg` — Subtitle menu
+3. `drtv-in-english-subs-chrome.jpg` — English subs
 
-All three images are ready for upload to both stores.
+**For Firefox Add-ons:**
+1. `drtv-in-english-options-firefox.jpg` — Options page
+2. `drtv-in-english-subs-menu-firefox.jpg` — Subtitle menu
+3. `drtv-in-english-subs-firefox.jpg` — English subs
+
+All images are 1280×800 JPEGs, ready for upload.
 
 ---
 
@@ -104,6 +113,6 @@ Once both stores approve:
 
 - [x] Privacy policy hosted at a stable URL
 - [x] 3 screenshots taken at 1280×800
-- [ ] Chrome Web Store submitted ($5 fee)
-- [ ] Firefox AMO submitted
+- [ ] Chrome Web Store submitted ($5 fee) — upload zips + 3 Chrome screenshots
+- [ ] Firefox AMO submitted — upload zip + source + 3 Firefox screenshots
 - [ ] Fresh-profile install tested end-to-end
