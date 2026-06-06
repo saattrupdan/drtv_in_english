@@ -68,3 +68,23 @@ export async function loadProviderConfig(): Promise<ProviderConfig> {
 export async function saveProviderConfig(cfg: ProviderConfig): Promise<void> {
   await chrome.storage.local.set({ [KEY]: cfg });
 }
+
+// Per provider+model maxParallel cache — stores the last known working
+// value to avoid re-probing on every session.
+export async function loadMaxParallel(
+  provider: string,
+  model: string,
+): Promise<number | null> {
+  const key = `maxParallel:${provider}:${model}`;
+  const got = await chrome.storage.local.get(key);
+  return got[key] ?? null;
+}
+
+export async function saveMaxParallel(
+  provider: string,
+  model: string,
+  value: number,
+): Promise<void> {
+  const key = `maxParallel:${provider}:${model}`;
+  await chrome.storage.local.set({ [key]: value });
+}
