@@ -3,25 +3,20 @@
   "name": "DRTV in English",
   "version": "1.0.0",
   "description": "English subtitles for DRTV — translated client-side with your own LLM API key.",
-  "permissions": ["storage", "webRequest", "webRequestBlocking", "webNavigation"],
+  "permissions": ["storage", "webNavigation", "declarativeNetRequest"],
   "host_permissions": [
-    "https://www.dr.dk/*",
-    "https://inference.alexandra.dk/*"
-  ],
+  "https://www.dr.dk/*",
+  "https://inference.alexandra.dk/*"
+],
 "optional_host_permissions": ["https://*/"],
   "background": {
-    "scripts": ["background/index.js"]
+    "service_worker": "background/index.js",
+    "type": "module"
   },
   "content_scripts": [
     {
       "matches": ["https://www.dr.dk/drtv/*"],
       "js": ["content/early.js"],
-      "run_at": "document_start",
-      "all_frames": false
-    },
-    {
-      "matches": ["https://www.dr.dk/drtv/*"],
-      "js": ["content/subtitle-fetcher.js"],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -48,13 +43,5 @@
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
-  },
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "drtv-in-english@local",
-      "data_collection_permissions": {
-        "required": ["none"]
-      }
-    }
   }
 }

@@ -6,6 +6,28 @@ This document walks through getting the extension live in both stores.
 
 **Privacy Policy URL:** `https://saattrupdan.github.io/drtv_in_english/privacy-policy.html`
 
+## Package Directory Structure
+
+All release artifacts are consolidated in `package/`:
+
+```
+package/
+  chrome/                  # Chrome build output (for testing)
+  firefox/                 # Firefox build output (for testing)
+  zips/
+    drtv-in-english-chrome-0.1.0-dev.zip    # Upload to Chrome Web Store
+    drtv-in-english-firefox-0.1.0-dev.zip   # Upload to Firefox AMO
+    drtv-in-english-source.zip              # Source package for Mozilla review
+  assets/
+    drtv-in-english-options.png             # Screenshot: options page
+    drtv-in-english-subs-menu.png           # Screenshot: subtitle menu
+    drtv-in-english-subs.png                # Screenshot: English subs
+  submission/
+    STORE-LISTING.md                        # Store descriptions
+    PERMISSION-JUSTIFICATIONS.md            # Firefox permission justifications
+    SOURCE_SUBMISSION.md                    # Build instructions for Mozilla
+```
+
 ---
 
 ## Step 1: Host the privacy policy ✅
@@ -16,21 +38,15 @@ Hosted on GitHub Pages from the `gh-pages` branch. Use this URL for both store d
 
 ---
 
-## Step 2: Take screenshots
+## Step 2: Take screenshots ✅
 
-Stores require screenshots at **1280×800**. You need three:
+Screenshots in `package/assets/`:
 
-1. **Options page** — showing the provider selector (OpenAI / Anthropic / Custom) and API key input
-2. **Three-way subtitle button** — the injected button on DR's player showing Dansk/English/Off
-3. **English subs rendering** — a frame with English subtitles visible over the video
+1. **Options page** — `drtv-in-english-options.png`
+2. **Three-way subtitle button** — `drtv-in-english-subs-menu.png`
+3. **English subs rendering** — `drtv-in-english-subs.png`
 
-**How:**
-- Go to `dr.dk/drtv` with the extension loaded (dev mode)
-- Open options page → screenshot
-- Play an episode, click the subtitle button → screenshot
-- Show English subs on screen → screenshot
-
-Resize each to exactly 1280×800 if needed.
+All three images are ready for upload to both stores.
 
 ---
 
@@ -39,13 +55,13 @@ Resize each to exactly 1280×800 if needed.
 1. Go to [chrome.google.com/webstore/devconsole](https://chrome.google.com/webstore/devconsole)
 2. Pay the **$5 one-time developer fee** (if you haven't already)
 3. Click **"New item"**
-4. Upload the **zipped extension** — run `npm run build`, then zip the `dist/chrome/` folder contents
+4. Upload **`package/zips/drtv-in-english-chrome-0.1.0-dev.zip`**
 5. Fill in:
    - **Title:** DRTV in English
-   - **Description:** Use the long description from `store-submission/STORE-LISTING.md`
+   - **Description:** Use the long description from `package/submission/STORE-LISTING.md`
    - **Category:** Accessibility
    - **Privacy policy URL:** the URL from Step 1
-   - **Screenshots:** upload the 3 images from Step 2
+   - **Screenshots:** upload the 3 images from `package/assets/`
    - **Rating:** Adults — not suitable
 6. Submit for review
 
@@ -57,14 +73,16 @@ Review typically takes 1–3 days.
 
 1. Go to [addons.mozilla.org/developers/addsubmit](https://addons.mozilla.org/developers/addsubmit)
 2. Sign in with your Mozilla account
-3. Upload the **zipped Firefox build** — run `npm run build`, then zip the `dist/firefox/` folder contents
-4. Fill in:
+3. Upload **`package/zips/drtv-in-english-firefox-0.1.0-dev.zip`**
+4. Upload **`package/zips/drtv-in-english-source.zip`** when prompted for source code
+5. Fill in:
    - **Name:** DRTV in English
-   - **Summary:** Use the short description from `store-submission/STORE-LISTING.md`
+   - **Summary:** Use the short description from `package/submission/STORE-LISTING.md`
    - **Description:** Use the long description
    - **Category:** Accessibility
-   - **Privacy policy:** AMO doesn't require a URL but having one is good practice. Link to the same page.
-5. Submit
+   - **Privacy policy:** Link to `https://saattrupdan.github.io/drtv_in_english/privacy-policy.html`
+   - **Reviewer notes:** Reference `package/submission/SOURCE_SUBMISSION.md` for build instructions
+6. Submit
 
 AMO usually auto-approves unsigned extensions within minutes (Developer Edition / Nightly only). For regular Firefox, AMO signs it automatically.
 
@@ -85,7 +103,7 @@ Once both stores approve:
 ## Checklist
 
 - [x] Privacy policy hosted at a stable URL
-- [ ] 3 screenshots taken at 1280×800
+- [x] 3 screenshots taken at 1280×800
 - [ ] Chrome Web Store submitted ($5 fee)
 - [ ] Firefox AMO submitted
 - [ ] Fresh-profile install tested end-to-end

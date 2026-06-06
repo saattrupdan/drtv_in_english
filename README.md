@@ -42,6 +42,17 @@ docs/
   extension-plan.md
 ```
 
+## Screenshots
+
+![Options page](gfx/drtv-in-english-options.png)
+*Options page — choose your LLM provider and enter your API key*
+
+![Subtitle menu](gfx/drtv-in-english-subs-menu.png)
+*Three-way Off / Dansk / English menu injected into DR's player*
+
+![English subtitles](gfx/drtv-in-english-subs.png)
+*English subtitles rendering over the video*
+
 ## Develop
 
 ```sh
