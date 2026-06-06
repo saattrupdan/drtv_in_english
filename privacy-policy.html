@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DRTV in English — Privacy Policy</title>
+</head>
+<body>
+<h1>DRTV in English — Privacy Policy</h1>
+
+<p><strong>Last updated:</strong> May 2026</p>
+
+<h2>No data collection</h2>
+<p>This extension collects <strong>zero personal data</strong>. Your API key is stored locally in your browser's <code>chrome.storage.local</code> and never leaves your machine except when sent directly to your chosen LLM provider's endpoint using your own API key.</p>
+
+<h2>Subtitle translation</h2>
+<p>The Danish subtitle text (<code>.vtt</code>) from DR's player is sent directly to the LLM endpoint you configure. We do not intercept, store, or log this data. Nothing phones home.</p>
+
+<h2>Network access</h2>
+<p>This extension only communicates with:</p>
+<ul>
+  <li><code>www.dr.dk</code> — to load the video player and its subtitle tracks.</li>
+  <li>Your chosen LLM provider's endpoint — to send subtitle text for translation and receive English translations.</li>
+</ul>
+
+<h2>Caching</h2>
+<p>Translated subtitles may be cached in your browser's IndexedDB for the current episode. This cache is stored locally and is not synced or transmitted anywhere.</p>
+
+<h2>Third-party services</h2>
+<p>Translation is performed by the LLM provider you select and configure. We are not responsible for their data practices. Please review their privacy policies separately.</p>
+</body>
+</html>
