@@ -10,7 +10,7 @@
 import { parseVtt } from "./vtt-parser.js";
 import type { Cue } from "../shared/types.js";
 
-async function pageFetch(url: string): Promise<string> {
+export async function pageFetch(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tabId = tabs[0]?.id;

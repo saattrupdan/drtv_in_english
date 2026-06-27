@@ -6,6 +6,7 @@ export type Provider =
   | "anthropic"
   | "openai"
   | "gemini"
+  | "alx"
   | "openai-compatible";
 
 export interface ProviderConfig {
@@ -41,6 +42,11 @@ export const PROVIDER_PRESETS: Record<Provider, ProviderPreset> = {
       "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     model: "gemini-3.5-flash",
   },
+  alx: {
+    label: "ALX",
+    endpoint: "https://inference.alexandra.dk/v1/chat/completions",
+    model: "qwen3.5-397b",
+  },
   "openai-compatible": {
     label: "OpenAI-compatible",
     endpoint: "",
@@ -49,10 +55,10 @@ export const PROVIDER_PRESETS: Record<Provider, ProviderPreset> = {
 };
 
 const DEFAULTS: ProviderConfig = {
-  provider: "anthropic",
-  endpoint: PROVIDER_PRESETS.anthropic.endpoint,
+  provider: "alx",
+  endpoint: PROVIDER_PRESETS.alx.endpoint,
   apiKey: "",
-  model: PROVIDER_PRESETS.anthropic.model,
+  model: PROVIDER_PRESETS.alx.model,
   batchSize: 5,
   contextWindow: 6,
   maxParallel: 20,

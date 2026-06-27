@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.1] - 2026-06-27
+
+### Added
+- "ALX" provider preset (`inference.alexandra.dk`, `qwen3.5-397b`), now
+  the default provider for new installs
+
+### Fixed
+- Chrome: extension hung on "Preparing English subtitles…". The service
+  worker crashed on startup because it touched `chrome.webRequest`
+  (unavailable on Chrome, which uses `declarativeNetRequest`) before
+  registering the connection listener. APIs are now feature-detected.
+- Chrome: page-world subtitle sniffer was blocked by DR's CSP. The
+  fetch/XHR patch now runs as a dedicated `world: "MAIN"` content script
+  instead of an inline-injected `<script>`.
+- Chrome: registered the `subtitle-fetcher` content script (was
+  Firefox-only) and route the master-manifest fetch through the page
+  context, so subtitle data is no longer blocked by missing CDN host
+  permissions.
+- Options: switching provider now resets the endpoint and model to that
+  provider's defaults instead of keeping the previous values.
+
 ## [1.0.0] - 2026-06-06
 
 ### Added

@@ -28,16 +28,11 @@ export interface TranslateLLMOptions {
 
 const SYSTEM_PROMPT =
   "You are an expert translator and editor of Danish TV subtitles. " +
-  "The source text was transcribed by an ASR model and may contain errors " +
-  "(missing words, mangled proper nouns, literal translations of idioms). " +
   "Your task is to: " +
-  "1) Correct any ASR errors using the surrounding context. " +
-  "2) Translate the corrected text into the requested target language. " +
-  "3) Preserve the original meaning, speaker intent, and subtitle length. " +
-  "4) Do not translate proper nouns (keep them as-is). " +
-  "5) Return ONLY the requested JSON object, with no extra prose.";
-
-const TARGET_LANGUAGE = "en";
+  "1) Translate the corrected text into the requested target language. " +
+  "2) Preserve the original meaning, speaker intent, and subtitle length. " +
+  "3) Do not translate proper nouns (keep them as-is). " +
+  "4) Return ONLY the requested JSON object, with no extra prose.";
 
 // Upper bound on a single provider call. Without this a silent
 // connection death leaves the user staring at the buffering overlay
@@ -77,8 +72,6 @@ export async function translateWithLLM(
 
   const batches = buildBatches(cues, cfg.batchSize, cfg.contextWindow);
   let emitted = 0;
-  let failedCount = 0;
-  let totalBatches = 0;
 
   // Load persisted maxParallel for this provider+model, or use configured value
   const persistedMaxParallel = await loadMaxParallel(cfg.provider, cfg.model);
@@ -262,6 +255,7 @@ async function callProvider(
       case "openai":
         return await callOpenAIResponses(cfg, userPrompt, boundedSignal);
       case "gemini":
+      case "alx":
       case "openai-compatible":
         return await callChatCompletions(cfg, userPrompt, boundedSignal);
       default:

@@ -121,3 +121,9 @@ data/*
 
 # Worktrees
 .worktrees
+
+# Extension build trees (throwaway). Load dist/ for dev; generate
+# submission zips with `npm run package`. The committed store artifacts
+# live in package/{assets,submission,zips} only.
+package/chrome/
+package/firefox/

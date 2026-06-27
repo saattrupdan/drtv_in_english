@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../../src/content/subtitle-fetcher.ts"],
-  "sourcesContent": ["// Fetch subtitle playlists/segments in the page context (no CORS issues).\n// Listens for messages from the background service worker and uses\n// the page's fetch to retrieve subtitle data.\n\n(() => {\n  const TAG = \"[drtv-en/fetcher]\";\n\n  // Listen for fetch requests from background\n  chrome.runtime.onMessage.addListener(\n    (msg: { type: \"fetch-url\"; url: string }, _sender, sendResponse) => {\n      if (msg.type !== \"fetch-url\") return;\n\n      // Fetch in page context (inherits dr.dk origin, no CORS issue)\n      fetch(msg.url)\n        .then((res) => {\n          if (!res.ok) {\n            throw new Error(`HTTP ${res.status}`);\n          }\n          return res.text();\n        })\n        .then(sendResponse)\n        .catch((err) => sendResponse({ error: err.message }));\n\n      return true; // Keep channel open for async response\n    },\n  );\n\n  console.log(TAG, \"subtitle fetcher ready\");\n})();\n"],
-  "mappings": ";;;AAIA,GAAC,MAAM;AACL,UAAM,MAAM;AAGZ,WAAO,QAAQ,UAAU;AAAA,MACvB,CAAC,KAAyC,SAAS,iBAAiB;AAClE,YAAI,IAAI,SAAS,YAAa;AAG9B,cAAM,IAAI,GAAG,EACV,KAAK,CAAC,QAAQ;AACb,cAAI,CAAC,IAAI,IAAI;AACX,kBAAM,IAAI,MAAM,QAAQ,IAAI,MAAM,EAAE;AAAA,UACtC;AACA,iBAAO,IAAI,KAAK;AAAA,QAClB,CAAC,EACA,KAAK,YAAY,EACjB,MAAM,CAAC,QAAQ,aAAa,EAAE,OAAO,IAAI,QAAQ,CAAC,CAAC;AAEtD,eAAO;AAAA,MACT;AAAA,IACF;AAEA,YAAQ,IAAI,KAAK,wBAAwB;AAAA,EAC3C,GAAG;",
-  "names": []
-}

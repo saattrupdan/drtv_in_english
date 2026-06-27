@@ -27,7 +27,14 @@ function $sel(id: string): HTMLSelectElement {
 
 function populateProviders(): void {
   const sel = $sel("provider");
-  for (const [key, preset] of Object.entries(PROVIDER_PRESETS)) {
+  // Alphabetical by label, but keep the generic "OpenAI-compatible"
+  // catch-all pinned to the end.
+  const entries = Object.entries(PROVIDER_PRESETS).sort(([a, pa], [b, pb]) => {
+    if (a === "openai-compatible") return 1;
+    if (b === "openai-compatible") return -1;
+    return pa.label.localeCompare(pb.label);
+  });
+  for (const [key, preset] of entries) {
     const opt = document.createElement("option");
     opt.value = key;
     opt.textContent = preset.label;
@@ -35,26 +42,18 @@ function populateProviders(): void {
   }
 }
 
-let currentProvider: Provider = "anthropic";
-
-function applyPresetIfDefault(next: Provider): void {
-  const prev = PROVIDER_PRESETS[currentProvider];
+// Switching provider resets the endpoint and model to that provider's
+// preset defaults. The API key is left alone — it's a secret the user
+// typed and presets carry no default for it.
+function applyPreset(next: Provider): void {
   const preset = PROVIDER_PRESETS[next];
-  const endpointEl = $("endpoint");
-  const modelEl = $("model");
-  if (!endpointEl.value || endpointEl.value === prev.endpoint) {
-    endpointEl.value = preset.endpoint;
-  }
-  if (!modelEl.value || modelEl.value === prev.model) {
-    modelEl.value = preset.model;
-  }
-  currentProvider = next;
+  $("endpoint").value = preset.endpoint;
+  $("model").value = preset.model;
 }
 
 async function init(): Promise<void> {
   populateProviders();
   const cfg = await loadProviderConfig();
-  currentProvider = cfg.provider;
 
   $sel("provider").value = cfg.provider;
   $("endpoint").value = cfg.endpoint || PROVIDER_PRESETS[cfg.provider].endpoint;
@@ -62,7 +61,7 @@ async function init(): Promise<void> {
   $("apiKey").value = cfg.apiKey;
 
   $sel("provider").addEventListener("change", () => {
-    applyPresetIfDefault($sel("provider").value as Provider);
+    applyPreset($sel("provider").value as Provider);
   });
 
   document.getElementById("save")!.addEventListener("click", async () => {

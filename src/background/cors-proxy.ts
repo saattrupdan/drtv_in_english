@@ -13,14 +13,22 @@ const CORS_HEADERS = [
 ];
 
 export async function enableCorsProxy(): Promise<void> {
-  const isFirefox = typeof browser !== "undefined";
-
-  if (isFirefox) {
-    // Firefox: use webRequest API (still works in MV3)
+  // Detect by actual API availability, NOT by sniffing a `browser`
+  // global: modern Chrome also exposes `browser` as an alias for
+  // `chrome`, so `typeof browser !== "undefined"` is true on Chrome too
+  // and would wrongly take the Firefox path — then crash on
+  // chrome.webRequest (undefined, since Chrome's manifest grants
+  // declarativeNetRequest instead).
+  if (chrome.declarativeNetRequest?.updateDynamicRules) {
+    // Chrome MV3: declarativeNetRequest (declared in manifest.chrome.json).
+    await enableCorsProxyChrome();
+  } else if (chrome.webRequest?.onHeadersReceived) {
+    // Firefox MV3: blocking webRequest (declared in manifest.firefox.json).
     enableCorsProxyFirefox();
   } else {
-    // Chrome MV3: use declarativeNetRequest
-    await enableCorsProxyChrome();
+    console.warn(
+      "[drtv-en/bg] no CORS proxy API available; provider calls may be blocked",
+    );
   }
 }
 

@@ -92,6 +92,19 @@ export function installVttSniffer(): void {
   // by the user; if Firefox hasn't been told to enable them, this
   // listener simply never fires and the page-world sniffer carries
   // the load.
+  //
+  // Chrome's manifest declares declarativeNetRequest instead of
+  // webRequest, so `chrome.webRequest` is undefined there. Touching it
+  // would throw at module load — before onConnect is registered in
+  // index.ts — leaving the content script hung on the buffering overlay.
+  // Skip gracefully; the page-world sniffer (early.ts) is the primary
+  // source on every browser.
+  if (!chrome.webRequest?.onCompleted) {
+    chrome.tabs?.onRemoved.addListener((tabId) => {
+      byTab.delete(tabId);
+    });
+    return;
+  }
   chrome.webRequest.onCompleted.addListener(
     (details) => {
       if (details.tabId < 0) return;

@@ -21,6 +21,7 @@ const entryPoints = {
   "background/index": resolve(here, "src/background/index.ts"),
   "content/index": resolve(here, "src/content/index.ts"),
   "content/early": resolve(here, "src/content/early.ts"),
+  "content/inject": resolve(here, "src/content/inject.ts"),
   "content/subtitle-fetcher": resolve(here, "src/content/subtitle-fetcher.ts"),
   "options/options": resolve(here, "src/options/options.ts"),
 };
@@ -82,6 +83,7 @@ async function buildTarget({ name, manifest }) {
         "background/index": entryPoints["background/index"],
         "content/index": entryPoints["content/index"],
         "content/early": entryPoints["content/early"],
+        "content/inject": entryPoints["content/inject"],
         "content/subtitle-fetcher": entryPoints["content/subtitle-fetcher"],
       },
       outdir: outDir,

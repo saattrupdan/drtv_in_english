@@ -12,7 +12,7 @@ import {
   setVttUrlForTab,
 } from "./vtt-sniffer.js";
 import { enableCorsProxy } from "./cors-proxy.js";
-import { fetchCuesFromPlaylist } from "./playlist.js";
+import { fetchCuesFromPlaylist, pageFetch } from "./playlist.js";
 import {
   parseSubtitleTracks,
   pickDanishTrack,
@@ -259,12 +259,13 @@ async function tryResolveFromMaster(
   signal: AbortSignal,
 ): Promise<string | undefined> {
   try {
-    const res = await fetch(masterUrl, { signal });
-    if (!res.ok) {
-      console.warn("[drtv-en/bg] master fetch", masterUrl, res.status);
-      return undefined;
-    }
-    const tracks = parseSubtitleTracks(await res.text());
+    // Fetch via the page context (not a raw SW fetch): DR's subtitle
+    // CDN isn't in host_permissions, so a service-worker fetch is
+    // blocked by CORS in Chrome. The content script shares the dr.dk
+    // origin and pulls it without trouble — same path as the playlist
+    // and segment fetches.
+    const text = await pageFetch(masterUrl);
+    const tracks = parseSubtitleTracks(text);
     const danish = pickDanishTrack(tracks);
     if (!danish || !danish.uri) {
       console.warn("[drtv-en/bg] no Danish track in master", tracks);
