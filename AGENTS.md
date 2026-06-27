@@ -60,16 +60,46 @@ docs/
 | Typecheck | `npm run typecheck` |
 | Package for stores | `npm run package` |
 
+## Build artifacts: `dist/` vs `package/`
+
+- **`dist/`** is throwaway build output (gitignored). `npm run build`
+  writes the unpacked extensions to `dist/chrome` and `dist/firefox`;
+  `npm run package` also drops store zips in `dist/`. **Load `dist/` for
+  dev** (Load unpacked / Load Temporary Add-on).
+- **`package/`** holds the *committed* store artifacts only:
+  `package/zips/` (the exact zips submitted to the stores),
+  `package/assets/` (screenshots), `package/submission/` (listing text,
+  permission justifications, source-submission notes).
+- **Do NOT commit `package/chrome/` or `package/firefox/`** — those
+  unpacked build trees are gitignored. They used to be committed and
+  drifted out of sync with `dist/`, causing "fixed it but it's still
+  broken" confusion (a stale tree was being loaded). Build to `dist/`;
+  copy zips into `package/zips/` for the release record.
+
 ## Updating the version
 
-Before releasing, bump the version in **two places**:
+Before releasing, bump the version in **three places** (keep them in
+sync):
 
-1. **`manifest.chrome.json`** — set `"version"` (e.g. `"1.0.0"`)
-2. **`manifest.firefox.json`** — set `"version"` (e.g. `"1.0.0"`)
+1. **`manifest.chrome.json`** — set `"version"` (e.g. `"1.0.1"`)
+2. **`manifest.firefox.json`** — set `"version"`
+3. **`package.json`** — set `"version"`. `build.mjs` reads the version
+   from **`package.json`** (not the manifests) when naming the zips, so
+   if you skip this the zips get the wrong/stale name.
 
-Then run `npm run package` to rebuild with the new version. The build
-script reads the version from the manifests and names the output zips
-accordingly (e.g. `drtv-in-english-chrome-1.0.0.zip`).
+Then run `npm run package` to rebuild and zip. Copy the resulting
+`dist/drtv-in-english-{chrome,firefox}-<version>.zip` into
+`package/zips/` (removing the previous version's zips).
+
+For a **Firefox AMO** update you also need a source zip (Mozilla
+requires it for bundled add-ons). Generate one from the repo source:
+
+```
+zip -r -q -X dist/drtv-in-english-source-<version>.zip \
+  src build.mjs package.json package-lock.json tsconfig.json \
+  manifest.chrome.json manifest.firefox.json icons \
+  README.md AGENTS.md CHANGELOG.md -x '*.DS_Store'
+```
 
 After packaging, update **`CHANGELOG.md`** with the new version number
 and release date. Commit all changes together before submitting to stores.
