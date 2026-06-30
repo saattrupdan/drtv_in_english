@@ -11,7 +11,7 @@ ______________________________________________________________________
 
 Developer:
 
-- Dan Saattrup Smart (<dan.smart@alexandra.dk>)
+- Dan Saattrup Smart (<saattrupdan@gmail.com>)
 
 ## How it works
 
