@@ -114,12 +114,11 @@ Firefox zip and re-signs it as an XPI on submission.
   works; we keep the spec but don't ship the renderer until a DR
   build masks the native track).
 
-## Store status
+## Install
 
-- **Firefox Add-ons (AMO)** — Submitted, awaiting approval
-- **Chrome Web Store** — Submitted, awaiting review
+- **Firefox** — [DRTV in English on Firefox Add-ons](https://addons.mozilla.org/en-GB/firefox/addon/drtv-in-english/)
+- **Chrome** — [DRTV in English on the Chrome Web Store](https://chromewebstore.google.com/detail/drtv-in-english/fahnnmmhloooagbgfmmdcmfbipiapedb)
 
-Once approved, installation links will be available on both stores.
 The build script produces store-ready zips via `npm run package`.
 
 ## Contribute
