@@ -11,7 +11,6 @@ import {
   installVttSniffer,
   setVttUrlForTab,
 } from "./vtt-sniffer.js";
-import { enableCorsProxy } from "./cors-proxy.js";
 import { fetchCuesFromPlaylist, pageFetch } from "./playlist.js";
 import {
   parseSubtitleTracks,
@@ -22,7 +21,6 @@ import { loadProviderConfig } from "../shared/storage.js";
 import { getCachedCues, putCachedCues, sha256Hex } from "./cache.js";
 
 installVttSniffer();
-enableCorsProxy();
 
 chrome.action?.onClicked.addListener(() => {
   void chrome.runtime.openOptionsPage();

@@ -93,10 +93,10 @@ export function installVttSniffer(): void {
   // listener simply never fires and the page-world sniffer carries
   // the load.
   //
-  // Chrome's manifest declares declarativeNetRequest instead of
-  // webRequest, so `chrome.webRequest` is undefined there. Touching it
-  // would throw at module load — before onConnect is registered in
-  // index.ts — leaving the content script hung on the buffering overlay.
+  // Chrome's manifest doesn't grant `webRequest`, so `chrome.webRequest`
+  // is undefined there. Touching it would throw at module load — before
+  // onConnect is registered in index.ts — leaving the content script hung
+  // on the buffering overlay.
   // Skip gracefully; the page-world sniffer (early.ts) is the primary
   // source on every browser.
   if (!chrome.webRequest?.onCompleted) {

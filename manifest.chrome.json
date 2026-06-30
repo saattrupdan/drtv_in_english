@@ -3,11 +3,15 @@
   "name": "DRTV in English",
   "version": "1.0.2",
   "description": "English subtitles for DRTV — translated client-side with your own LLM API key.",
-  "permissions": ["storage", "webNavigation", "declarativeNetRequest"],
+  "permissions": ["storage", "webNavigation"],
   "host_permissions": [
-    "https://www.dr.dk/*"
+    "https://www.dr.dk/*",
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://inference.alexandra.dk/*"
   ],
-"optional_host_permissions": ["https://*/"],
+  "optional_host_permissions": ["*://*/*"],
   "background": {
     "service_worker": "background/index.js",
     "type": "module"

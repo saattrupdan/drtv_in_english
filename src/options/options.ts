@@ -43,12 +43,51 @@ function populateProviders(): void {
 }
 
 // Switching provider resets the endpoint and model to that provider's
-// preset defaults. The API key is left alone — it's a secret the user
-// typed and presets carry no default for it.
+// preset defaults, and clears the API key — a key is provider-specific, so
+// carrying the previous provider's key over is never what the user wants.
+// Only fires on an explicit provider change, not on initial load, so the
+// saved key is preserved when the page opens.
 function applyPreset(next: Provider): void {
   const preset = PROVIDER_PRESETS[next];
   $("endpoint").value = preset.endpoint;
   $("model").value = preset.model;
+  $("apiKey").value = "";
+}
+
+// Request host access for the configured endpoint's host. Resolves true if
+// access is already held or the user grants it. Built-in providers are
+// already in `host_permissions`, so no prompt appears for them. Once
+// granted, the background fetch to that host is CORS-exempt — no proxy
+// needed. Must run inside a user gesture (the save click).
+async function ensureEndpointPermission(endpoint: string): Promise<boolean> {
+  let origins: string[];
+  try {
+    const url = new URL(endpoint);
+    // Match patterns can't carry a port, so scope to the host — a portless
+    // host pattern matches every port on it (e.g. local `http://localhost`
+    // endpoints on :8080/:11434). Keep the scheme so `http://` endpoints
+    // resolve to an http pattern.
+    origins = [`${url.protocol}//${url.hostname}/*`];
+  } catch {
+    return true; // not a valid URL; the save-time field validation handles it
+  }
+  try {
+    return await chrome.permissions.request({ origins });
+  } catch {
+    return false;
+  }
+}
+
+// Custom ("OpenAI-compatible") servers — local models in particular — often
+// don't check the key, but the field stays required. Spell out that any
+// value works there so the user isn't stuck wondering what to type.
+function setApiKeyLabel(provider: Provider): void {
+  const label = document.querySelector('label[for="apiKey"]');
+  if (!label) return;
+  label.textContent =
+    provider === "openai-compatible"
+      ? "API key (enter any value if the server doesn't require one)"
+      : "API key";
 }
 
 async function init(): Promise<void> {
@@ -59,31 +98,52 @@ async function init(): Promise<void> {
   $("endpoint").value = cfg.endpoint || PROVIDER_PRESETS[cfg.provider].endpoint;
   $("model").value = cfg.model || PROVIDER_PRESETS[cfg.provider].model;
   $("apiKey").value = cfg.apiKey;
+  setApiKeyLabel(cfg.provider);
 
   $sel("provider").addEventListener("change", () => {
-    applyPreset($sel("provider").value as Provider);
+    const provider = $sel("provider").value as Provider;
+    applyPreset(provider);
+    setApiKeyLabel(provider);
   });
 
   document.getElementById("save")!.addEventListener("click", async () => {
     const status = document.getElementById("status")!;
     status.classList.remove("error");
     const provider = $sel("provider").value as Provider;
-    const prev = await loadProviderConfig();
-    const next: ProviderConfig = {
-      provider,
-      endpoint: $("endpoint").value.trim(),
-      model: $("model").value.trim(),
-      apiKey: $("apiKey").value,
-      batchSize: prev.batchSize,
-      contextWindow: prev.contextWindow,
-      maxParallel: prev.maxParallel,
-    };
-    if (!next.endpoint || !next.model || !next.apiKey) {
+    const endpoint = $("endpoint").value.trim();
+    const model = $("model").value.trim();
+    const apiKey = $("apiKey").value;
+    if (!endpoint || !model || !apiKey) {
       status.classList.add("error");
       status.textContent =
         "Endpoint, model, and API key are all required.";
       return;
     }
+
+    // Make sure we're allowed to reach the endpoint host before saving.
+    // Built-in providers ship in `host_permissions`, so this resolves
+    // instantly with no prompt; a custom endpoint's host isn't pre-granted,
+    // so the user sees a permission prompt scoped to just that origin —
+    // otherwise the translation fetch would fail on CORS with no hint why.
+    // Kept before any other `await` so the click's user gesture is still
+    // live when `chrome.permissions.request` runs.
+    if (!(await ensureEndpointPermission(endpoint))) {
+      status.classList.add("error");
+      status.textContent =
+        "Can't translate without permission to reach that endpoint. Save again to retry.";
+      return;
+    }
+
+    const prev = await loadProviderConfig();
+    const next: ProviderConfig = {
+      provider,
+      endpoint,
+      model,
+      apiKey,
+      batchSize: prev.batchSize,
+      contextWindow: prev.contextWindow,
+      maxParallel: prev.maxParallel,
+    };
     await saveProviderConfig(next);
     status.textContent = "Saved.";
     setTimeout(() => (status.textContent = ""), 2000);

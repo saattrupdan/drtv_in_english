@@ -2,6 +2,42 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.3] - 2026-06-30
+
+### Fixed
+- Translation was silently blocked by CORS for any provider that doesn't
+  send its own permissive CORS headers — including the default **ALX**
+  provider and **Anthropic**. The CORS proxy that was meant to handle this
+  only takes effect on hosts the extension has host permission for, but the
+  broad `optional_host_permissions` it relied on was never actually
+  requested, so on a real install it was a no-op. (OpenAI and Gemini kept
+  working only because they send their own CORS headers.) This regressed the
+  default provider in 1.0.2, which removed ALX's baked-in host permission.
+- Options: switching provider now clears the API key field. A key is
+  provider-specific, so the previous provider's key no longer carries over.
+- Options: for the custom "OpenAI-compatible" provider, the API key label
+  now notes that any value works if the server doesn't require one — the
+  field stays required, so keyless local servers no longer leave the user
+  guessing what to enter.
+
+### Changed
+- The built-in provider endpoints (Anthropic, OpenAI, Gemini, ALX) are now
+  declared in `host_permissions`, so they work out of the box. A host
+  permission alone makes the background fetch CORS-exempt.
+- Custom ("OpenAI-compatible") endpoints now request host access for the
+  host entered, at the moment the user saves — a scoped prompt instead of a
+  silent CORS failure. Both `http` and `https` hosts are supported, so
+  locally hosted models (e.g. `http://localhost:8080`) work too.
+
+### Removed
+- The CORS proxy and the permissions that only existed to power it:
+  `declarativeNetRequest` (Chrome) and `webRequestBlocking` (Firefox). Header
+  rewriting is no longer needed now that endpoint access comes from host
+  permissions. Reduces the extension's footprint and review surface.
+- `optional_host_permissions` is no longer relied on implicitly: the broad
+  pattern is only ever requested one host at a time, at save, for a custom
+  endpoint.
+
 ## [1.0.2] - 2026-06-30
 
 ### Changed
