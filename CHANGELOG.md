@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.2] - 2026-06-30
+
+### Changed
+- Removed the `https://inference.alexandra.dk/*` host permission from both
+  manifests. The Alexandra inference endpoint is reached through the
+  user-granted `optional_host_permissions` like any other provider, so the
+  baked-in host permission was unnecessary.
+
 ## [1.0.1] - 2026-06-27
 
 ### Added

@@ -17,6 +17,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const watch = process.argv.includes("--watch");
 const pkg = process.argv.includes("--package");
 
+// package.json is the single source of truth for the version; it gets
+// injected into each manifest at build time (see writeManifest).
+const { version } = JSON.parse(
+  await readFile(resolve(here, "package.json"), "utf8"),
+);
+
 const entryPoints = {
   "background/index": resolve(here, "src/background/index.ts"),
   "content/index": resolve(here, "src/content/index.ts"),
@@ -58,8 +64,14 @@ async function renderIcons(iconsOutDir) {
 }
 
 async function writeManifest(outDir, manifestName) {
-  const raw = await readFile(resolve(here, manifestName), "utf8");
-  await writeFile(resolve(outDir, "manifest.json"), raw);
+  const manifest = JSON.parse(await readFile(resolve(here, manifestName), "utf8"));
+  // package.json wins: a bump there propagates to both manifests, so the
+  // manifests' own version field is just a placeholder.
+  manifest.version = version;
+  await writeFile(
+    resolve(outDir, "manifest.json"),
+    JSON.stringify(manifest, null, 2) + "\n",
+  );
 }
 
 async function buildTarget({ name, manifest }) {
@@ -120,9 +132,6 @@ if (watch) {
 }
 
 if (pkg) {
-  const { version } = JSON.parse(
-    await readFile(resolve(here, "package.json"), "utf8"),
-  );
   for (const t of targets) {
     await packageTarget(t.name, version);
   }
