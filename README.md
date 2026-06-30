@@ -6,8 +6,8 @@ Watch DR TV with English subtitles via a Manifest V3 browser extension
 Bring your own LLM API key — nothing runs on a server.
 
 ______________________________________________________________________
-[![License](https://img.shields.io/github/license/saattrupdan/danglish)](https://github.com/saattrupdan/danglish/blob/main/LICENSE)
-[![LastCommit](https://img.shields.io/github/last-commit/saattrupdan/danglish)](https://github.com/saattrupdan/danglish/commits/main)
+[![License](https://img.shields.io/github/license/saattrupdan/drtv_in_english)](https://github.com/saattrupdan/drtv_in_english/blob/main/LICENSE)
+[![LastCommit](https://img.shields.io/github/last-commit/saattrupdan/dr_in_english)](https://github.com/saattrupdan/drtv_in_english/commits/main)
 
 Developer:
 
