@@ -39,6 +39,24 @@ const targets = [
 
 const ICON_SIZES = [16, 32, 48, 128];
 
+// Raw source only — no dist/ output, node_modules, or store artifacts — so
+// Mozilla's "no transpiled/concatenated/minified/machine-generated source"
+// rule holds. SOURCE_SUBMISSION.md carries the build instructions.
+const SOURCE_ENTRIES = [
+  "src",
+  "build.mjs",
+  "package.json",
+  "package-lock.json",
+  "tsconfig.json",
+  "manifest.chrome.json",
+  "manifest.firefox.json",
+  "icons",
+  "README.md",
+  "AGENTS.md",
+  "CHANGELOG.md",
+  "package/submission/SOURCE_SUBMISSION.md",
+];
+
 async function copyStatic(outDir) {
   await mkdir(resolve(outDir, "options"), { recursive: true });
   await cp(
@@ -135,6 +153,9 @@ if (pkg) {
   for (const t of targets) {
     await packageTarget(t.name, version);
   }
+  // Firefox AMO requires the source for bundled add-ons. Always produced
+  // alongside the store zips so it can never drift to a stale version.
+  await packageSource(version);
 }
 
 async function packageTarget(name, version) {
@@ -145,17 +166,24 @@ async function packageTarget(name, version) {
   // `zip -r ... .` from inside outDir so paths inside the archive are
   // relative to the extension root (manifest.json at top level — what
   // both stores expect).
-  await runZip(outDir, zipPath);
+  await runZip(outDir, zipPath, ["."], ["*.map"]);
   console.log(`[build] packaged ${name} -> dist/${zipName}`);
 }
 
-function runZip(cwd, zipPath) {
+async function packageSource(version) {
+  const zipName = `drtv-in-english-source-${version}.zip`;
+  const zipPath = resolve(here, "dist", zipName);
+  await mkdir(resolve(here, "dist"), { recursive: true });
+  await rm(zipPath, { force: true });
+  // Zipped from the repo root so archive paths mirror the project layout.
+  await runZip(here, zipPath, SOURCE_ENTRIES, ["*.DS_Store"]);
+  console.log(`[build] packaged source -> dist/${zipName}`);
+}
+
+function runZip(cwd, zipPath, entries, excludes) {
   return new Promise((resolveP, reject) => {
-    const child = spawn(
-      "zip",
-      ["-r", "-q", "-X", zipPath, ".", "-x", "*.map"],
-      { cwd, stdio: "inherit" },
-    );
+    const args = ["-r", "-q", "-X", zipPath, ...entries, "-x", ...excludes];
+    const child = spawn("zip", args, { cwd, stdio: "inherit" });
     child.on("error", reject);
     child.on("exit", (code) =>
       code === 0 ? resolveP() : reject(new Error(`zip exited ${code}`)),

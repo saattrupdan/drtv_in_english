@@ -78,28 +78,23 @@ docs/
 
 ## Updating the version
 
-Before releasing, bump the version in **three places** (keep them in
-sync):
+Bump the version in **`package.json` only**. It is the single source of
+truth: `build.mjs` injects it into each manifest at build time (so the
+`"version"` field in `manifest.chrome.json` / `manifest.firefox.json` is
+just a placeholder the build overwrites) and uses it to name the zips.
 
-1. **`manifest.chrome.json`** — set `"version"` (e.g. `"1.0.1"`)
-2. **`manifest.firefox.json`** — set `"version"`
-3. **`package.json`** — set `"version"`. `build.mjs` reads the version
-   from **`package.json`** (not the manifests) when naming the zips, so
-   if you skip this the zips get the wrong/stale name.
+Then run `npm run package` to rebuild and zip. This produces all three
+submission zips in `dist/`:
 
-Then run `npm run package` to rebuild and zip. Copy the resulting
-`dist/drtv-in-english-{chrome,firefox}-<version>.zip` into
-`package/zips/` (removing the previous version's zips).
+- `drtv-in-english-chrome-<version>.zip`
+- `drtv-in-english-firefox-<version>.zip`
+- `drtv-in-english-source-<version>.zip` — raw source for Firefox AMO
+  review (Mozilla requires it for bundled add-ons). Generated from the
+  `SOURCE_ENTRIES` list in `build.mjs`; contains only raw source, never
+  `dist/` output, so it satisfies AMO's no-machine-generated-source rule.
 
-For a **Firefox AMO** update you also need a source zip (Mozilla
-requires it for bundled add-ons). Generate one from the repo source:
-
-```
-zip -r -q -X dist/drtv-in-english-source-<version>.zip \
-  src build.mjs package.json package-lock.json tsconfig.json \
-  manifest.chrome.json manifest.firefox.json icons \
-  README.md AGENTS.md CHANGELOG.md -x '*.DS_Store'
-```
+Copy all three into `package/zips/` (removing the previous version's
+zips).
 
 After packaging, update **`CHANGELOG.md`** with the new version number
 and release date. Commit all changes together before submitting to stores.

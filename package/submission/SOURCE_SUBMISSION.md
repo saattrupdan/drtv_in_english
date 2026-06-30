@@ -43,7 +43,7 @@ npm install
 ```
 
 This installs:
-- `esbuild` v0.24.x — JavaScript bundler/minifier
+- `esbuild` v0.24.x — JavaScript bundler (bundles TypeScript → JavaScript; no minification)
 - `sharp` v0.34.x — Image processing for icon generation
 - `typescript` v5.5.x — Type checking
 - `@types/chrome` — Chrome extension type definitions
@@ -59,7 +59,7 @@ This produces:
 - `dist/firefox/` — Firefox Add-ons version
 
 Output includes:
-- Bundled and minified JavaScript files (`.js`)
+- Bundled (non-minified) JavaScript files (`.js`)
 - Source maps (`.js.map`) for debugging/review
 - Static assets (HTML, icons, manifest)
 
@@ -72,6 +72,7 @@ npm run package
 This creates:
 - `dist/drtv-in-english-chrome-<version>.zip`
 - `dist/drtv-in-english-firefox-<version>.zip`
+- `dist/drtv-in-english-source-<version>.zip` (raw source for AMO review)
 
 ### Step 4: (Optional) Watch Mode for Development
 
@@ -93,10 +94,11 @@ Runs TypeScript type checking without emitting files.
 
 The build script is `build.mjs` in the root directory. It:
 
-1. **Bundles TypeScript** → JavaScript using esbuild
+1. **Bundles TypeScript** → JavaScript using esbuild (no minification)
    - `src/background/index.ts` → `background/index.js`
    - `src/content/index.ts` → `content/index.js`
    - `src/content/early.ts` → `content/early.js`
+   - `src/content/inject.ts` → `content/inject.js`
    - `src/content/subtitle-fetcher.ts` → `content/subtitle-fetcher.js`
    - `src/options/options.ts` → `options/options.js`
 
