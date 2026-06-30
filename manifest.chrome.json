@@ -5,9 +5,8 @@
   "description": "English subtitles for DRTV — translated client-side with your own LLM API key.",
   "permissions": ["storage", "webNavigation", "declarativeNetRequest"],
   "host_permissions": [
-  "https://www.dr.dk/*",
-  "https://inference.alexandra.dk/*"
-],
+    "https://www.dr.dk/*"
+  ],
 "optional_host_permissions": ["https://*/"],
   "background": {
     "service_worker": "background/index.js",

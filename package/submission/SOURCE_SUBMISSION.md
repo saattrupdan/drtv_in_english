@@ -142,5 +142,5 @@ src/
 For questions about building or reviewing this extension:
 
 - Developer: Dan Saattrup Smart
-- Email: dan.smart@alexandra.dk
+- Email: saattrupdan@gmail.com
 - GitHub: https://github.com/saattrupdan/drtv_in_english
